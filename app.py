@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import datetime
 
 from flask import Flask, render_template, request
@@ -45,9 +46,10 @@ UNIVERSE = load_universe()
 print("UNIVERSE size =", len(UNIVERSE))
 print("Sample =", UNIVERSE[:10])
 
-# ====== 精選股票結果緩存（每日只掃一次，避免太慢） ====== #
+# ====== 精選股票結果緩存（內存 + JSON，一日只算一次） ====== #
 DAILY_PICKS_CACHE: list[dict] = []
 DAILY_PICKS_DATE: str | None = None
+CACHE_FILE = os.path.join(os.path.dirname(__file__), "daily_picks.json")
 
 # =========================================================
 # 技術指標函數（共用：單股分析 + 每日精選）
@@ -341,23 +343,39 @@ def get_pick_meta_info(prompt: str):
         return "", "", err
 
 
-def get_daily_picks(num_picks: int = 3):
+# -------------- JSON 緩存：讀／寫 daily_picks.json --------------
+
+
+def _load_picks_from_file(today: str):
+    if not os.path.exists(CACHE_FILE):
+        return None
+    try:
+        with open(CACHE_FILE, "r") as f:
+            data = json.load(f)
+        if data.get("date") == today and isinstance(data.get("picks"), list):
+            return data["picks"]
+        return None
+    except Exception:
+        return None
+
+
+def _save_picks_to_file(today: str, picks: list[dict]):
+    try:
+        data = {"date": today, "picks": picks}
+        with open(CACHE_FILE, "w") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("Save daily_picks.json error:", e)
+
+
+# -------------- 真正計算每日精選（可能比較慢） --------------
+
+
+def compute_daily_picks(num_picks: int = 3):
     """
-    每日精選股票：
-    - 從 UNIVERSE 入面掃描
-    - 根據 RSI + MA60 做簡單排序
-    - 再交畀 AI 做文字分析 + 排名理由 + 合理價建議
-    - 結果 cache 一日
+    真正去掃 UNIVERSE，計分 + 叫 AI，回傳 list[dict]
+    （這個函數可能要幾十秒，所以只會偶爾被叫）
     """
-    global DAILY_PICKS_CACHE, DAILY_PICKS_DATE
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    if DAILY_PICKS_DATE == today and DAILY_PICKS_CACHE:
-        return DAILY_PICKS_CACHE
-
-    DAILY_PICKS_CACHE = []
-    DAILY_PICKS_DATE = today
-
     if not UNIVERSE:
         return []
 
@@ -399,7 +417,41 @@ def get_daily_picks(num_picks: int = 3):
         }
         picks.append(pick)
 
+    return picks
+
+
+# -------------- 對外用：快速取得每日精選（優先用 cache） --------------
+
+
+def get_daily_picks(num_picks: int = 3):
+    """
+    每日精選股票：
+    1. 先看內存 cache（同一個進程內最快）
+    2. 再看 daily_picks.json（Render 重新啟動之後都仲有）
+    3. 以上都冇，就真正計算一次，之後寫返去 JSON + 內存
+    """
+    global DAILY_PICKS_CACHE, DAILY_PICKS_DATE
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # 1) 內存 cache
+    if DAILY_PICKS_DATE == today and DAILY_PICKS_CACHE:
+        return DAILY_PICKS_CACHE
+
+    # 2) JSON 文件 cache
+    file_picks = _load_picks_from_file(today)
+    if file_picks:
+        DAILY_PICKS_DATE = today
+        DAILY_PICKS_CACHE = file_picks
+        print("Loaded daily picks from JSON cache.")
+        return file_picks
+
+    # 3) 真正計算（可能較慢），但只會一日一次
+    print("Computing daily picks from scratch...")
+    picks = compute_daily_picks(num_picks=num_picks)
+    DAILY_PICKS_DATE = today
     DAILY_PICKS_CACHE = picks
+    _save_picks_to_file(today, picks)
     return picks
 
 
@@ -418,7 +470,7 @@ def index():
     chart_prices = []
     error = None
 
-    # 每日精選（內部已經 cache，一日只計一次）
+    # 每日精選（內部已經 cache，一日只計一次；優先用 JSON）
     daily_picks = get_daily_picks()
 
     if request.method == "POST":

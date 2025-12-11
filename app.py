@@ -1,8 +1,8 @@
 import os
-import json
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 import yfinance as yf
 import pandas as pd
 from openai import OpenAI
@@ -46,10 +46,31 @@ UNIVERSE = load_universe()
 print("UNIVERSE size =", len(UNIVERSE))
 print("Sample =", UNIVERSE[:10])
 
-# ====== 精選股票結果緩存（內存 + JSON，一日只算一次） ====== #
+# ====== 精選股票結果緩存（每日只掃一次，避免太慢） ====== #
 DAILY_PICKS_CACHE: list[dict] = []
-DAILY_PICKS_DATE: str | None = None
-CACHE_FILE = os.path.join(os.path.dirname(__file__), "daily_picks.json")
+DAILY_PICKS_DATE: str | None = None  # 我哋會用「交易日 key」去記錄
+
+
+def _current_pick_key() -> str:
+    """
+    每日精選的「日期鍵」：
+    - 以紐約時間 (America/New_York) 為準
+    - 每日 09:45 之前仍算前一日
+    - 09:45 之後改為今日
+    """
+    now_east = datetime.now(ZoneInfo("America/New_York"))
+
+    # 每天 09:45 視為新一天的分界
+    threshold = now_east.replace(hour=9, minute=45, second=0, microsecond=0)
+
+    if now_east < threshold:
+        # 未到 9:45，仍算前一日
+        day = (now_east - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        day = now_east.strftime("%Y-%m-%d")
+
+    return day
+
 
 # =========================================================
 # 技術指標函數（共用：單股分析 + 每日精選）
@@ -343,39 +364,21 @@ def get_pick_meta_info(prompt: str):
         return "", "", err
 
 
-# -------------- JSON 緩存：讀／寫 daily_picks.json --------------
-
-
-def _load_picks_from_file(today: str):
-    if not os.path.exists(CACHE_FILE):
-        return None
-    try:
-        with open(CACHE_FILE, "r") as f:
-            data = json.load(f)
-        if data.get("date") == today and isinstance(data.get("picks"), list):
-            return data["picks"]
-        return None
-    except Exception:
-        return None
-
-
-def _save_picks_to_file(today: str, picks: list[dict]):
-    try:
-        data = {"date": today, "picks": picks}
-        with open(CACHE_FILE, "w") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print("Save daily_picks.json error:", e)
-
-
-# -------------- 真正計算每日精選（可能比較慢） --------------
-
-
-def compute_daily_picks(num_picks: int = 3):
+def get_daily_picks(num_picks: int = 3):
     """
-    真正去掃 UNIVERSE，計分 + 叫 AI，回傳 list[dict]
-    （這個函數可能要幾十秒，所以只會偶爾被叫）
+    每日精選股票：
+    - 使用 _current_pick_key()，以紐約時間 09:45 分界
+    - 同一天內多次打開網頁只用 cache
     """
+    global DAILY_PICKS_CACHE, DAILY_PICKS_DATE
+
+    today_key = _current_pick_key()
+    if DAILY_PICKS_DATE == today_key and DAILY_PICKS_CACHE:
+        return DAILY_PICKS_CACHE
+
+    DAILY_PICKS_CACHE = []
+    DAILY_PICKS_DATE = today_key
+
     if not UNIVERSE:
         return []
 
@@ -417,48 +420,31 @@ def compute_daily_picks(num_picks: int = 3):
         }
         picks.append(pick)
 
+    DAILY_PICKS_CACHE = picks
     return picks
 
 
-# -------------- 對外用：快速取得每日精選（優先用 cache） --------------
+# =========================================================
+# Flask routes
+# =========================================================
 
 
-def get_daily_picks(num_picks: int = 3):
+@app.route("/refresh_picks", methods=["POST"])
+def refresh_picks():
     """
-    每日精選股票：
-    1. 先看內存 cache（同一個進程內最快）
-    2. 再看 daily_picks.json（Render 重新啟動之後都仲有）
-    3. 以上都冇，就真正計算一次，之後寫返去 JSON + 內存
+    手動刷新「今日 Smart AI 精選」：
+    - 清空 cache
+    - 立即重算一次
     """
     global DAILY_PICKS_CACHE, DAILY_PICKS_DATE
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    DAILY_PICKS_CACHE = []
+    DAILY_PICKS_DATE = None
 
-    # 1) 內存 cache
-    if DAILY_PICKS_DATE == today and DAILY_PICKS_CACHE:
-        return DAILY_PICKS_CACHE
+    # 順便跑一次，避免回到首頁還是空白
+    get_daily_picks()
 
-    # 2) JSON 文件 cache
-    file_picks = _load_picks_from_file(today)
-    if file_picks:
-        DAILY_PICKS_DATE = today
-        DAILY_PICKS_CACHE = file_picks
-        print("Loaded daily picks from JSON cache.")
-        return file_picks
-
-    # 3) 真正計算（可能較慢），但只會一日一次
-    print("Computing daily picks from scratch...")
-    picks = compute_daily_picks(num_picks=num_picks)
-    DAILY_PICKS_DATE = today
-    DAILY_PICKS_CACHE = picks
-    _save_picks_to_file(today, picks)
-    return picks
-
-
-# =========================================================
-# Flask 主頁
-# =========================================================
-
+    return redirect(url_for("index"))
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -470,7 +456,7 @@ def index():
     chart_prices = []
     error = None
 
-    # 每日精選（內部已經 cache，一日只計一次；優先用 JSON）
+    # 每日精選（內部已經 cache，一日只計一次 / 或你手動 refresh）
     daily_picks = get_daily_picks()
 
     if request.method == "POST":

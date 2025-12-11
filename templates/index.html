@@ -71,6 +71,18 @@
             color: #9ca3af;
         }
 
+        .refresh-picks-btn {
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border-width: 1px;
+            opacity: 0.85;
+        }
+
+        .refresh-picks-btn:hover {
+            opacity: 1;
+        }
+
         .btn-primary {
             background: linear-gradient(135deg, #4f46e5, #6366f1);
             border-color: #4f46e5;
@@ -311,7 +323,15 @@
                         從 S&P 500 範圍中，根據 RSI + 60 日均線等技術指標，自動揀選出最多 3 隻偏超賣或可能低估的觀察股票（程式化篩選，非人工推薦）。
                     </div>
                 </div>
+
+                <!-- 手動刷新每日精選 -->
+                <form method="POST" action="{{ url_for('refresh_picks') }}">
+                    <button type="submit" class="btn btn-sm btn-outline-light refresh-picks-btn">
+                        🔄 重新精選
+                    </button>
+                </form>
             </div>
+            
             <div class="card-body">
                 <div class="row g-3">
                     {% for pick in daily_picks %}

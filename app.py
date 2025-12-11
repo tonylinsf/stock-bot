@@ -4,6 +4,8 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 import os
 from datetime import datetime
 
+import json
+
 from flask import Flask, render_template, request
 import yfinance as yf
 import pandas as pd
@@ -12,6 +14,10 @@ from dotenv import load_dotenv
 
 # 載入 .env（如有）
 load_dotenv()
+
+IS_RENDER = os.getenv("RENDER") is not None   # Render 會自動有 RENDER=1/true
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DAILY_PICKS_JSON = os.path.join(BASE_DIR, "daily_picks.json")
 
 client = OpenAI()  # 用環境變數 OPENAI_API_KEY
 
@@ -435,43 +441,63 @@ def get_daily_picks(num_picks: int = 3):
     - 再交畀 AI 做文字分析 + 排名理由 + 合理價建議
     - 結果 cache 一日
     """
+
     global DAILY_PICKS_CACHE, DAILY_PICKS_DATE
 
     today = datetime.now().strftime("%Y-%m-%d")
+
+    # ===== 1) Render 用檔案 cache（避免每次重算）=====
+    if IS_RENDER and os.path.exists(DAILY_PICKS_JSON):
+        try:
+            with open(DAILY_PICKS_JSON, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            cached_date = data.get("_date")
+            if cached_date == today:
+                cached_picks = data.get("picks", [])
+                if cached_picks:
+                    # 同步返 memory cache（可選）
+                    DAILY_PICKS_CACHE = cached_picks
+                    DAILY_PICKS_DATE = today
+                    return cached_picks
+        except Exception as e:
+            print("Daily picks file cache error:", e)
+
+    # ===== 2) Memory cache（一日內第二次進入唔重算）=====
     if DAILY_PICKS_DATE == today and DAILY_PICKS_CACHE:
         return DAILY_PICKS_CACHE
 
-    DAILY_PICKS_CACHE = []
-    DAILY_PICKS_DATE = today
+    # ===== 3) 開始計算（一定要先建立 picks）=====
+    picks = []
 
     if not UNIVERSE:
+        DAILY_PICKS_CACHE = []
+        DAILY_PICKS_DATE = today
         return []
 
-    candidates: list[dict] = []
+    candidates = []
     for ticker in UNIVERSE:
         stats = _fetch_universe_stock_stats(ticker)
         if not stats:
             continue
-
-        score = _score_candidate(stats)
-        stats["score"] = score
         candidates.append(stats)
 
     if not candidates:
+        DAILY_PICKS_CACHE = []
+        DAILY_PICKS_DATE = today
         return []
 
-    # 用分數由高到低排，揀前 num_picks 隻
-    candidates.sort(key=lambda x: x["score"], reverse=True)
+    # 你原本排序邏輯照用（示例：RSI 越低越好、距離 MA60 越近越好）
+    candidates.sort(key=lambda x: (x.get("rsi", 999), abs(x.get("dist_pct", 999))))
+
     top = candidates[:num_picks]
     total = len(top)
 
-    picks: list[dict] = []
     for idx, stats in enumerate(top, start=1):
-        # 1) 長一點的技術分析
+        # 1) 長一啲分析
         analysis_prompt = build_pick_analysis_prompt(stats, idx, total)
         reason = get_ai_advice(analysis_prompt)
 
-        # 2) 排名 + 安全買入區 + 合理價
+        # 2) 排名 + 安全買入 + 合理價（三行）
         meta_prompt = build_pick_meta_prompt(stats, idx, total)
         rank_text, safe_text, fair_text = get_pick_meta_info(meta_prompt)
 
@@ -485,7 +511,23 @@ def get_daily_picks(num_picks: int = 3):
         }
         picks.append(pick)
 
+    # ===== 4) 設定 memory cache =====
     DAILY_PICKS_CACHE = picks
+    DAILY_PICKS_DATE = today
+
+    # ===== 5) Render：寫入檔案 cache =====
+    if IS_RENDER:
+        try:
+            with open(DAILY_PICKS_JSON, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"_date": today, "picks": picks},
+                    f,
+                    ensure_ascii=False,
+                    indent=2
+                )
+        except Exception as e:
+            print("Failed to write daily picks cache:", e)
+
     return picks
 
 

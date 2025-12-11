@@ -43,6 +43,17 @@
             font-size: 20px;
         }
 
+        .refresh-picks-btn {
+            font-size: 0.7rem;
+            line-height: 1.05;
+            padding: 0.45rem 0.6rem;
+            border-radius: 999px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
         .main-container {
             max-width: 1080px;
         }
@@ -69,18 +80,6 @@
         .card-subtitle {
             font-size: 0.85rem;
             color: #9ca3af;
-        }
-
-        .refresh-picks-btn {
-            font-size: 0.8rem;
-            padding: 4px 10px;
-            border-radius: 999px;
-            border-width: 1px;
-            opacity: 0.85;
-        }
-
-        .refresh-picks-btn:hover {
-            opacity: 1;
         }
 
         .btn-primary {
@@ -116,7 +115,7 @@
             border-radius: 10px;
         }
 
-        /* 圖表卡片右上角的價格 + 漲跌 */
+        /* 图表卡片右上角的价格 + 涨跌 */
         .chart-header-info {
             position: absolute;
             top: 9px;
@@ -145,7 +144,7 @@
             font-weight: 700;
         }
 
-        /* AI 分析區 */
+        /* AI 分析区 */
         .ai-card {
             margin-top: 18px;
         }
@@ -157,16 +156,7 @@
             color: #e5e7eb;
         }
 
-        .ai-summary-label {
-            font-weight: 600;
-            color: #fbbf24;
-        }
-
-        .ai-summary-text {
-            color: #e5e7eb;
-        }
-
-        /* 技術指標區 */
+        /* 技术指标区 */
         .indicator-badge {
             font-size: 0.78rem;
             border-radius: 999px;
@@ -188,90 +178,102 @@
             margin-left: 4px;
         }
 
-        canvas {
-            max-height: 360px;
+        /* 技術信號 badge */
+        .signal-badge {
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 0.78rem;
+            border: 1px solid #4b5563;
         }
 
-        /* ===== 每日精選卡片 ===== */
+        .signal-badge-risk {
+            background: rgba(239, 68, 68, 0.12);
+            color: #fecaca;
+            border-color: #b91c1c;
+        }
 
-        .pick-card {
-            border-radius: 16px;
-            padding: 14px 14px 12px 14px;
-            background: radial-gradient(circle at top left, #1f2937 0%, #020617 60%);
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            min-height: 230px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+        .signal-badge-opportunity {
+            background: rgba(34, 197, 94, 0.12);
+            color: #bbf7d0;
+            border-color: #15803d;
+        }
+
+        .signal-badge-bull {
+            background: rgba(56, 189, 248, 0.12);
+            color: #bae6fd;
+            border-color: #0ea5e9;
+        }
+
+        .signal-badge-bear {
+            background: rgba(249, 115, 22, 0.12);
+            color: #fed7aa;
+            border-color: #ea580c;
+        }
+
+        /* 趨勢分數 */
+        .trend-score-number {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #e5e7eb;
+        }
+
+        .trend-score-bar {
+            height: 6px;
+            width: 100%;
+            background: #020617;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .trend-score-bar-inner {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #eab308, #ef4444);
+        }
+
+        /* 每日精選卡片 */
+        .pick-rank {
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid #4b5563;
+            color: #e5e7eb;
         }
 
         .pick-ticker {
-            font-weight: 800;
-            font-size: 1.1rem;
-            color: #ffffff;
-            text-shadow: 0 0 6px rgba(0, 0, 0, 0.7);
-        }
-
-        .pick-latest {
-            color: #e5e7eb;
-            font-size: 0.85rem;
-        }
-
-        .pick-latest-price {
-            color: #fef08a;
+            font-size: 1.05rem;
             font-weight: 700;
+            color: #f9fafb;
         }
 
         .pick-price {
-            color: #fef08a; /* 柔和亮黃色 */
-            font-weight: 700;
             font-size: 0.95rem;
-        }
-
-        .pick-change-pos {
-            color: #22c55e;
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-
-        .pick-change-neg {
-            color: #ef4444;
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-
-        .pick-badges .badge {
-            font-size: 0.7rem;
-            border-radius: 999px;
-            padding: 4px 9px;
-        }
-
-        .pick-badges .text-warning {
-            background-color: rgba(234, 179, 8, 0.15);
-        }
-
-        .pick-badges .text-info {
-            background-color: rgba(56, 189, 248, 0.15);
-        }
-
-        .pick-meta {
-            margin-top: 4px;
-            margin-bottom: 4px;
+            color: #e5e7eb;
         }
 
         .pick-meta-line {
             font-size: 0.8rem;
-            color: #e5e7eb;
-            line-height: 1.4;
+            color: #fef3c7;
+            line-height: 1.45;
         }
 
-        .pick-reason {
+        .ai-summary-label {
+            font-weight: 600;
+            color: #facc15;
+            font-size: 0.9rem;
+        }
+
+        .ai-summary-text {
+            font-size: 0.9rem;
+        }
+
+        .ai-disclaimer {
+            margin-top: 10px;
             font-size: 0.8rem;
-            color: #cbd5f5;
+            color: #9ca3af;
         }
 
-        .pick-footer-note {
-            font-size: 0.75rem;
+        canvas {
+            max-height: 360px;
         }
     </style>
 </head>
@@ -313,100 +315,91 @@
         </div>
         {% endif %}
 
-        <!-- ====== 今日 Smart AI 精選 ====== -->
+        <!-- 今日 Smart AI 精選 -->
         {% if daily_picks %}
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="card-title mb-0">🌟 今日 Smart AI 精選</div>
-                    <div class="card-subtitle">
-                        從 S&P 500 範圍中，根據 RSI + 60 日均線等技術指標，自動揀選出最多 3 隻偏超賣或可能低估的觀察股票（程式化篩選，非人工推薦）。
-                    </div>
+                <div class="card-title mb-0">✨ 今日 Smart AI 精選（來自股票池）</div>
+                <div class="text-muted" style="font-size: 0.8rem;">
+                    每日按 RSI + MA60 自動篩選，並由 AI 給出觀察重點
                 </div>
-
-                <!-- 手動刷新每日精選 -->
-                <form method="POST" action="{{ url_for('refresh_picks') }}">
-                    <button type="submit" class="btn btn-sm btn-outline-light refresh-picks-btn">
-                        🔄 重新精選
-                    </button>
-                </form>
             </div>
-            
+
+            <!-- 右边：手动刷新按钮 -->
+            <form method="post" class="mb-0">
+              <button
+                type="submit"
+                name="refresh_picks"
+                value="1"
+                class="btn btn-outline-light btn-sm refresh-picks-btn"
+                title="重新生成今日精选"
+              >
+                🔄<br>重新<br>精选
+              </button>
+            </form>
+          </div>
+
             <div class="card-body">
                 <div class="row g-3">
-                    {% for pick in daily_picks %}
+                    {% for p in daily_picks %}
                     <div class="col-md-4">
-                        <div class="pick-card">
-                            <div>
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <div class="pick-ticker">
-                                        #{{ pick.rank }} {{ pick.ticker }}
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="pick-price">
-                                            ${{ '%.2f'|format(pick.last_price or 0) }}
-                                        </div>
-                                        {% if pick.change_pct is not none and pick.change_pct >= 0 %}
-                                        <span class="pick-change-pos">
-                                            ▲ {{ '%.2f'|format(pick.change_pct) }}%
-                                        </span>
-                                        {% elif pick.change_pct is not none %}
-                                        <span class="pick-change-neg">
-                                            ▼ {{ '%.2f'|format(pick.change_pct) }}%
-                                        </span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <div class="pick-latest small mb-1">
-                                    最新價：
-                                    <span class="pick-latest-price">
-                                        ${{ '%.2f'|format(pick.last_price or 0) }}
-                                    </span>
-                                </div>
-
-                                <div class="pick-badges mb-1">
-                                    <span class="badge rounded-pill text-warning">
-                                        RSI {{ '%.1f'|format(pick.rsi or 0) }}
-                                    </span>
-                                    <span class="badge rounded-pill text-info">
-                                        MA60 {{ '%.1f'|format(pick.ma60 or 0) }}
-                                    </span>
-                                </div>
-
-                                <!-- AI 排名 + 安全買入區 + 合理價 -->
-                                <div class="pick-meta">
-                                    {% if pick.rank_text %}
-                                    <div class="pick-meta-line">
-                                        {{ pick.rank_text }}
-                                    </div>
-                                    {% endif %}
-
-                                    {% if pick.safe_text %}
-                                    <div class="pick-meta-line">
-                                        {{ pick.safe_text }}
-                                    </div>
-                                    {% endif %}
-
-                                    {% if pick.fair_text %}
-                                    <div class="pick-meta-line">
-                                        {{ pick.fair_text }}
-                                    </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 詳細分析 -->
-                                <div class="pick-reason">
-                                    {{ pick.reason }}
-                                </div>
+                        <div class="p-3 rounded-3" style="background: #020617; border: 1px solid #1f2937;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="pick-rank">第 {{ p.rank }} 名</span>
+                                <span class="pick-ticker">{{ p.ticker }}</span>
                             </div>
+                            <div class="mb-1 pick-price">
+                                最新股價：<strong>${{ '%.2f'|format(p.last_price) }}</strong>
+                                {% if p.change_pct >= 0 %}
+                                    <span class="change-positive ms-1">▲ {{ '%.2f'|format(p.change_pct) }}%</span>
+                                {% else %}
+                                    <span class="change-negative ms-1">▼ {{ '%.2f'|format(p.change_pct) }}%</span>
+                                {% endif %}
+                            </div>
+                            <div class="pick-meta mb-2">
+                                <span class="badge rounded-pill bg-warning text-dark">
+                                    RSI {{ '%.1f'|format(p.rsi or 0) }}
+                                </span>
+
+                                <span class="badge rounded-pill bg-info text-dark ms-1">
+                                     MA60 {{ '%.1f'|format(p.ma60 or 0) }}
+                                </span>
+
+                                <div class="pick-meta-line">
+                                    價格相對 MA60：約 {{ '%.2f'|format(p.dist_pct or 0) }}%
+                                </div>
+
+                                <div class="pick-meta-line">
+                                    成交量：約 {{ p.volume_str }}
+                                </div>
+
+                            </div>
+                            {% if p.rank_text %}
+                            <div class="pick-meta-line mb-1">
+                                {{ p.rank_text }}
+                            </div>
+                            {% endif %}
+                            {% if p.safe_text %}
+                            <div class="pick-meta-line mb-1">
+                                {{ p.safe_text }}
+                            </div>
+                            {% endif %}
+                            {% if p.fair_text %}
+                            <div class="pick-meta-line mb-1">
+                                {{ p.fair_text }}
+                            </div>
+                            {% endif %}
+                            {% if p.reason %}
+                            <div class="mt-2" style="font-size:0.8rem; color:#d1d5db;">
+                                {{ p.reason }}
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                     {% endfor %}
                 </div>
-
-                <div class="pick-footer-note text-muted mt-2">
-                    ⚠️ 以上為程式根據技術指標自動篩選，只供參考，並不構成任何買賣建議。
+                <div class="mt-2 text-muted" style="font-size: 0.75rem;">
+                    ⚠️ 精選結果只係根據技術指標 + AI 分析，唔構成任何買賣建議。
                 </div>
             </div>
         </div>
@@ -442,6 +435,17 @@
                         </span>
                         {% endif %}
                     </div>
+                    <div class="mt-1" style="font-size:0.8rem; color:#9ca3af;">
+                        成交量：約 {{ indicators.volume_str }} ｜ 20 日均量：約 {{ indicators.avg20_volume_str }}
+                    </div>
+                    {% if indicators.low_52w and indicators.high_52w %}
+                    <div class="mt-1" style="font-size:0.8rem; color:#9ca3af;">
+                        52 週區間：{{ '%.2f'|format(indicators.low_52w) }} ~ {{ '%.2f'|format(indicators.high_52w) }}
+                        {% if indicators.from_high_pct is not none %}
+                            （現價距離 52 週高位：約 {{ '%.2f'|format(indicators.from_high_pct) }}%）
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -450,10 +454,25 @@
                     走勢概況：{{ indicators.trend_text }}
                 </div>
 
+                <!-- 趨勢分數 -->
+                {% if indicators.trend_score is not none %}
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">趨勢分數（0–100）：</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="trend-score-number">
+                            {{ indicators.trend_score }}/100
+                        </div>
+                        <div class="trend-score-bar">
+                            <div class="trend-score-bar-inner" style="width: {{ indicators.trend_score }}%;"></div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="mb-2" style="font-size: 0.9rem; color: #9ca3af">
                     技術指標（最近一日）：
                 </div>
-                <div class="d-flex flex-wrap">
+                <div class="d-flex flex-wrap mb-2">
                     <div class="indicator-badge">
                         <span class="indicator-label">RSI14</span>
                         <span class="indicator-value">
@@ -484,8 +503,6 @@
                             {{ '%.4f'|format(indicators.macd) }}
                         </span>
                     </div>
-
-                    <!-- 布林帶 -->
                     <div class="indicator-badge">
                         <span class="indicator-label">BOLL 上軌</span>
                         <span class="indicator-value">
@@ -505,6 +522,35 @@
                         </span>
                     </div>
                 </div>
+
+                <!-- 技術信號 -->
+                {% if indicators.tech_signals %}
+                <div class="mb-1" style="font-size: 0.9rem; color: #9ca3af">
+                    技術信號（系統簡單判斷）：
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    {% for s in indicators.tech_signals %}
+                        {% set cls = "signal-badge" %}
+                        {% if s.level == "risk" %}
+                            {% set cls = cls + " signal-badge-risk" %}
+                        {% elif s.level == "opportunity" %}
+                            {% set cls = cls + " signal-badge-opportunity" %}
+                        {% elif s.level == "bull" %}
+                            {% set cls = cls + " signal-badge-bull" %}
+                        {% elif s.level == "bear" %}
+                            {% set cls = cls + " signal-badge-bear" %}
+                        {% endif %}
+                        <span class="{{ cls }}">
+                            {{ s.label }}
+                        </span>
+                    {% endfor %}
+                </div>
+                <div style="font-size:0.8rem; color:#9ca3af;">
+                    {% for s in indicators.tech_signals %}
+                        • {{ s.label }}：{{ s.text }}<br />
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -533,29 +579,29 @@
         </div>
 
         <!-- AI 建議 -->
-        {% if ai_advice %}
-        <div class="card ai-card">
-            <div class="card-header d-flex align-items-center">
-                <div class="card-title mb-0">🤖 AI 分析建議</div>
-            </div>
-            <div class="card-body ai-text">
+       {% if ai_advice %}
+       <div class="card ai-card">
+           <div class="card-header d-flex align-items-center">
+               <div class="card-title mb-0">🤖 AI 分析建議</div>
+           </div>
+           <div class="card-body ai-text">
 
-                {% if ai_summary %}
-                <div class="ai-summary mb-2">
-                    <span class="ai-summary-label">⚡ 一句話技術總評：</span>
-                    <span class="ai-summary-text">{{ ai_summary }}</span>
-                </div>
-                {% endif %}
+               {% if ai_summary %}
+               <div class="ai-summary mb-2">
+                   <span class="ai-summary-label">⚡ 一句話技術總評：</span>
+                   <span class="ai-summary-text">{{ ai_summary }}</span>
+               </div>
+               {% endif %}
 
-                <div>
-                    {{ ai_advice }}
-                </div>
+               <div>
+                   {{ ai_advice }}
+               </div>
 
-                <div class="ai-disclaimer mt-2 text-muted" style="font-size:0.8rem;">
-                    ⚠️ 以上分析只供參考，並不構成任何買賣建議或保證。
-                    投資涉及風險，請根據自己風險承受能力及實際情況獨立判斷。
-                </div>
-            </div>
+               <div class="ai-disclaimer">
+                   ⚠️ 以上分析只供參考，並不構成任何買賣建議或保證。
+                   投資涉及風險，請根據自己風險承受能力及實際情況獨立判斷。
+               </div>
+           </div>
         </div>
         {% endif %}
     </div>

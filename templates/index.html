@@ -43,17 +43,6 @@
             font-size: 20px;
         }
 
-        .refresh-picks-btn {
-            font-size: 0.7rem;
-            line-height: 1.05;
-            padding: 0.45rem 0.6rem;
-            border-radius: 999px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
         .main-container {
             max-width: 1080px;
         }
@@ -253,7 +242,7 @@
         .pick-meta-line {
             font-size: 0.8rem;
             color: #fef3c7;
-            line-height: 1.45;
+            line-height: 1.5;
         }
 
         .ai-summary-label {
@@ -316,33 +305,24 @@
         {% endif %}
 
         <!-- 今日 Smart AI 精選 -->
-        {% if daily_picks %}
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <div class="card-title mb-0">✨ 今日 Smart AI 精選（來自股票池）</div>
-                <div class="text-muted" style="font-size: 0.8rem;">
-                    每日按 RSI + MA60 自動篩選，並由 AI 給出觀察重點
-                </div>
+
+                <!-- 👇 新加的按钮 -->
+                <form method="POST" action="/refresh_picks" class="m-0">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        手動更新今日精選
+                    </button>
+                </form>
             </div>
 
-            <!-- 右边：手动刷新按钮 -->
-            <form method="post" class="mb-0">
-              <button
-                type="submit"
-                name="refresh_picks"
-                value="1"
-                class="btn btn-outline-light btn-sm refresh-picks-btn"
-                title="重新生成今日精选"
-              >
-                🔄<br>重新<br>精选
-              </button>
-            </form>
-          </div>
-
             <div class="card-body">
-                <div class="row g-3">
-                    {% for p in daily_picks %}
-                    <div class="col-md-4">
+                {% if daily_picks %}
+                    <!-- 🔽 真正显示结果 -->
+                    <div class="row g-3">
+                        {% for p in daily_picks %}
+                        <div class="col-md-4">
                         <div class="p-3 rounded-3" style="background: #020617; border: 1px solid #1f2937;">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="pick-rank">第 {{ p.rank }} 名</span>
@@ -357,16 +337,17 @@
                                 {% endif %}
                             </div>
                             <div class="pick-meta mb-2">
+                                
+                                <!-- 技術指標 badge：改亮色 -->
                                 <span class="badge rounded-pill bg-warning text-dark">
                                     RSI {{ '%.1f'|format(p.rsi or 0) }}
                                 </span>
-
-                                <span class="badge rounded-pill bg-info text-dark ms-1">
-                                     MA60 {{ '%.1f'|format(p.ma60 or 0) }}
+                                <span class="badge rounded-pill bg-info text-dark">
+                                    MA60 {{ '%.1f'|format(p.ma60 or 0) }}
                                 </span>
 
                                 <div class="pick-meta-line">
-                                    價格相對 MA60：約 {{ '%.2f'|format(p.dist_pct or 0) }}%
+                                    偏離 MA60：約 {{ '%.2f'|format(p.dist_pct or 0) }}%
                                 </div>
 
                                 <div class="pick-meta-line">

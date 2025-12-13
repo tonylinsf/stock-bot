@@ -355,7 +355,13 @@
         <div class="card mb-3">
           <div class="card-header d-flex justify-content-between align-items-center">
             <div class="card-title mb-0">📊 今日市场概览（SPY / QQQ / DIA）</div>
-            <div class="text-muted" style="font-size:0.85rem;">每日自动更新（缓存一日一次）</div>
+            <div class="d-flex align-items-center gap-2">
+              <div class="text-muted" style="font-size:0.85rem;">每日自动更新（缓存一日一次）</div>
+            
+            <form method="POST" action="/refresh_market" class="m-0">
+              <button type="submit" class="btn btn-sm btn-primary">手动更新市场</button>
+            </form>
+          </div>
         </div>
 
         <div class="card-body">

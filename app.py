@@ -427,20 +427,42 @@ def get_pick_meta_info(prompt: str):
         err = f"AI meta 出錯：{e}"
         return "", "", err
 
-def get_market_overview():
+from zoneinfo import ZoneInfo
+from datetime import datetime as _dt  # 用 _dt 避免同你其他 datetime 撞名
+
+ET = ZoneInfo("America/New_York")
+
+MARKET_CACHE = None
+MARKET_CACHE_DATE = None  # 用 ET 日期字串，例如 "2025-12-13"
+
+def _et_now():
+    return _dt.now(ET)
+
+def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = True):
     """
-    今日市场概览：SPY / QQQ / DIA
-    - 只抓 3 个 ticker，极快
-    - cache 一日一次
+    今日市場概覽：SPY / QQQ / DIA
+    - cache 一日一次（以美東日期計）
+    - force_refresh=True：按鍵手動刷新
+    - auto_refresh_945=True：每日 ET 09:45 之後，第一次有人打開頁面會自動刷新一次
     """
     global MARKET_CACHE, MARKET_CACHE_DATE
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    if MARKET_CACHE_DATE == today and MARKET_CACHE:
+    now_et = _et_now()
+    today_et = now_et.strftime("%Y-%m-%d")
+
+    # ✅ 有 cache 而且係今日：通常直接用
+    if (not force_refresh) and MARKET_CACHE_DATE == today_et and MARKET_CACHE:
         return MARKET_CACHE
 
+    # ✅ 如果你想「9:45 前唔自動刷新」，就用呢段守門
+    if (not force_refresh) and auto_refresh_945:
+        # 9:45 前：如果有舊 cache 就照用（避免朝早未開市就成日刷新）
+        if now_et.hour < 9 or (now_et.hour == 9 and now_et.minute < 45):
+            if MARKET_CACHE:
+                return MARKET_CACHE
+
     tickers = ["SPY", "QQQ", "DIA"]
-    results: list[dict] = []
+    results = []
 
     for t in tickers:
         try:
@@ -452,12 +474,21 @@ def get_market_overview():
                 progress=False,
             )
             if df is None or df.empty or "Close" not in df.columns:
+                results.append({"ticker": t, "error": "no data"})
                 continue
 
             close = df["Close"].dropna()
+            if close.empty:
+                results.append({"ticker": t, "error": "no close"})
+                continue
+
             last_close = float(close.iloc[-1])
             prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
-            change_pct = (last_close - prev_close) / prev_close * 100 if prev_close else 0.0
+            change_pct = ((last_close - prev_close) / prev_close * 100) if prev_close else 0.0
+
+            # ✅ 用最後一日數據日期（同個股一致），唔用 “今日”
+            last_dt = close.index[-1]
+            updated_date = last_dt.strftime("%Y-%m-%d")
 
             rsi_series = calc_rsi(close, 14)
             rsi14 = float(rsi_series.iloc[-1]) if rsi_series is not None and not rsi_series.empty else None
@@ -467,22 +498,19 @@ def get_market_overview():
 
             results.append({
                 "ticker": t,
-                "last_price": round(last_close, 2),
-                "change_pct": round(change_pct, 2),
+                "last_price": last_close,
+                "change_pct": change_pct,
+                "updated_date": updated_date,
                 "rsi14": round(rsi14, 2) if rsi14 is not None else None,
                 "ma20": round(ma20, 2) if ma20 is not None else None,
                 "ma60": round(ma60, 2) if ma60 is not None else None,
-                "updated_date": today,
-            })
-        except Exception as e:
-            results.append({
-                "ticker": t,
-                "error": str(e),
-                "updated_date": today,
             })
 
+        except Exception as e:
+            results.append({"ticker": t, "error": str(e)})
+
     MARKET_CACHE = results
-    MARKET_CACHE_DATE = today
+    MARKET_CACHE_DATE = today_et
     return results
 
 def get_daily_picks(num_picks: int = 3):
@@ -743,11 +771,16 @@ def index():
 # ================================
 # 手動刷新每日精選
 # ================================
-from flask import redirect, url_for
+from flask import Flask, redirect, url_for
 
 @app.route("/refresh_picks", methods=["POST"])
 def refresh_picks():
     get_daily_picks(num_picks=3)
+    return redirect(url_for("index"))
+
+@app.post("/refresh_market")
+def refresh_market():
+    get_market_overview(force_refresh=True, auto_refresh_945=False)  # 手動就直接刷新
     return redirect(url_for("index"))
 
 

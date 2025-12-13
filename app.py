@@ -45,6 +45,10 @@ UNIVERSE = load_universe()
 print("UNIVERSE size =", len(UNIVERSE))
 print("Sample =", UNIVERSE[:10])
 
+# ====== 指数概览缓存（首页固定 3 个：SPY/QQQ/DIA）======
+MARKET_CACHE: list[dict] = []
+MARKET_CACHE_DATE: str | None = None
+
 # ====== 精選股票結果緩存（每日只掃一次，避免太慢） ====== #
 DAILY_PICKS_CACHE: list[dict] = []
 DAILY_PICKS_DATE: str | None = None
@@ -407,7 +411,7 @@ def get_pick_meta_info(prompt: str):
     """
     try:
         resp = client.responses.create(
-            model="gpt-5.1",
+            model="gpt-5.1-mini",
             input=prompt,
         )
         text = resp.output_text.strip()
@@ -423,6 +427,63 @@ def get_pick_meta_info(prompt: str):
         err = f"AI meta 出錯：{e}"
         return "", "", err
 
+def get_market_overview():
+    """
+    今日市场概览：SPY / QQQ / DIA
+    - 只抓 3 个 ticker，极快
+    - cache 一日一次
+    """
+    global MARKET_CACHE, MARKET_CACHE_DATE
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    if MARKET_CACHE_DATE == today and MARKET_CACHE:
+        return MARKET_CACHE
+
+    tickers = ["SPY", "QQQ", "DIA"]
+    results: list[dict] = []
+
+    for t in tickers:
+        try:
+            df = yf.download(
+                t,
+                period="6mo",
+                interval="1d",
+                auto_adjust=True,
+                progress=False,
+            )
+            if df is None or df.empty or "Close" not in df.columns:
+                continue
+
+            close = df["Close"].dropna()
+            last_close = float(close.iloc[-1])
+            prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
+            change_pct = (last_close - prev_close) / prev_close * 100 if prev_close else 0.0
+
+            rsi_series = calc_rsi(close, 14)
+            rsi14 = float(rsi_series.iloc[-1]) if rsi_series is not None and not rsi_series.empty else None
+
+            ma20 = float(close.rolling(20).mean().iloc[-1]) if len(close) >= 20 else None
+            ma60 = float(close.rolling(60).mean().iloc[-1]) if len(close) >= 60 else None
+
+            results.append({
+                "ticker": t,
+                "last_price": round(last_close, 2),
+                "change_pct": round(change_pct, 2),
+                "rsi14": round(rsi14, 2) if rsi14 is not None else None,
+                "ma20": round(ma20, 2) if ma20 is not None else None,
+                "ma60": round(ma60, 2) if ma60 is not None else None,
+                "updated_date": today,
+            })
+        except Exception as e:
+            results.append({
+                "ticker": t,
+                "error": str(e),
+                "updated_date": today,
+            })
+
+    MARKET_CACHE = results
+    MARKET_CACHE_DATE = today
+    return results
 
 def get_daily_picks(num_picks: int = 3):
     """
@@ -503,6 +564,7 @@ def index():
 
     # 每日精選（內部已經 cache，一日只計一次）
     daily_picks = DAILY_PICKS_CACHE if DAILY_PICKS_CACHE else []
+    market_overview = get_market_overview()
 
     if request.method == "POST":
         ticker = request.form.get("ticker", "").strip().upper()
@@ -675,6 +737,7 @@ def index():
         chart_prices=chart_prices,
         error=error,
         daily_picks=daily_picks,
+        market_overview=market_overview,
     )
 
 # ================================

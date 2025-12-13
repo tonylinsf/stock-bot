@@ -219,6 +219,47 @@
             background: linear-gradient(90deg, #22c55e, #eab308, #ef4444);
         }
 
+        /* 市场概览卡片：提亮文字 */
+        .market-card .ticker {
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 1.05rem;
+        }
+
+        .market-card .price {
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 1.15rem;
+        }
+
+        .market-card .date {
+            color: rgba(255,255,255,0.75);
+            font-weight: 600;
+        }
+
+        .market-card .meta {
+            color: rgba(255,255,255,0.85);
+            font-weight: 700;
+        }
+
+        .market-card .market-label {
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        /* 市场概览 RSI / MA badge 统一样式 */
+        .market-card .badge-rsi {
+            background-color: #facc15;   /* 黄 */
+            color: #1f2937;
+            font-weight: 700;
+        }
+
+        .market-card .badge-ma {
+            background-color: #38bdf8;   /* 蓝 */
+            color: #020617;
+            font-weight: 700;
+        }
+
         /* 每日精選卡片 */
         .pick-rank {
             font-size: 0.8rem;
@@ -264,6 +305,11 @@
         canvas {
             max-height: 360px;
         }
+
+        /* RSI 動態顏色 */
+        .badge-rsi-overbought { background:#ef4444 !important; color:#fff !important; } /* >=70 */
+        .badge-rsi-oversold   { background:#22c55e !important; color:#0b1220 !important; } /* <=30 */
+        .badge-rsi-neutral    { background:#facc15 !important; color:#111827 !important; } /* 其他 */
     </style>
 </head>
 
@@ -303,6 +349,78 @@
             {{ error }}
         </div>
         {% endif %}
+
+        <!-- 📊 今日市场概览：SPY / QQQ / DIA -->
+        {% if market_overview %}
+        <div class="card mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-title mb-0">📊 今日市场概览（SPY / QQQ / DIA）</div>
+            <div class="text-muted" style="font-size:0.85rem;">每日自动更新（缓存一日一次）</div>
+        </div>
+
+        <div class="card-body">
+          <div class="row g-3">
+            {% for m in market_overview %}
+            <div class="col-md-4">
+              <!-- ✅ 关键：market-card class 放在最外层卡片容器 -->
+              <div class="market-card p-3 rounded-3"
+                   style="background:#0b1220;border:1px solid rgba(255,255,255,0.08);">
+
+                <!-- 顶部：Ticker + 涨跌（横向） -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="ticker">{{ m.ticker }}</div>
+
+                  {% if m.change_pct is not none %}
+                    {% if m.change_pct >= 0 %}
+                      <div class="change-positive">▲ {{ "%.2f"|format(m.change_pct) }}%</div>
+                    {% else %}
+                      <div class="change-negative">▼ {{ "%.2f"|format(m.change_pct) }}%</div>
+                    {% endif %}
+                  {% endif %}
+                </div>
+
+                {% if m.error %}
+                  <div class="text-danger" style="font-size:0.9rem;">拉取失败：{{ m.error }}</div>
+                {% else %}
+                  <!-- 价格行：✅ price class -->
+                  <div style="font-size:0.95rem;">
+                    <span class="market-label">最新：</span>
+                    <span class="price">${{ "%.2f"|format(m.last_price) }}</span>
+                    <span class="date ms-2">{{ m.updated_date }}</span>
+                  </div>
+
+                  <!-- 指标 badges -->
+                   <div class="mt-2 d-flex flex-wrap gap-2">
+                     {% if m.rsi14 is not none %}
+                       {% set rsi = m.rsi14|float %}
+                       <span class="badge rounded-pill
+                         {% if rsi >= 70 %}badge-rsi-overbought
+                         {% elif rsi <= 30 %}badge-rsi-oversold
+                         {% else %}badge-rsi-neutral
+                         {% endif %}">
+                         RSI14 {{ "%.2f"|format(rsi) }}
+                         {% if m.rsi14 >= 70 %}
+                            （超買）
+                         {% elif m.rsi14 <= 30 %}
+                            （超賣）
+                       {% endif %}
+                       </span>
+                     {% endif %}
+                     {% if m.ma20 is not none %}
+                       <span class="badge rounded-pill badge-ma">MA20 {{ m.ma20 }}</span>
+                     {% endif %}
+                     {% if m.ma60 is not none %}
+                       <span class="badge rounded-pill badge-ma">MA60 {{ m.ma60 }}</span>
+                     {% endif %}
+                   </div>
+                 {% endif %}
+
+               </div>
+             </div>
+             {% endfor %}
+           </div>
+
+           {% endif %}
 
         <!-- 今日 Smart AI 精選 -->
         <div class="card mb-3">

@@ -411,7 +411,7 @@ def get_pick_meta_info(prompt: str):
     """
     try:
         resp = client.responses.create(
-            model="gpt-5.1-mini",
+            model="gpt-5-mini",
             input=prompt,
         )
         text = resp.output_text.strip()

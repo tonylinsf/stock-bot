@@ -1,791 +1,348 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8" />
-    <title>Smart Stock Bot</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Stock Bot</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#0f1b2e; --muted:#9fb0c7; --text:#eaf1ff;
+      --border:rgba(255,255,255,.10); --good:#20c997; --bad:#ff6b6b; --chip:#1b2b45;
+      --btn:#6f5bff;
+    }
+    body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial;}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px;}
+    .row{display:flex;gap:14px;flex-wrap:wrap;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 10px 25px rgba(0,0,0,.25);}
+    .card h2,.card h3{margin:0 0 10px 0;}
+    .muted{color:var(--muted);font-size:13px}
+    .btn{background:var(--btn);border:none;color:white;padding:10px 12px;border-radius:10px;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .input{width:100%;padding:12px 12px;border-radius:10px;border:1px solid var(--border);background:#081021;color:var(--text)}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    @media(max-width:900px){.grid3{grid-template-columns:1fr}}
+    .price{font-size:22px;font-weight:700}
+    .chg.up{color:var(--good);font-weight:700}
+    .chg.down{color:var(--bad);font-weight:700}
+    .chip{display:inline-block;background:var(--chip);border:1px solid var(--border);padding:6px 10px;border-radius:999px;font-size:12px;margin:4px 6px 0 0}
+    .pre{white-space:pre-wrap;word-wrap:break-word;background:#081021;border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0}
+    .sep{height:1px;background:var(--border);margin:14px 0}
+    .badge-pill{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;}
+    .badge-hot{background:rgba(255,77,79,.18);border:1px solid rgba(255,77,79,.35);}
+    .badge-strong{background:rgba(82,196,26,.16);border:1px solid rgba(82,196,26,.35);}
+    .badge-weak{background:rgba(250,173,20,.16);border:1px solid rgba(250,173,20,.35);}
+    .badge-cold{background:rgba(24,144,255,.16);border:1px solid rgba(24,144,255,.35);}
+    .badge-neutral{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);}
+    .grade{font-size:12px;padding:3px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.18);opacity:.95}
+    .grade-a{background:rgba(82,196,26,.18)}
+    .grade-b{background:rgba(255,255,255,.10)}
+    .grade-c{background:rgba(255,77,79,.16)}
+    .muted2{opacity:.85;font-size:12px;line-height:1.35}
+    .badge {
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
 
-    <!-- Bootstrap 5 -->
-    <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    />
+   .badge-hot { background:#7a1f1f; color:#ffb3b3; }
+   .badge-strong { background:#14532d; color:#86efac; }
+   .badge-weak { background:#1e3a8a; color:#93c5fd; }
+   .badge-cold { background:#312e81; color:#c7d2fe; }
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+   .badge-grade {
+     background:#334155;
+     color:#e5e7eb;
+    }
 
-    <style>
-        body {
-            background-color: #0b1220;
-            color: #e5e7eb;
-            font-family: -apple-system, BlinkMacSystemFont, "PingFang TC",
-                "Microsoft JhengHei", system-ui, sans-serif;
-        }
+    .badge-support {
+      background: #123f2d;
+      color: #7CFFB2;
+      border: 1px solid #2ecc71;
+    }
 
-        .navbar-title {
-            font-size: 2.2rem;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
+    .badge-resist {
+      background: #3a1a1a;
+      color: #ff9c9c;
+      border: 1px solid #e74c3c;
+    }
 
-        .brand-icon {
-            width: 34px;
-            height: 34px;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #f97316, #ef4444);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 10px;
-        }
-
-        .brand-icon span {
-            font-size: 20px;
-        }
-
-        .main-container {
-            max-width: 1080px;
-        }
-
-        .card {
-            background-color: #111827;
-            border: 1px solid #374151;
-            border-radius: 12px;
-            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-        }
-
-        .card-header {
-            border-bottom: 1px solid #1f2933;
-            background: linear-gradient(90deg, #111827, #020617);
-            border-radius: 12px 12px 0 0 !important;
-        }
-
-        .card-title {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #f9fafb;
-        }
-
-        .card-subtitle {
-            font-size: 0.85rem;
-            color: #9ca3af;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #4f46e5, #6366f1);
-            border-color: #4f46e5;
-            font-weight: 600;
-            letter-spacing: 0.03em;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #4338ca, #4f46e5);
-            border-color: #4338ca;
-        }
-
-        .form-control {
-            background-color: #020617;
-            border-color: #4b5563;
-            color: #e5e7eb;
-        }
-
-        .form-control:focus {
-            background-color: #020617;
-            border-color: #6366f1;
-            color: #f9fafb;
-            box-shadow: 0 0 0 1px #6366f1;
-        }
-
-        .text-muted {
-            color: #9ca3af !important;
-        }
-
-        .alert-danger {
-            border-radius: 10px;
-        }
-
-        /* 图表卡片右上角的价格 + 涨跌 */
-        .chart-header-info {
-            position: absolute;
-            top: 9px;
-            right: 18px;
-            font-size: 0.88rem;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .chart-ticker-label {
-            background-color: rgba(0, 0, 0, 0.75);
-            border-radius: 999px;
-            padding: 3px 12px;
-            font-weight: 600;
-            color: #f9fafb;
-        }
-
-        .change-positive {
-            color: #22c55e;
-            font-weight: 700;
-        }
-
-        .change-negative {
-            color: #ef4444;
-            font-weight: 700;
-        }
-
-        /* AI 分析区 */
-        .ai-card {
-            margin-top: 18px;
-        }
-
-        .ai-text {
-            white-space: pre-wrap;
-            font-size: 0.93rem;
-            line-height: 1.6;
-            color: #e5e7eb;
-        }
-
-        /* 技术指标区 */
-        .indicator-badge {
-            font-size: 0.78rem;
-            border-radius: 999px;
-            padding: 4px 9px;
-            margin-right: 6px;
-            margin-bottom: 6px;
-            border: 1px solid #4b5563;
-            background: rgba(15, 23, 42, 0.95);
-        }
-
-        .indicator-label {
-            color: #e5e7eb;
-            font-weight: 600;
-        }
-
-        .indicator-value {
-            color: #facc15; /* 黃色，醒目 */
-            font-weight: 700;
-            margin-left: 4px;
-        }
-
-        /* 技術信號 badge */
-        .signal-badge {
-            border-radius: 999px;
-            padding: 4px 10px;
-            font-size: 0.78rem;
-            border: 1px solid #4b5563;
-        }
-
-        .signal-badge-risk {
-            background: rgba(239, 68, 68, 0.12);
-            color: #fecaca;
-            border-color: #b91c1c;
-        }
-
-        .signal-badge-opportunity {
-            background: rgba(34, 197, 94, 0.12);
-            color: #bbf7d0;
-            border-color: #15803d;
-        }
-
-        .signal-badge-bull {
-            background: rgba(56, 189, 248, 0.12);
-            color: #bae6fd;
-            border-color: #0ea5e9;
-        }
-
-        .signal-badge-bear {
-            background: rgba(249, 115, 22, 0.12);
-            color: #fed7aa;
-            border-color: #ea580c;
-        }
-
-        /* 趨勢分數 */
-        .trend-score-number {
-            font-weight: 700;
-            font-size: 1rem;
-            color: #e5e7eb;
-        }
-
-        .trend-score-bar {
-            height: 6px;
-            width: 100%;
-            background: #020617;
-            border-radius: 999px;
-            overflow: hidden;
-        }
-
-        .trend-score-bar-inner {
-            height: 100%;
-            background: linear-gradient(90deg, #22c55e, #eab308, #ef4444);
-        }
-
-        /* 市场概览卡片：提亮文字 */
-        .market-card .ticker {
-            color: #ffffff;
-            font-weight: 800;
-            font-size: 1.05rem;
-        }
-
-        .market-card .price {
-            color: #ffffff;
-            font-weight: 800;
-            font-size: 1.15rem;
-        }
-
-        .market-card .date {
-            color: rgba(255,255,255,0.75);
-            font-weight: 600;
-        }
-
-        .market-card .meta {
-            color: rgba(255,255,255,0.85);
-            font-weight: 700;
-        }
-
-        .market-card .market-label {
-            color: #ffffff;
-            font-weight: 700;
-        }
-
-        /* 市场概览 RSI / MA badge 统一样式 */
-        .market-card .badge-rsi {
-            background-color: #facc15;   /* 黄 */
-            color: #1f2937;
-            font-weight: 700;
-        }
-
-        .market-card .badge-ma {
-            background-color: #38bdf8;   /* 蓝 */
-            color: #020617;
-            font-weight: 700;
-        }
-
-        /* 每日精選卡片 */
-        .pick-rank {
-            font-size: 0.8rem;
-            padding: 2px 8px;
-            border-radius: 999px;
-            border: 1px solid #4b5563;
-            color: #e5e7eb;
-        }
-
-        .pick-ticker {
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: #f9fafb;
-        }
-
-        .pick-price {
-            font-size: 0.95rem;
-            color: #e5e7eb;
-        }
-
-        .pick-meta-line {
-            font-size: 0.8rem;
-            color: #fef3c7;
-            line-height: 1.5;
-        }
-
-        .ai-summary-label {
-            font-weight: 600;
-            color: #facc15;
-            font-size: 0.9rem;
-        }
-
-        .ai-summary-text {
-            font-size: 0.9rem;
-        }
-
-        .ai-disclaimer {
-            margin-top: 10px;
-            font-size: 0.8rem;
-            color: #9ca3af;
-        }
-
-        canvas {
-            max-height: 360px;
-        }
-
-        /* RSI 動態顏色 */
-        .badge-rsi-overbought { background:#ef4444 !important; color:#fff !important; } /* >=70 */
-        .badge-rsi-oversold   { background:#22c55e !important; color:#0b1220 !important; } /* <=30 */
-        .badge-rsi-neutral    { background:#facc15 !important; color:#111827 !important; } /* 其他 */
-    </style>
+    .badge-mid {
+      background: #1f2937;
+      color: #9ca3af;
+      border: 1px solid #374151;
+    }
+  </style>
 </head>
-
 <body>
-    <div class="container py-4 main-container">
-        <!-- 顶部标题 -->
-        <div class="d-flex align-items-center mb-3">
-            <div class="brand-icon">
-                <span>📈</span>
-            </div>
-            <div>
-                <div class="navbar-title">Smart Stock Bot</div>
-                <div class="text-muted" style="font-size: 0.85rem">
-                    輸入股票代號，查看走勢 + 技術指標 + AI 分析建議（非投資建議）
-                </div>
-            </div>
-        </div>
+<div class="wrap">
 
-        <!-- 搜索表单 -->
-        <form method="POST" class="mb-3">
-            <div class="input-group">
-                <input
-                    type="text"
-                    name="ticker"
-                    class="form-control"
-                    placeholder="輸入股票代號，例如：AAPL、NVDA、QQQ"
-                    value="{{ ticker or '' }}"
-                    required
-                />
-                <button class="btn btn-primary" type="submit">分析</button>
-            </div>
-        </form>
-
-        <!-- 错误显示（如果有） -->
-        {% if error %}
-        <div class="alert alert-danger" role="alert">
-            {{ error }}
-        </div>
-        {% endif %}
-
-        <!-- 📊 今日市场概览：SPY / QQQ / DIA -->
-        {% if market_overview %}
-        <div class="card mb-3">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <div class="card-title mb-0">📊 今日市场概览（SPY / QQQ / DIA）</div>
-            <div class="d-flex align-items-center gap-2">
-              <div class="text-muted" style="font-size:0.85rem;">每日自动更新（缓存一日一次）</div>
-            
-            <form method="POST" action="/refresh_market" class="m-0">
-              <button type="submit" class="btn btn-sm btn-primary">手动更新市场</button>
-            </form>
-          </div>
-        </div>
-
-        <div class="card-body">
-          <div class="row g-3">
-            {% for m in market_overview %}
-            <div class="col-md-4">
-              <!-- ✅ 关键：market-card class 放在最外层卡片容器 -->
-              <div class="market-card p-3 rounded-3"
-                   style="background:#0b1220;border:1px solid rgba(255,255,255,0.08);">
-
-                <!-- 顶部：Ticker + 涨跌（横向） -->
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <div class="ticker">{{ m.ticker }}</div>
-
-                  {% if m.change_pct is not none %}
-                    {% if m.change_pct >= 0 %}
-                      <div class="change-positive">▲ {{ "%.2f"|format(m.change_pct) }}%</div>
-                    {% else %}
-                      <div class="change-negative">▼ {{ "%.2f"|format(m.change_pct) }}%</div>
-                    {% endif %}
-                  {% endif %}
-                </div>
-
-                {% if m.error %}
-                  <div class="text-danger" style="font-size:0.9rem;">拉取失败：{{ m.error }}</div>
-                {% else %}
-                  <!-- 价格行：✅ price class -->
-                  <div style="font-size:0.95rem;">
-                    <span class="market-label">最新：</span>
-                    <span class="price">${{ "%.2f"|format(m.last_price) }}</span>
-                    <span class="date ms-2">{{ m.updated_date }}</span>
-                  </div>
-
-                  <!-- 指标 badges -->
-                   <div class="mt-2 d-flex flex-wrap gap-2">
-                     {% if m.rsi14 is not none %}
-                       {% set rsi = m.rsi14|float %}
-                       <span class="badge rounded-pill
-                         {% if rsi >= 70 %}badge-rsi-overbought
-                         {% elif rsi <= 30 %}badge-rsi-oversold
-                         {% else %}badge-rsi-neutral
-                         {% endif %}">
-                         RSI14 {{ "%.2f"|format(rsi) }}
-                         {% if m.rsi14 >= 70 %}
-                            （超買）
-                         {% elif m.rsi14 <= 30 %}
-                            （超賣）
-                       {% endif %}
-                       </span>
-                     {% endif %}
-                     {% if m.ma20 is not none %}
-                       <span class="badge rounded-pill badge-ma">MA20 {{ m.ma20 }}</span>
-                     {% endif %}
-                     {% if m.ma60 is not none %}
-                       <span class="badge rounded-pill badge-ma">MA60 {{ m.ma60 }}</span>
-                     {% endif %}
-                   </div>
-                 {% endif %}
-
-               </div>
-             </div>
-             {% endfor %}
-           </div>
-
-           {% endif %}
-
-        <!-- 今日 Smart AI 精選 -->
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div class="card-title mb-0">✨ 今日 Smart AI 精選（來自股票池）</div>
-
-                <!-- 👇 新加的按钮 -->
-                <form method="POST" action="/refresh_picks" class="m-0">
-                    <button type="submit" class="btn btn-sm btn-primary">
-                        手動更新今日精選
-                    </button>
-                </form>
-            </div>
-
-            <div class="card-body">
-                {% if daily_picks %}
-                    <!-- 🔽 真正显示结果 -->
-                    <div class="row g-3">
-                        {% for p in daily_picks %}
-                        <div class="col-md-4">
-                        <div class="p-3 rounded-3" style="background: #020617; border: 1px solid #1f2937;">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="pick-rank">第 {{ p.rank }} 名</span>
-                                <span class="pick-ticker">{{ p.ticker }}</span>
-                            </div>
-                            <div class="mb-1 pick-price">
-                                最新股價：<strong>${{ '%.2f'|format(p.last_price) }}</strong>
-                                {% if p.change_pct >= 0 %}
-                                    <span class="change-positive ms-1">▲ {{ '%.2f'|format(p.change_pct) }}%</span>
-                                {% else %}
-                                    <span class="change-negative ms-1">▼ {{ '%.2f'|format(p.change_pct) }}%</span>
-                                {% endif %}
-                            </div>
-                            <div class="pick-meta mb-2">
-                                
-                                <!-- 技術指標 badge：改亮色 -->
-                                <span class="badge rounded-pill bg-warning text-dark">
-                                    RSI {{ '%.1f'|format(p.rsi or 0) }}
-                                </span>
-                                <span class="badge rounded-pill bg-info text-dark">
-                                    MA60 {{ '%.1f'|format(p.ma60 or 0) }}
-                                </span>
-
-                                <div class="pick-meta-line">
-                                    偏離 MA60：約 {{ '%.2f'|format(p.dist_pct or 0) }}%
-                                </div>
-
-                                <div class="pick-meta-line">
-                                    成交量：約 {{ p.volume_str }}
-                                </div>
-
-                            </div>
-                            {% if p.rank_text %}
-                            <div class="pick-meta-line mb-1">
-                                {{ p.rank_text }}
-                            </div>
-                            {% endif %}
-                            {% if p.safe_text %}
-                            <div class="pick-meta-line mb-1">
-                                {{ p.safe_text }}
-                            </div>
-                            {% endif %}
-                            {% if p.fair_text %}
-                            <div class="pick-meta-line mb-1">
-                                {{ p.fair_text }}
-                            </div>
-                            {% endif %}
-                            {% if p.reason %}
-                            <div class="mt-2" style="font-size:0.8rem; color:#d1d5db;">
-                                {{ p.reason }}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                <div class="mt-2 text-muted" style="font-size: 0.75rem;">
-                    ⚠️ 精選結果只係根據技術指標 + AI 分析，唔構成任何買賣建議。
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- 股票信息 + 技術指標 -->
-        {% if indicators %}
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="card-title mb-0">
-                        📌 股票資訊
-                    </div>
-                    <div class="card-subtitle">
-                        股票代號：<strong>{{ indicators.ticker }}</strong>
-                    </div>
-                </div>
-                <div style="text-align: right; font-size: 0.9rem; color:#e5e7eb;">
-                    <div>
-                        最新收市價：
-                        <strong>${{ '%.2f'|format(indicators.last_price) }}</strong>
-                    </div>
-                    <div>更新日期：{{ indicators.last_date }}</div>
-                    <div>
-                        漲跌：
-                        {% if indicators.change_pct >= 0 %}
-                        <span class="change-positive">
-                            ▲ {{ '%.2f'|format(indicators.change_pct) }}%
-                        </span>
-                        {% else %}
-                        <span class="change-negative">
-                            ▼ {{ '%.2f'|format(indicators.change_pct) }}%
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="mt-1" style="font-size:0.8rem; color:#9ca3af;">
-                        成交量：約 {{ indicators.volume_str }} ｜ 20 日均量：約 {{ indicators.avg20_volume_str }}
-                    </div>
-                    {% if indicators.low_52w and indicators.high_52w %}
-                    <div class="mt-1" style="font-size:0.8rem; color:#9ca3af;">
-                        52 週區間：{{ '%.2f'|format(indicators.low_52w) }} ~ {{ '%.2f'|format(indicators.high_52w) }}
-                        {% if indicators.from_high_pct is not none %}
-                            （現價距離 52 週高位：約 {{ '%.2f'|format(indicators.from_high_pct) }}%）
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="card-body">
-                <div class="mb-2" style="font-size: 0.9rem; color: #9ca3af">
-                    走勢概況：{{ indicators.trend_text }}
-                </div>
-
-                <!-- 趨勢分數 -->
-                {% if indicators.trend_score is not none %}
-                <div class="mb-3">
-                    <div class="small text-muted mb-1">趨勢分數（0–100）：</div>
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="trend-score-number">
-                            {{ indicators.trend_score }}/100
-                        </div>
-                        <div class="trend-score-bar">
-                            <div class="trend-score-bar-inner" style="width: {{ indicators.trend_score }}%;"></div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="mb-2" style="font-size: 0.9rem; color: #9ca3af">
-                    技術指標（最近一日）：
-                </div>
-                <div class="d-flex flex-wrap mb-2">
-                    <div class="indicator-badge">
-                        <span class="indicator-label">RSI14</span>
-                        <span class="indicator-value">
-                            {{ '%.2f'|format(indicators.rsi) }}
-                        </span>
-                    </div>
-                    <div class="indicator-badge">
-                        <span class="indicator-label">MA5</span>
-                        <span class="indicator-value">
-                            {{ '%.2f'|format(indicators.ma5) }}
-                        </span>
-                    </div>
-                    <div class="indicator-badge">
-                        <span class="indicator-label">MA20</span>
-                        <span class="indicator-value">
-                            {{ '%.2f'|format(indicators.ma20) }}
-                        </span>
-                    </div>
-                    <div class="indicator-badge">
-                        <span class="indicator-label">MA60</span>
-                        <span class="indicator-value">
-                            {{ '%.2f'|format(indicators.ma60) }}
-                        </span>
-                    </div>
-                    <div class="indicator-badge">
-                        <span class="indicator-label">MACD</span>
-                        <span class="indicator-value">
-                            {{ '%.4f'|format(indicators.macd) }}
-                        </span>
-                    </div>
-                    <div class="indicator-badge">
-                        <span class="indicator-label">BOLL 上軌</span>
-                        <span class="indicator-value">
-                            {{ '%.2f'|format(indicators.boll_upper) }}
-                        </span>
-                    </div>
-                    <div class="indicator-badge">
-                        <span class="indicator-label">BOLL 中軌</span>
-                        <span class="indicator-value">
-                            {{ '%.2f'|format(indicators.boll_mid) }}
-                        </span>
-                    </div>
-                    <div class="indicator-badge">
-                        <span class="indicator-label">BOLL 下軌</span>
-                        <span class="indicator-value">
-                            {{ '%.2f'|format(indicators.boll_lower) }}
-                        </span>
-                    </div>
-                </div>
-
-                <!-- 技術信號 -->
-                {% if indicators.tech_signals %}
-                <div class="mb-1" style="font-size: 0.9rem; color: #9ca3af">
-                    技術信號（系統簡單判斷）：
-                </div>
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                    {% for s in indicators.tech_signals %}
-                        {% set cls = "signal-badge" %}
-                        {% if s.level == "risk" %}
-                            {% set cls = cls + " signal-badge-risk" %}
-                        {% elif s.level == "opportunity" %}
-                            {% set cls = cls + " signal-badge-opportunity" %}
-                        {% elif s.level == "bull" %}
-                            {% set cls = cls + " signal-badge-bull" %}
-                        {% elif s.level == "bear" %}
-                            {% set cls = cls + " signal-badge-bear" %}
-                        {% endif %}
-                        <span class="{{ cls }}">
-                            {{ s.label }}
-                        </span>
-                    {% endfor %}
-                </div>
-                <div style="font-size:0.8rem; color:#9ca3af;">
-                    {% for s in indicators.tech_signals %}
-                        • {{ s.label }}：{{ s.text }}<br />
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- 价格图表卡 -->
-        <div class="card mb-3 position-relative">
-            <div class="card-header d-flex align-items-center">
-                <div class="card-title mb-0">📊 最近 3 個月走勢</div>
-            </div>
-            <div class="card-body">
-                <!-- 图表右上角：股名 + 价格 + 涨跌 -->
-                {% if indicators %}
-                <div class="chart-header-info">
-                    <div class="chart-ticker-label">
-                        {{ indicators.ticker }} ${{ '%.2f'|format(indicators.last_price) }}
-                    </div>
-                    {% if indicators.change_pct >= 0 %}
-                    <div class="change-positive">▲ {{ '%.2f'|format(indicators.change_pct) }}%</div>
-                    {% else %}
-                    <div class="change-negative">▼ {{ '%.2f'|format(indicators.change_pct) }}%</div>
-                    {% endif %}
-                </div>
-                {% endif %}
-                <canvas id="priceChart"></canvas>
-            </div>
-        </div>
-
-        <!-- AI 建議 -->
-       {% if ai_advice %}
-       <div class="card ai-card">
-           <div class="card-header d-flex align-items-center">
-               <div class="card-title mb-0">🤖 AI 分析建議</div>
-           </div>
-           <div class="card-body ai-text">
-
-               {% if ai_summary %}
-               <div class="ai-summary mb-2">
-                   <span class="ai-summary-label">⚡ 一句話技術總評：</span>
-                   <span class="ai-summary-text">{{ ai_summary }}</span>
-               </div>
-               {% endif %}
-
-               <div>
-                   {{ ai_advice }}
-               </div>
-
-               <div class="ai-disclaimer">
-                   ⚠️ 以上分析只供參考，並不構成任何買賣建議或保證。
-                   投資涉及風險，請根據自己風險承受能力及實際情況獨立判斷。
-               </div>
-           </div>
-        </div>
-        {% endif %}
+  <!-- Market Overview -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>
+        <h2>📌 今日市場概覽（SPY / QQQ / DIA）</h2>
+        <div class="muted">提示：如見到數據舊，按右邊「手動更新」</div>
+      </div>
+      <form method="POST" action="/refresh_market" style="margin:0">
+        <button class="btn" type="submit">手動更新市場</button>
+      </form>
     </div>
 
-    <!-- Chart.js 初始化 -->
-    <script>
-        const labels = {{ chart_labels|tojson|default('[]') }};
-        const prices = {{ chart_prices|tojson|default('[]') }};
+    <div class="sep"></div>
 
-        const ctx = document.getElementById("priceChart").getContext("2d");
+    <div class="grid3">
+      {% for m in market_overview %}
+        <div class="card" style="padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3 style="margin:0">{{ m.ticker }}</h3>
+            <div class="muted">更新：{{ m.updated_date if m.updated_date else "-" }}</div>
+              {% if m.is_stale %}
+                <span class="badge bg-warning text-dark" style="margin-left:6px;">
+                  資料未更新
+                </span>
+              {% endif %}
+          </div>
 
-        const chart = new Chart(ctx, {
-            type: "line",
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: "收盤價",
-                        data: prices,
-                        tension: 0.25,
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        borderColor: "#38bdf8",
-                        fill: false,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        ticks: {
-                            color: "#9ca3af",
-                            maxRotation: 0,
-                            minRotation: 0,
-                            autoSkip: true,
-                            maxTicksLimit: 10,
-                        },
-                        grid: {
-                            color: "#1f2933",
-                        },
-                    },
-                    y: {
-                        ticks: {
-                            color: "#9ca3af",
-                        },
-                        grid: {
-                            color: "#111827",
-                        },
-                    },
-                },
-                plugins: {
-                    legend: {
-                        display: false,
-                    },
-                    tooltip: {
-                        mode: "index",
-                        intersect: false,
-                        backgroundColor: "rgba(15, 23, 42, 0.95)",
-                        titleColor: "#e5e7eb",
-                        bodyColor: "#e5e7eb",
-                        borderColor: "#4b5563",
-                        borderWidth: 1,
-                        padding: 10,
-                        callbacks: {
-                            label: (ctx) => {
-                                const v = ctx.parsed.y;
-                                return " 收盤價: " + v.toFixed(2);
-                            },
-                        },
-                    },
-                },
-                interaction: {
-                    mode: "index",
-                    intersect: false,
-                },
-            },
+          {% if m.error %}
+            <div class="muted">Error: {{ m.error }}</div>
+          {% else %}
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:6px">
+              <div class="price">${{ '%.2f'|format(m.last_price) }}</div>
+              {% if m.change_pct is not none %}
+                {% if m.change_pct >= 0 %}
+                  <div class="chg up">▲ {{ '%.2f'|format(m.change_pct) }}%</div>
+                {% else %}
+                  <div class="chg down">▼ {{ '%.2f'|format(m.change_pct) }}%</div>
+                {% endif %}
+              {% endif %}
+            </div>
+
+            <div class="muted" style="margin-top:8px">
+              RSI14：{{ m.rsi14 if m.rsi14 is not none else "-" }}　
+              MA20：{{ m.ma20 if m.ma20 is not none else "-" }}　
+              MA60：{{ m.ma60 if m.ma60 is not none else "-" }}
+            </div>
+
+            {% if m.trend20_pct is not none %}
+            <div class="muted" style="margin-top:6px">
+              20日趋势：
+              {% if m.trend20_dir == "up" %}
+                <span style="color:#4ade80">↑ {{ m.trend20_pct }}%</span>
+              {% elif m.trend20_dir == "down" %}
+                <span style="color:#f87171">↓ {{ m.trend20_pct }}%</span>
+              {% else %}
+                <span style="color:#a3a3a3">→ {{ m.trend20_pct }}%</span>
+              {% endif %}
+            </div>
+            {% endif %}
+
+            {% if m.ma_cross %}
+            <div class="muted" style="margin-top:4px">
+              {% if m.ma_cross == "golden" %}
+                <span style="color:#facc15">✨ 金叉（MA20 ↑ MA60）</span>
+              {% elif m.ma_cross == "death" %}
+                <span style="color:#fb7185">⚠️ 死叉（MA20 ↓ MA60）</span>
+              {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="muted" style="margin-top:6px">
+              距離 MA60：{{ m.dist_ma60 if m.dist_ma60 is not none else "-" }}%　
+              52週：{{ m.low_52w if m.low_52w is not none else "-" }} ~ {{ m.high_52w if m.high_52w is not none else "-" }}　
+              距高位：{{ m.from_high_pct if m.from_high_pct is not none else "-" }}%
+            </div>
+
+            {% if m.sr_text %}
+            <div class="muted" style="margin-top:6px">
+              📍 {{ m.sr_text }}
+            </div>
+            {% endif %}
+
+            {% if m.support20 and m.resist20 %}
+            <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+
+              {% if m.sr_zone == "support" %}
+                <span class="badge badge-support">
+                  靠近支撑 ({{ m.dist_support_pct }}%)
+                </span>
+              {% elif m.sr_zone == "resist" %}
+                <span class="badge badge-resist">
+                  接近阻力 ({{ m.dist_resist_pct }}%)
+                </span>
+              {% else %}
+                <span class="badge badge-mid">
+                  区间中部
+                </span>
+              {% endif %}
+
+            </div>
+            {% endif %}
+
+            {% if m.weekly_text %}
+              <div class="muted" style="margin-top:6px">週線概況：{{ m.weekly_text }}</div>
+            {% endif %}
+
+            {% if m.support20 and m.resist20 %}
+              <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                {% if m.sr_zone == "support" %}
+                  <span class="badge badge-support">🟢 接近支撐 ({{ m.dist_support_pct }}%)</span>
+                {% elif m.sr_zone == "resist" %}
+                  <span class="badge badge-resist">🔴 接近阻力 ({{ m.dist_resist_pct }}%)</span>
+                {% else %}
+                  <span class="badge badge-mid">⚪ 區間中段</span>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            <div class="muted" style="margin-top:6px">
+              支撑/阻力(20日)：{{ m.support20 if m.support20 is not none else "--" }} ~ {{ m.resist20 if m.resist20 is not none else "--" }}
+            </div>
+
+            <div class="muted" style="margin-top:6px">
+              波動(ATR14%)：{{ (m.atr_pct|string + "%") if m.atr_pct is not none else "--" }}
+            </div>
+
+            {% if m.ticker != "SPY" and (m.rs_1m is not none or m.rs_3m is not none) %}
+              <div class="muted" style="margin-top:6px">
+                相對SPY：1M {{ m.rs_1m if m.rs_1m is not none else "--" }}%
+                ／3M {{ m.rs_3m if m.rs_3m is not none else "--" }}%
+              </div>
+            {% endif %}
+
+            <!-- 🔥 RSI 狀態 + 市場評級 -->
+           <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+
+             {% if m.rsi_label %}
+                  <span class="badge {{ m.rsi_class }}">
+                   {{ m.rsi_label }}
+                  </span>
+             {% endif %}
+
+             {% if m.grade %}
+                  <span class="badge badge-grade">
+                    評級 {{ m.grade }}
+                  </span>
+             {% endif %}
+
+           </div>
+
+           {% if m.conclusion %}
+             <div class="muted" style="margin-top:6px">
+               {{ m.conclusion }}
+             </div>
+           {% endif %}
+
+            <div style="margin-top:8px">
+              {% for s in m.signals %}
+                <span class="chip">{{ s }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="height:14px"></div>
+
+  <!-- Single stock -->
+  <div class="card">
+    <h2>🔎 個股分析（技術指標 + AI）</h2>
+
+    <form method="POST" action="/" style="margin-top:10px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input class="input" name="ticker" placeholder="輸入代號，例如 NVDA / AAPL / TSLA / QQQ" value="{{ ticker }}" style="flex:1;min-width:220px">
+        <button class="btn" type="submit">分析</button>
+      </div>
+    </form>
+
+    {% if error %}
+      <div class="sep"></div>
+      <div class="muted">❌ {{ error }}</div>
+    {% endif %}
+
+    {% if indicators %}
+      <div class="sep"></div>
+
+      <h3 style="margin:0 0 8px 0">{{ indicators.ticker }}　${{ indicators.last_price }}　
+        {% if indicators.change_pct is not none %}
+          {% if indicators.change_pct >= 0 %}
+            <span class="chg up">▲ {{ indicators.change_pct }}%</span>
+          {% else %}
+            <span class="chg down">▼ {{ indicators.change_pct }}%</span>
+          {% endif %}
+        {% endif %}
+      </h3>
+      <div class="muted">收市日：{{ indicators.last_date }}｜趨勢分數：{{ indicators.trend_score }}</div>
+
+      <div style="margin-top:10px">
+        <span class="chip">RSI {{ indicators.rsi }}</span>
+        <span class="chip">MA5 {{ indicators.ma5 }}</span>
+        <span class="chip">MA20 {{ indicators.ma20 }}</span>
+        <span class="chip">MA60 {{ indicators.ma60 }}</span>
+        <span class="chip">MACD {{ indicators.macd }}</span>
+        <span class="chip">BOLL {{ indicators.boll_lower }} ~ {{ indicators.boll_upper }}</span>
+        <span class="chip">量 {{ indicators.volume_str }}（20日均 {{ indicators.avg20_volume_str }}）</span>
+      </div>
+
+      {% if indicators.high_52w and indicators.low_52w %}
+        <div class="muted" style="margin-top:8px">
+          52週：{{ indicators.low_52w }} ~ {{ indicators.high_52w }}｜距高位：{{ indicators.from_high_pct }}%
+        </div>
+      {% endif %}
+
+      {% if indicators.tech_signals %}
+        <div style="margin-top:10px">
+          {% for s in indicators.tech_signals %}
+            <span class="chip">{{ s.label }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if ai_summary %}
+        <div class="sep"></div>
+        <div class="muted">一句話總評：</div>
+        <pre>{{ ai_summary }}</pre>
+      {% endif %}
+
+      {% if ai_advice %}
+        <div class="sep"></div>
+        <div class="muted">AI 詳細分析：</div>
+        <pre>{{ ai_advice }}</pre>
+      {% endif %}
+
+      <div class="sep"></div>
+      <h3 style="margin:0 0 10px 0">📈 最近90日走勢</h3>
+      <canvas id="priceChart" height="110"></canvas>
+
+      <script>
+        const labels = {{ chart_labels|tojson }};
+        const prices = {{ chart_prices|tojson }};
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: '{{ indicators.ticker }} Close',
+              data: prices,
+              tension: 0.2,
+              pointRadius: 0,
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: true } },
+            scales: {
+              x: { ticks: { maxTicksLimit: 8 } }
+            }
+          }
         });
-    </script>
+      </script>
+    {% endif %}
+  </div>
+
+</div>
 </body>
 </html>

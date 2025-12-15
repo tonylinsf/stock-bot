@@ -1,5 +1,6 @@
 import os
-from datetime import datetime
+from datetime import datetime as _dt
+from zoneinfo import ZoneInfo
 
 from flask import Flask, render_template, request, redirect, url_for
 import yfinance as yf
@@ -11,55 +12,69 @@ from dotenv import load_dotenv
 load_dotenv()
 
 client = OpenAI()  # 用環境變數 OPENAI_API_KEY
-
 app = Flask(__name__)
 
-# =========================================================
-# 讀取股票池：universe_tickers.txt  （供「每日精選」使用）
-# =========================================================
+ET = ZoneInfo("America/New_York")
+
+# ====== 大盤概覽缓存（SPY/QQQ/DIA）======
+MARKET_CACHE: list[dict] | None = None
+MARKET_CACHE_DATE: str | None = None  # ET 日期字串，例如 "2025-12-15"
 
 
-def load_universe():
+# =========================================================
+# 技術指標
+# =========================================================
+def calc_atr_pct(df: pd.DataFrame, period: int = 14) -> float | None:
     """
-    從 universe_tickers.txt 讀入股票池
-    每行一個 ticker，例如：
-    AAPL
-    MSFT
-    AMZN
+    用 High/Low/Close 計 ATR，最後回傳 ATR%（ATR/Price*100）
     """
-    path = os.path.join(os.path.dirname(__file__), "universe_tickers.txt")
-    tickers: list[str] = []
+    try:
+        if df is None or df.empty:
+            return None
+        if not all(c in df.columns for c in ["High", "Low", "Close"]):
+            return None
 
-    if os.path.exists(path):
-        with open(path, "r") as f:
-            for line in f:
-                t = line.strip().upper()
-                if t:
-                    tickers.append(t)
+        high = df["High"].dropna()
+        low = df["Low"].dropna()
+        close = df["Close"].dropna()
+        if len(close) < period + 2:
+            return None
 
-    # 去重 + 排序，方便之後維護
-    return list(sorted(set(tickers)))
+        prev_close = close.shift(1)
+        tr = pd.concat([
+            (high - low),
+            (high - prev_close).abs(),
+            (low - prev_close).abs()
+        ], axis=1).max(axis=1)
 
-
-UNIVERSE = load_universe()
-print("UNIVERSE size =", len(UNIVERSE))
-print("Sample =", UNIVERSE[:10])
-
-# ====== 指数概览缓存（首页固定 3 个：SPY/QQQ/DIA）======
-MARKET_CACHE: list[dict] = []
-MARKET_CACHE_DATE: str | None = None
-
-# ====== 精選股票結果緩存（每日只掃一次，避免太慢） ====== #
-DAILY_PICKS_CACHE: list[dict] = []
-DAILY_PICKS_DATE: str | None = None
-
-# =========================================================
-# 技術指標函數（共用：單股分析 + 每日精選）
-# =========================================================
+        atr = tr.rolling(period).mean()
+        last_atr = float(atr.iloc[-1])
+        last_price = float(close.iloc[-1])
+        if last_price == 0:
+            return None
+        return round(last_atr / last_price * 100, 2)
+    except Exception:
+        return None
 
 
+def rolling_levels(df: pd.DataFrame, window: int = 20) -> tuple[float | None, float | None]:
+    """
+    近 window 日 支撐/阻力：Low rolling min / High rolling max
+    """
+    try:
+        if df is None or df.empty:
+            return None, None
+        if not all(c in df.columns for c in ["High", "Low"]):
+            return None, None
+        if len(df) < window:
+            return None, None
+        support = float(df["Low"].dropna().rolling(window).min().iloc[-1])
+        resist = float(df["High"].dropna().rolling(window).max().iloc[-1])
+        return round(support, 2), round(resist, 2)
+    except Exception:
+        return None, None
+    
 def calc_rsi(close: pd.Series, period: int = 14) -> pd.Series:
-    """計算 RSI"""
     delta = close.diff()
     gain = delta.where(delta > 0, 0.0)
     loss = -delta.where(delta < 0, 0.0)
@@ -73,7 +88,6 @@ def calc_rsi(close: pd.Series, period: int = 14) -> pd.Series:
 
 
 def calc_macd(close: pd.Series):
-    """計算 MACD (DIF, DEA, HIST)"""
     ema12 = close.ewm(span=12, adjust=False).mean()
     ema26 = close.ewm(span=26, adjust=False).mean()
     dif = ema12 - ema26
@@ -82,8 +96,27 @@ def calc_macd(close: pd.Series):
     return dif, dea, hist
 
 
+def calc_atr(df: pd.DataFrame, period: int = 14):
+    if df is None or df.empty:
+        return None
+
+    high = df["High"]
+    low = df["Low"]
+    close = df["Close"]
+
+    prev_close = close.shift(1)
+
+    tr = pd.concat([
+        high - low,
+        (high - prev_close).abs(),
+        (low - prev_close).abs()
+    ], axis=1).max(axis=1)
+
+    atr = tr.rolling(period).mean()
+    return atr
+
+
 def calc_boll(close: pd.Series, days: int = 20):
-    """計算布林帶：上軌 / 中軌 / 下軌"""
     mid = close.rolling(days).mean()
     std = close.rolling(days).std()
     upper = mid + 2 * std
@@ -92,7 +125,6 @@ def calc_boll(close: pd.Series, days: int = 20):
 
 
 def format_volume(v: float) -> str:
-    """成交量格式化：1.2M / 850K"""
     try:
         v = float(v)
     except Exception:
@@ -105,10 +137,6 @@ def format_volume(v: float) -> str:
 
 
 def compute_trend_score(ind: dict) -> int:
-    """
-    趨勢打分（0–100）
-    綜合 RSI + 價格 vs MA60 + 均線多頭 / 空頭 + MACD + 布林帶波動
-    """
     score = 50
 
     rsi = ind.get("rsi")
@@ -120,7 +148,6 @@ def compute_trend_score(ind: dict) -> int:
     boll_up = ind.get("boll_upper")
     boll_low = ind.get("boll_lower")
 
-    # RSI：45–60 最舒服，再偏離會扣分
     if rsi is not None:
         if 45 <= rsi <= 60:
             score += 10
@@ -129,7 +156,6 @@ def compute_trend_score(ind: dict) -> int:
         elif rsi < 30 or rsi > 75:
             score -= 10
 
-    # 價格 vs MA60
     if last_price and ma60:
         dist = (last_price - ma60) / ma60 * 100
         if -5 <= dist <= 5:
@@ -139,39 +165,27 @@ def compute_trend_score(ind: dict) -> int:
         elif dist < -15 or dist > 15:
             score -= 10
 
-    # 均線排列：多頭 / 空頭
     if ma5 and ma20 and ma60:
         if ma5 > ma20 > ma60:
             score += 10
         elif ma5 < ma20 < ma60:
             score -= 10
 
-    # MACD
     if macd is not None:
-        if macd > 0:
-            score += 5
-        else:
-            score -= 5
+        score += 5 if macd > 0 else -5
 
-    # 布林帶波動太闊 → 風險略高
     if boll_up and boll_low and last_price:
         width = (boll_up - boll_low) / last_price * 100
         if width > 25:
             score -= 5
 
-    score = max(0, min(100, int(round(score))))
-    return score
+    return max(0, min(100, int(round(score))))
 
 
 # =========================================================
-# AI 相關（單股分析用）
+# AI（個股分析用）
 # =========================================================
-
-
 def build_ai_prompt(ticker: str, ind: dict) -> str:
-    """
-    用價格 + 簡單走勢 + 技術指標，交畀 AI 做分析
-    """
     return f"""
 你係一位專業股票技術分析顧問，請用簡單中文（廣東話風格）、條理清晰，幫我分析以下股票：
 
@@ -188,22 +202,22 @@ def build_ai_prompt(ticker: str, ind: dict) -> str:
 - 52 週區間：{ind.get("low_52w")} ~ {ind.get("high_52w")}
 - 現價距離 52 週高位：約 {ind.get("from_high_pct")}%
 
-系統計算嘅趨勢分數（0–100）：{ind.get("trend_score")}
+系統計算趨勢分數（0–100）：{ind.get("trend_score")}
 
 請你：
-1. 用 2–3 句描述最近三個月走勢（偏強、偏弱、定係橫行），可以簡單引用 RSI / 均線 / MACD。
-2. 估計一個「可能買入區間」同「大約止蝕位」（例如 100–105；如果風險好大可以建議先觀望）。
-3. 提醒 1–2 點需要留意嘅風險（例如跌穿某啲支持位、消息風險、整體大市情況）。
-4. 語氣保持中性唔好太肯定，最後加一句：以上只係參考，唔係任何投資建議。
+1) 用 2–3 句描述最近三個月走勢（偏強、偏弱、定係橫行），可引用 RSI/均線/MACD。
+2) 估計「可能買入區間」同「大約止蝕位」（風險太大可建議觀望）。
+3) 提醒 1–2 點要留意嘅風險（例如跌穿支持、消息風險、大市）。
+4) 最後加一句：以上只係參考，唔係任何投資建議。
 
-請用分段方式輸出，用換行排版清晰。
+用分段輸出，換行排版清晰。
 """
 
 
 def get_ai_advice(prompt: str) -> str:
     try:
         resp = client.responses.create(
-            model="gpt-5.1",
+            model="gpt-5-mini",   # 你話用 gpt-5-mini
             input=prompt,
         )
         return resp.output_text
@@ -212,23 +226,16 @@ def get_ai_advice(prompt: str) -> str:
 
 
 def build_ai_short_prompt(ticker: str, indicators: dict) -> str:
-    """
-    一句話技術總評（快速提示）
-    要求 AI 清楚講：偏強 / 偏弱 / 橫行 + 建議：觀望 / 分段吸納 / 減持
-    """
     return f"""
 你係一個專業股票短線交易顧問。
 
-根據以下最新技術指標，請用 **一句話** 總結呢隻股票嘅短線情況：
-- 必須包含三樣元素：
-  1）簡單判斷：偏強 / 偏弱 / 橫行
-  2）建議傾向：觀望 / 分段吸納 / 減持
-  3）一句簡短風險提示
-- 例如：「目前走勢偏強，可以考慮分段吸納，不過要留意大市回調風險。」
+根據以下最新技術指標，請用 **一句話** 總結呢隻股票短線情況：
+必須包含：
+1）偏強 / 偏弱 / 橫行
+2）觀望 / 分段吸納 / 減持
+3）一句風險提示
 
-要求：
-1. 只輸出一句話，不要分點、不用前綴。
-2. 語氣中性，不要太肯定，不要寫「一定」「必然」。
+只輸出一句話，不要分點。
 
 股票：{ticker}
 最新收市價：{indicators.get("last_price")}
@@ -243,17 +250,14 @@ BOLL 中軌：{indicators.get("boll_mid")}
 BOLL 下軌：{indicators.get("boll_lower")}
 成交量：{indicators.get("volume_str")}（20 日平均：{indicators.get("avg20_volume_str")}）
 52 週高低：{indicators.get("low_52w")} ~ {indicators.get("high_52w")}
-趨勢分數（0–100）：{indicators.get("trend_score")}
+趨勢分數：{indicators.get("trend_score")}
 """
 
 
 def get_ai_short_summary(prompt: str) -> str:
-    """
-    一句話技術總評（AI）
-    """
     try:
         resp = client.responses.create(
-            model="gpt-5.1",
+            model="gpt-5-mini",
             input=prompt,
         )
         return resp.output_text
@@ -262,324 +266,348 @@ def get_ai_short_summary(prompt: str) -> str:
 
 
 # =========================================================
-# 每日精選：技術計分 + AI 排名 + 安全買入區 + 合理價
+# Market Overview（SPY/QQQ/DIA）升級版
 # =========================================================
+def _et_now():
+    return _dt.now(ET)
 
 
-def _fetch_universe_stock_stats(ticker: str) -> dict | None:
-    """
-    幫每日精選用：取 6 個月日線，計 RSI14 + MA60 + 今日漲跌
-    回傳 dict，失敗就回傳 None
-    """
+def _download_daily(ticker: str) -> pd.DataFrame | None:
     try:
         df = yf.download(
             ticker,
-            period="6mo",
+            period="12mo",
             interval="1d",
             auto_adjust=True,
             progress=False,
         )
         if df is None or df.empty or "Close" not in df.columns:
             return None
-
-        close = df["Close"]
-        if len(close) < 60:
-            return None
-
-        # 技術指標
-        rsi_series = calc_rsi(close)
-        ma60_series = close.rolling(60).mean()
-
-        last_close = float(close.iloc[-1])
-        prev_close = float(close.iloc[-2])
-        change_pct = (last_close - prev_close) / prev_close * 100.0
-
-        rsi = float(rsi_series.iloc[-1])
-        ma60_val = float(ma60_series.iloc[-1])
-
-        # 價格相對 MA60 的距離（%）
-        dist_pct = (last_close - ma60_val) / ma60_val * 100.0
-
-        # 成交量（簡化版，取最後一日）
-        if "Volume" in df.columns:
-            last_vol = float(df["Volume"].iloc[-1])
-            vol_str = format_volume(last_vol)
-        else:
-            last_vol = 0.0
-            vol_str = "-"
-
-        return {
-            "ticker": ticker,
-            "last_price": round(last_close, 2),
-            "change_pct": round(change_pct, 2),
-            "rsi": round(rsi, 1),
-            "ma60": round(ma60_val, 1),
-            "dist_pct": round(dist_pct, 2),
-            "volume_str": vol_str,
-        }
+        return df
     except Exception:
         return None
 
 
-def _score_candidate(stats: dict) -> float:
-    """
-    算一個簡單分數，用來排序：
-    - 越接近 RSI=35 越高分（偏超賣但未太極端）
-    - 越接近 MA60 或略低於 MA60，越高分
-    - 跌得太急或 RSI 太高會被扣分
-    """
-    rsi = stats["rsi"]
-    dist = stats["dist_pct"]
-
-    # 以 RSI=35 為中心
-    rsi_score = 40 - abs(rsi - 35)  # 最大約 40 分
-
-    # 價格距離 MA60 越近越好，落在 -15% ~ +5% 內較好
-    dist_score = 0
-    if -20 <= dist <= 10:
-        dist_score = 20 - abs(dist)  # 最高約 20 分
-    elif dist < -25 or dist > 20:
-        dist_score = -10  # 太遠，扣分
-
-    # RSI 太高或太低，額外調整
-    if rsi >= 65:
-        rsi_score -= 15
-    if rsi <= 20:
-        rsi_score -= 10  # 太超賣，波動風險亦大
-
-    return rsi_score + dist_score
-
-
-def build_pick_analysis_prompt(stats: dict, rank: int, total: int) -> str:
-    """
-    每日精選卡片內那段長一點的 AI 文字
-    """
-    return f"""
-你而家係一個專業股票技術分析顧問，幫我用簡單中文（廣東話）分析一隻已經由程式選出來嘅觀察股。
-
-股票代號：{stats["ticker"]}
-目前股價：{stats["last_price"]}
-當日升跌：{stats["change_pct"]}%
-RSI(14)：{stats["rsi"]}
-MA60：{stats["ma60"]}
-股價距離 MA60 百分比：{stats["dist_pct"]}%
-成交量（最近一日）：{stats.get("volume_str", "-")}
-系統排名：第 {rank} / {total} 名（數據根據 RSI + MA60 自動排序）
-
-請用 3–5 句：
-1. 簡單描述最近技術走勢（偏弱 / 偏強 / 橫行）。
-2. 解釋點解會排喺今日清單嘅第 {rank} 位（例如：RSI 較低、接近 MA60 支持等等）。
-3. 簡單講下短線可以留意嘅風險位同需要注意嘅情況（例如跌穿某啲支持位、消息風險）。
-4. 最尾加一句：以上只係技術角度嘅觀察，唔構成任何買賣建議。
-
-輸出時請用段落分行，好似正常人寫嘅短分析一樣。
-"""
-
-
-def build_pick_meta_prompt(stats: dict, rank: int, total: int) -> str:
-    """
-    生成「AI 排名一句話 + 安全買入區 + 合理價」嘅 prompt
-    """
-    return f"""
-你係一位專業技術分析顧問，請根據以下數據，用**極簡短廣東話**比出呢隻股票嘅排名原因同合理價建議。
-
-股票：{stats["ticker"]}
-目前股價：{stats["last_price"]}
-當日升跌：{stats["change_pct"]}%
-RSI(14)：{stats["rsi"]}
-MA60：{stats["ma60"]}
-股價距離 MA60 百分比：{stats["dist_pct"]}%
-系統初步排序：第 {rank} / {total} 名
-成交量：{stats.get("volume_str", "-")}
-
-請只輸出以下三行內容（唔好加其他文字）：
-
-1）AI 排名一句話
-2）安全買入區一句
-3）合理價 / 目標價一句
-
-輸出格式務必如下（三行，每行開頭加 '- '）：
-- AI 排名：...
-- 安全買入區：...
-- 合理價：...
-"""
-
-
-def get_pick_meta_info(prompt: str):
-    """
-    呼叫 AI，回傳 (rank_text, safe_text, fair_text)
-    """
+def _download_weekly(ticker: str) -> pd.DataFrame | None:
     try:
-        resp = client.responses.create(
-            model="gpt-5-mini",
-            input=prompt,
+        df = yf.download(
+            ticker,
+            period="3y",
+            interval="1wk",
+            auto_adjust=True,
+            progress=False,
         )
-        text = resp.output_text.strip()
-        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if df is None or df.empty or "Close" not in df.columns:
+            return None
+        return df
+    except Exception:
+        return None
 
-        # 預期三行，但如果少於三行就用空字串頂住
-        rank_text = lines[0] if len(lines) >= 1 else ""
-        safe_text = lines[1] if len(lines) >= 2 else ""
-        fair_text = lines[2] if len(lines) >= 3 else ""
 
-        return rank_text, safe_text, fair_text
-    except Exception as e:
-        err = f"AI meta 出錯：{e}"
-        return "", "", err
+def _market_signals(
+    rsi14: float | None,
+    price: float | None,
+    ma20: float | None,
+    ma60: float | None
+):
+    s = []
 
-from zoneinfo import ZoneInfo
-from datetime import datetime as _dt  # 用 _dt 避免同你其他 datetime 撞名
+    # ===== RSI 新分界：80 / 50 / 20 =====
+    if rsi14 is not None:
+        if rsi14 >= 80:
+            s.append("RSI 極度超買（>80）")
+        elif rsi14 >= 50:
+            s.append("RSI 強勢區（50–80）")
+        elif rsi14 <= 20:
+            s.append("RSI 極度超賣（<20）")
+        else:
+            s.append("RSI 中性偏弱（20–50）")
 
-ET = ZoneInfo("America/New_York")
+    # ===== 均線 + 價格趨勢 =====
+    if price is not None and ma20 is not None and ma60 is not None:
+        if ma20 > ma60 and price > ma20:
+            s.append("偏強（價在 MA20 上，MA20 > MA60）")
+        elif ma20 < ma60 and price < ma20:
+            s.append("偏弱（價在 MA20 下，MA20 < MA60）")
+        else:
+            s.append("橫行／拉鋸")
 
-MARKET_CACHE = None
-MARKET_CACHE_DATE = None  # 用 ET 日期字串，例如 "2025-12-13"
+    return s
 
-def _et_now():
-    return _dt.now(ET)
+def _rsi_badge(rsi14: float | None):
+    """
+    回傳 (label, css_class)
+    4 級：極度超買 / 強勢 / 中性偏弱 / 極度超賣
+    """
+    if rsi14 is None:
+        return ("RSI --", "badge-neutral")
+
+    if rsi14 >= 80:
+        return (f"RSI {rsi14:.1f} 極度超買", "badge-hot")
+    if rsi14 >= 50:
+        return (f"RSI {rsi14:.1f} 強勢", "badge-strong")
+    if rsi14 <= 20:
+        return (f"RSI {rsi14:.1f} 極度超賣", "badge-cold")
+    return (f"RSI {rsi14:.1f} 中性偏弱", "badge-weak")
+
+
+def _market_grade(rsi14: float | None, price: float | None, ma20: float | None, ma60: float | None):
+    """
+    A / B / C（簡單但實用）
+    - A：趨勢強（價 > MA20 且 MA20 > MA60）+ RSI 在強勢區 (>=50 且 <80)
+    - B：中性/拉鋸（其他非極端情況）
+    - C：偏弱（價 < MA20 且 MA20 < MA60）或 RSI 極端（>80 / <20 風險偏高）
+    """
+    if rsi14 is None or price is None or ma20 is None or ma60 is None:
+        return "B"
+
+    strong_trend = (price > ma20) and (ma20 > ma60)
+    weak_trend = (price < ma20) and (ma20 < ma60)
+
+    extreme = (rsi14 >= 80) or (rsi14 <= 20)
+
+    if strong_trend and (50 <= rsi14 < 80) and not extreme:
+        return "A"
+    if weak_trend or extreme:
+        return "C"
+    return "B"
+
+
+def _market_conclusion(ticker: str, grade: str, rsi14: float | None, price: float | None, ma20: float | None, ma60: float | None):
+    """
+    一句總評（ETF 更實用）
+    """
+    if grade == "A":
+        return f"{ticker}：偏強趨勢市，可順勢操作，但留意回調。"
+    if grade == "C":
+        return f"{ticker}：偏弱或風險偏高，宜保守觀望／等待確認。"
+    return f"{ticker}：拉鋸/橫行，適合等突破或做區間策略。"
+
 
 def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = True):
-    """
-    今日市場概覽：SPY / QQQ / DIA
-    - cache 一日一次（以美東日期計）
-    - force_refresh=True：按鍵手動刷新
-    - auto_refresh_945=True：每日 ET 09:45 之後，第一次有人打開頁面會自動刷新一次
-    """
     global MARKET_CACHE, MARKET_CACHE_DATE
 
     now_et = _et_now()
     today_et = now_et.strftime("%Y-%m-%d")
 
-    # ✅ 有 cache 而且係今日：通常直接用
+    # 有 cache 而且係今日：直接用
     if (not force_refresh) and MARKET_CACHE_DATE == today_et and MARKET_CACHE:
         return MARKET_CACHE
 
-    # ✅ 如果你想「9:45 前唔自動刷新」，就用呢段守門
+    # 9:45 前：如果有舊 cache 就先用（避免朝早狂刷新）
     if (not force_refresh) and auto_refresh_945:
-        # 9:45 前：如果有舊 cache 就照用（避免朝早未開市就成日刷新）
         if now_et.hour < 9 or (now_et.hour == 9 and now_et.minute < 45):
             if MARKET_CACHE:
                 return MARKET_CACHE
 
     tickers = ["SPY", "QQQ", "DIA"]
-    results = []
+    results: list[dict] = []
+    closes_map = {}   # 用嚟後面計 RS
+    dates: list[str] = []
 
     for t in tickers:
-        try:
-            df = yf.download(
-                t,
-                period="6mo",
-                interval="1d",
-                auto_adjust=True,
-                progress=False,
+        ddf = _download_daily(t)
+        if ddf is None or ddf.empty or "Close" not in ddf.columns:
+            results.append({"ticker": t, "error": "no data"})
+            continue
+
+        close = ddf["Close"].dropna()
+        if close.empty:
+            results.append({"ticker": t, "error": "no close"})
+            continue
+
+        price = float(close.iloc[-1])
+        prev = float(close.iloc[-2]) if len(close) >= 2 else price
+        change_pct = ((price - prev) / prev * 100) if prev else 0.0
+        updated_date = close.index[-1].strftime("%Y-%m-%d")
+
+        rsi_series = calc_rsi(close, 14)
+        rsi14 = float(rsi_series.iloc[-1]) if rsi_series is not None and not rsi_series.empty else None
+
+        ma20 = float(close.rolling(20).mean().iloc[-1]) if len(close) >= 20 else None
+        ma60 = float(close.rolling(60).mean().iloc[-1]) if len(close) >= 60 else None
+
+        high_52w = float(close.max()) if len(close) >= 200 else float(close.max())
+        low_52w = float(close.min()) if len(close) >= 200 else float(close.min())
+
+        dist_ma60 = ((price - ma60) / ma60 * 100) if (ma60 and ma60 != 0) else None
+        from_high = ((price - high_52w) / high_52w * 100) if high_52w else None
+
+        # ===== 20 日趋势（百分比）=====
+        trend20_pct = None
+        trend20_dir = None
+
+        if len(close) >= 21:
+            price_20d_ago = float(close.iloc[-21])
+            if price_20d_ago != 0:
+                trend20_pct = round((price / price_20d_ago - 1) * 100, 2)
+                if trend20_pct > 0.3:
+                    trend20_dir = "up"
+                elif trend20_pct < -0.3:
+                    trend20_dir = "down"
+                else:
+                    trend20_dir = "flat"
+
+        # ===== MA20 / MA60 金叉死叉 =====
+        ma_cross = None
+
+        if len(close) >= 61:
+            ma20_prev = float(close.rolling(20).mean().iloc[-2])
+            ma60_prev = float(close.rolling(60).mean().iloc[-2])
+
+            if ma20_prev <= ma60_prev and ma20 > ma60:
+                ma_cross = "golden"   # 金叉
+            elif ma20_prev >= ma60_prev and ma20 < ma60:
+                ma_cross = "death"    # 死叉            
+
+        # === 支撑 / 阻力（20日，容错版）===
+        support20 = None
+        resist20 = None
+
+        # 距离支撑 / 阻力（百分比）
+        dist_support_pct = None
+        dist_resist_pct = None
+        sr_zone = None   # support / resist / mid
+
+        if support20 and price:
+            dist_support_pct = round((price - support20) / support20 * 100, 2)
+
+        if resist20 and price:
+            dist_resist_pct = round((resist20 - price) / resist20 * 100, 2)
+
+        # 位置判断（给前端上色）
+        if dist_support_pct is not None and dist_support_pct <= 2:
+            sr_zone = "support"   # 靠近支撑
+        elif dist_resist_pct is not None and dist_resist_pct <= 2:
+            sr_zone = "resist"    # 靠近阻力
+        else:
+            sr_zone = "mid"
+
+        # === 支撑 / 阻力 区间判断 ===
+        sr_zone = None
+        sr_text = None
+
+        if support20 and resist20 and price:
+            dist_support = (price - support20) / price
+            dist_resist = (resist20 - price) / price
+
+            if abs(dist_support) <= 0.01:
+                sr_zone = "support"
+                sr_text = "靠近支撑区（低风险）"
+            elif abs(dist_resist) <= 0.01:
+                sr_zone = "resist"
+                sr_text = "接近阻力位（追价风险）"
+            else:
+                sr_zone = "middle"
+                sr_text = "区间中段（等方向）"    
+
+        # 优先用 High/Low（较准确）
+        if {"High", "Low"}.issubset(ddf.columns):
+            lowN = ddf["Low"].dropna().tail(20)
+            highN = ddf["High"].dropna().tail(20)
+            if len(lowN) >= 10 and len(highN) >= 10:
+                support20 = float(lowN.min())
+                resist20 = float(highN.max())
+
+        # 如果 High/Low 冇数据：退而求其次用 Close（保证有数）
+        if (support20 is None or resist20 is None) and "Close" in ddf.columns:
+            closeN = ddf["Close"].dropna().tail(20)
+            if len(closeN) >= 10:
+                support20 = float(closeN.min())
+                resist20 = float(closeN.max())
+
+        atr_series = calc_atr(ddf, 14)
+        atr14 = None
+        if atr_series is not None and not atr_series.dropna().empty:
+            atr14 = float(atr_series.dropna().iloc[-1])
+
+        # ATR 转成百分比（更直观）
+        atr_pct = round((atr14 / price) * 100, 2) if atr14 and price else None
+
+        # weekly：睇大方向（可選）
+        wdf = _download_weekly(t)
+        weekly_text = None
+        if wdf is not None and not wdf.empty and "Close" in wdf.columns:
+            wclose = wdf["Close"].dropna()
+            if len(wclose) >= 12:
+                w_first = float(wclose.iloc[-12])
+                w_last = float(wclose.iloc[-1])
+                if w_last > w_first * 1.05:
+                    weekly_text = "近3個月偏向上"
+                elif w_last < w_first * 0.95:
+                    weekly_text = "近3個月偏向下"
+                else:
+                    weekly_text = "近3個月偏橫行"
+
+        signals = _market_signals(rsi14, price, ma20, ma60)
+
+        rsi_label, rsi_class = _rsi_badge(rsi14)
+        grade = _market_grade(rsi14, price, ma20, ma60)
+        conclusion = None
+        if grade == "A":
+            conclusion = "整體屬於偏強結構，可留意回調機會。"
+        elif grade == "B":
+            conclusion = "目前屬於整理區，方向未算明確。"
+        elif grade == "C":
+            conclusion = "走勢偏弱，短線風險較高。"
+
+        results.append({
+            "ticker": t,
+            "last_price": round(price, 2),
+            "change_pct": round(change_pct, 2),
+            "updated_date": updated_date,
+
+            "rsi14": round(rsi14, 2) if rsi14 is not None else None,
+            "ma20": round(ma20, 2) if ma20 is not None else None,
+            "ma60": round(ma60, 2) if ma60 is not None else None,
+            "dist_ma60": round(dist_ma60, 2) if dist_ma60 is not None else None,
+
+            "high_52w": round(high_52w, 2) if high_52w is not None else None,
+            "low_52w": round(low_52w, 2) if low_52w is not None else None,
+            "from_high_pct": round(from_high, 2) if from_high is not None else None,
+
+            "weekly_text": weekly_text,
+            "signals": _market_signals(rsi14, price, ma20, ma60),
+
+            # 🔥 B）新增
+            "rsi_label": rsi_label,
+            "rsi_class": rsi_class,
+            "grade": grade,
+            "conclusion": conclusion,
+            "atr_pct": atr_pct,
+            "support20": round(support20, 2) if support20 is not None else None,
+            "resist20": round(resist20, 2) if resist20 is not None else None,
+            "support20": round(support20, 2) if support20 else None,
+            "resist20": round(resist20, 2) if resist20 else None,
+            "dist_support_pct": dist_support_pct,
+            "dist_resist_pct": dist_resist_pct,
+            "sr_zone": sr_zone,
+            "trend20_pct": trend20_pct,
+            "trend20_dir": trend20_dir,
+            "ma_cross": ma_cross,
+            "sr_zone": sr_zone,
+            "sr_text": sr_text,
+        })
+
+        # 👉 市場最新交易日（以三隻 ETF 入面最新為準）
+        market_latest_date = max(dates) if dates else None
+
+        # 👉 標記邊啲 ETF 資料落後
+        for r in results:
+            r["is_stale"] = (
+                market_latest_date is not None
+                and r.get("updated_date") != market_latest_date
             )
-            if df is None or df.empty or "Close" not in df.columns:
-                results.append({"ticker": t, "error": "no data"})
-                continue
-
-            close = df["Close"].dropna()
-            if close.empty:
-                results.append({"ticker": t, "error": "no close"})
-                continue
-
-            last_close = float(close.iloc[-1])
-            prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
-            change_pct = ((last_close - prev_close) / prev_close * 100) if prev_close else 0.0
-
-            # ✅ 用最後一日數據日期（同個股一致），唔用 “今日”
-            last_dt = close.index[-1]
-            updated_date = last_dt.strftime("%Y-%m-%d")
-
-            rsi_series = calc_rsi(close, 14)
-            rsi14 = float(rsi_series.iloc[-1]) if rsi_series is not None and not rsi_series.empty else None
-
-            ma20 = float(close.rolling(20).mean().iloc[-1]) if len(close) >= 20 else None
-            ma60 = float(close.rolling(60).mean().iloc[-1]) if len(close) >= 60 else None
-
-            results.append({
-                "ticker": t,
-                "last_price": last_close,
-                "change_pct": change_pct,
-                "updated_date": updated_date,
-                "rsi14": round(rsi14, 2) if rsi14 is not None else None,
-                "ma20": round(ma20, 2) if ma20 is not None else None,
-                "ma60": round(ma60, 2) if ma60 is not None else None,
-            })
-
-        except Exception as e:
-            results.append({"ticker": t, "error": str(e)})
+            r["market_latest_date"] = market_latest_date  # 可留可唔留
 
     MARKET_CACHE = results
     MARKET_CACHE_DATE = today_et
     return results
 
-def get_daily_picks(num_picks: int = 3):
-    """
-    每日精選股票：
-    - 從 UNIVERSE 入面掃描
-    - 根據 RSI + MA60 做簡單排序
-    - 再交畀 AI 做文字分析 + 排名理由 + 合理價建議
-    - 結果 cache 一日
-    """
-    global DAILY_PICKS_CACHE, DAILY_PICKS_DATE
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    if DAILY_PICKS_DATE == today and DAILY_PICKS_CACHE:
-        return DAILY_PICKS_CACHE
-
-    DAILY_PICKS_CACHE = []
-    DAILY_PICKS_DATE = today
-
-    if not UNIVERSE:
-        return []
-
-    candidates: list[dict] = []
-    for ticker in UNIVERSE:
-        stats = _fetch_universe_stock_stats(ticker)
-        if not stats:
-            continue
-
-        score = _score_candidate(stats)
-        stats["score"] = score
-        candidates.append(stats)
-
-    if not candidates:
-        return []
-
-    # 用分數由高到低排，揀前 num_picks 隻
-    candidates.sort(key=lambda x: x["score"], reverse=True)
-    top = candidates[:num_picks]
-    total = len(top)
-
-    picks: list[dict] = []
-    for idx, stats in enumerate(top, start=1):
-        # 1) 長一點的技術分析
-        analysis_prompt = build_pick_analysis_prompt(stats, idx, total)
-        reason = get_ai_advice(analysis_prompt)
-
-        # 2) 排名 + 安全買入區 + 合理價
-        meta_prompt = build_pick_meta_prompt(stats, idx, total)
-        rank_text, safe_text, fair_text = get_pick_meta_info(meta_prompt)
-
-        pick = {
-            **stats,
-            "rank": idx,
-            "reason": reason,
-            "rank_text": rank_text,
-            "safe_text": safe_text,
-            "fair_text": fair_text,
-        }
-        picks.append(pick)
-
-    DAILY_PICKS_CACHE = picks
-    return picks
-
 
 # =========================================================
-# Flask 主頁
+# Flask Routes
 # =========================================================
-
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     ticker = ""
@@ -590,8 +618,6 @@ def index():
     chart_prices = []
     error = None
 
-    # 每日精選（內部已經 cache，一日只計一次）
-    daily_picks = DAILY_PICKS_CACHE if DAILY_PICKS_CACHE else []
     market_overview = get_market_overview()
 
     if request.method == "POST":
@@ -601,7 +627,6 @@ def index():
             error = "請輸入股票代號，例如 NVDA、AAPL、QQQ。"
         else:
             try:
-                # 1) 下載 6 個月日線數據（用來畫圖 + 計技術指標）
                 df = yf.download(
                     ticker,
                     period="6mo",
@@ -612,29 +637,26 @@ def index():
 
                 if df is None or df.empty:
                     raise ValueError(f"找不到代號 {ticker} 的數據，可能打錯或者冇上市。")
-
                 if "Close" not in df.columns:
                     raise ValueError("數據缺少 Close 價。")
 
-                close = df["Close"]
-
+                close = df["Close"].dropna()
                 if len(close) < 2:
                     raise ValueError("數據太少，冇辦法計算漲跌。")
 
-                # 成交量（可能有股票冇 Volume，先安全處理）
-                if "Volume" in df.columns:
-                    vol_series = df["Volume"]
+                # volume
+                if "Volume" in df.columns and not df["Volume"].dropna().empty:
+                    vol_series = df["Volume"].dropna()
                     last_vol = float(vol_series.iloc[-1])
                     avg20_vol = float(vol_series.tail(20).mean())
                 else:
                     last_vol = 0.0
                     avg20_vol = 0.0
-                    vol_series = None
 
                 volume_str = format_volume(last_vol)
                 avg20_volume_str = format_volume(avg20_vol)
 
-                # 2) 技術指標
+                # indicators
                 rsi_series = calc_rsi(close)
                 dif, dea, macd_hist = calc_macd(close)
                 ma5 = close.rolling(5).mean()
@@ -642,23 +664,19 @@ def index():
                 ma60 = close.rolling(60).mean()
                 boll_upper, boll_mid, boll_lower = calc_boll(close, 20)
 
-                # 3) 價格 / 漲跌
                 last_close = float(close.iloc[-1])
                 last_date = close.index[-1].strftime("%Y-%m-%d")
-
                 prev_close = float(close.iloc[-2])
-                change = last_close - prev_close
-                change_pct = change / prev_close * 100
+                change_pct = (last_close - prev_close) / prev_close * 100
 
-                # 4) 最近 90 日用來畫圖
+                # chart 90d
                 chart_df = close.tail(90)
                 chart_labels = [idx.strftime("%Y-%m-%d") for idx in chart_df.index]
                 chart_prices = [float(v) for v in chart_df.values]
 
-                # 5) 簡單判斷 90 日走勢
+                # trend text
                 first_90 = float(chart_df.iloc[0])
                 last_90 = float(chart_df.iloc[-1])
-
                 if last_90 > first_90 * 1.05:
                     trend_text = "最近三個月整體屬於向上走勢。"
                 elif last_90 < first_90 * 0.95:
@@ -666,40 +684,34 @@ def index():
                 else:
                     trend_text = "最近三個月大致屬於橫行或窄幅震盪。"
 
-                # 6) 52 週高低價（用 history 1y 估算）
+                # 52w
                 high_52w = None
                 low_52w = None
                 try:
-                    ticker_obj = yf.Ticker(ticker)
-                    hist_1y = ticker_obj.history(period="1y", interval="1d", auto_adjust=True)
-                    if hist_1y is not None and not hist_1y.empty:
+                    tkr = yf.Ticker(ticker)
+                    hist_1y = tkr.history(period="1y", interval="1d", auto_adjust=True)
+                    if hist_1y is not None and not hist_1y.empty and "Close" in hist_1y.columns:
                         high_52w = float(hist_1y["Close"].max())
                         low_52w = float(hist_1y["Close"].min())
                 except Exception:
                     pass
 
-                if high_52w:
-                    from_high_pct = (last_close - high_52w) / high_52w * 100
-                else:
-                    from_high_pct = None
+                from_high_pct = ((last_close - high_52w) / high_52w * 100) if high_52w else None
 
-                # 7) 整合成一個 indicators dict，前端用 dot 語法存取
                 indicators = {
                     "ticker": ticker,
                     "last_price": round(last_close, 2),
                     "last_date": last_date,
                     "change_pct": round(change_pct, 2),
                     "trend_text": trend_text,
-                    "rsi": round(float(rsi_series.iloc[-1]), 2),
-                    "ma5": round(float(ma5.iloc[-1]), 2),
-                    "ma20": round(float(ma20.iloc[-1]), 2),
-                    "ma60": round(float(ma60.iloc[-1]), 2),
-                    "macd": round(float(macd_hist.iloc[-1]), 4),
-                    "boll_upper": round(float(boll_upper.iloc[-1]), 2),
-                    "boll_mid": round(float(boll_mid.iloc[-1]), 2),
-                    "boll_lower": round(float(boll_lower.iloc[-1]), 2),
-                    "volume": int(last_vol) if last_vol else 0,
-                    "avg20_volume": int(avg20_vol) if avg20_vol else 0,
+                    "rsi": round(float(rsi_series.iloc[-1]), 2) if rsi_series is not None and not rsi_series.empty else None,
+                    "ma5": round(float(ma5.iloc[-1]), 2) if len(ma5.dropna()) else None,
+                    "ma20": round(float(ma20.iloc[-1]), 2) if len(ma20.dropna()) else None,
+                    "ma60": round(float(ma60.iloc[-1]), 2) if len(ma60.dropna()) else None,
+                    "macd": round(float(macd_hist.iloc[-1]), 4) if macd_hist is not None and not macd_hist.empty else None,
+                    "boll_upper": round(float(boll_upper.iloc[-1]), 2) if len(boll_upper.dropna()) else None,
+                    "boll_mid": round(float(boll_mid.iloc[-1]), 2) if len(boll_mid.dropna()) else None,
+                    "boll_lower": round(float(boll_lower.iloc[-1]), 2) if len(boll_lower.dropna()) else None,
                     "volume_str": volume_str,
                     "avg20_volume_str": avg20_volume_str,
                     "high_52w": round(high_52w, 2) if high_52w else None,
@@ -707,50 +719,34 @@ def index():
                     "from_high_pct": round(from_high_pct, 2) if from_high_pct is not None else None,
                 }
 
-                # 8) 趨勢打分（0–100）
-                trend_score = compute_trend_score(indicators)
-                indicators["trend_score"] = trend_score
+                indicators["trend_score"] = compute_trend_score(indicators)
 
-                # 9) 簡單技術信號（給前端顯示標籤）
+                # tech signals
                 tech_signals: list[dict] = []
+                rsi = indicators.get("rsi")
 
-                rsi = indicators["rsi"]
-                if rsi >= 70:
-                    tech_signals.append(
-                        {"level": "risk", "label": "RSI 超買", "text": "RSI 高於 70，短線有回調風險。"}
-                    )
-                elif rsi <= 30:
-                    tech_signals.append(
-                        {"level": "opportunity", "label": "RSI 超賣", "text": "RSI 低於 30，屬於超賣區，或有技術反彈機會。"}
-                    )
+                if rsi is not None:
+                    if rsi >= 70:
+                        tech_signals.append({"level": "risk", "label": "RSI 超買", "text": "RSI 高於 70，短線有回調風險。"})
+                    elif rsi <= 30:
+                        tech_signals.append({"level": "opportunity", "label": "RSI 超賣", "text": "RSI 低於 30，屬於超賣區，或有技術反彈機會。"})
 
-                if indicators["ma5"] > indicators["ma20"] > indicators["ma60"]:
-                    tech_signals.append(
-                        {"level": "bull", "label": "多頭排列", "text": "短中長期均線呈多頭排列，整體趨勢偏強。"}
-                    )
-                elif indicators["ma5"] < indicators["ma20"] < indicators["ma60"]:
-                    tech_signals.append(
-                        {"level": "bear", "label": "空頭排列", "text": "短中長期均線呈空頭排列，整體趨勢偏弱。"}
-                    )
+                if indicators.get("ma5") and indicators.get("ma20") and indicators.get("ma60"):
+                    if indicators["ma5"] > indicators["ma20"] > indicators["ma60"]:
+                        tech_signals.append({"level": "bull", "label": "多頭排列", "text": "短中長期均線呈多頭排列，整體趨勢偏強。"})
+                    elif indicators["ma5"] < indicators["ma20"] < indicators["ma60"]:
+                        tech_signals.append({"level": "bear", "label": "空頭排列", "text": "短中長期均線呈空頭排列，整體趨勢偏弱。"})
 
-                if indicators["macd"] > 0:
-                    tech_signals.append(
-                        {"level": "bull", "label": "MACD 正柱", "text": "MACD 柱狀圖在零軸以上，動能偏多。"}
-                    )
-                else:
-                    tech_signals.append(
-                        {"level": "risk", "label": "MACD 負柱", "text": "MACD 在零軸以下，需留意下跌動能。"}
-                    )
+                if indicators.get("macd") is not None:
+                    if indicators["macd"] > 0:
+                        tech_signals.append({"level": "bull", "label": "MACD 正柱", "text": "MACD 柱狀圖在零軸以上，動能偏多。"})
+                    else:
+                        tech_signals.append({"level": "risk", "label": "MACD 負柱", "text": "MACD 在零軸以下，需留意下跌動能。"})
 
                 indicators["tech_signals"] = tech_signals
 
-                # 10) 生成 AI 詳細建議
-                prompt = build_ai_prompt(ticker, indicators)
-                ai_advice = get_ai_advice(prompt)
-
-                # 11) 一句話技術總評
-                short_prompt = build_ai_short_prompt(ticker, indicators)
-                ai_summary = get_ai_short_summary(short_prompt)
+                ai_advice = get_ai_advice(build_ai_prompt(ticker, indicators))
+                ai_summary = get_ai_short_summary(build_ai_short_prompt(ticker, indicators))
 
             except Exception as e:
                 error = f"後端錯誤：{e}"
@@ -764,23 +760,13 @@ def index():
         chart_labels=chart_labels,
         chart_prices=chart_prices,
         error=error,
-        daily_picks=daily_picks,
         market_overview=market_overview,
     )
 
-# ================================
-# 手動刷新每日精選
-# ================================
-from flask import Flask, redirect, url_for
-
-@app.route("/refresh_picks", methods=["POST"])
-def refresh_picks():
-    get_daily_picks(num_picks=3)
-    return redirect(url_for("index"))
 
 @app.post("/refresh_market")
 def refresh_market():
-    get_market_overview(force_refresh=True, auto_refresh_945=False)  # 手動就直接刷新
+    get_market_overview(force_refresh=True, auto_refresh_945=False)
     return redirect(url_for("index"))
 
 

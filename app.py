@@ -433,6 +433,124 @@ def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = Tr
         dist_ma60 = ((price - ma60) / ma60 * 100) if (ma60 and ma60 != 0) else None
         from_high = ((price - high_52w) / high_52w * 100) if high_52w else None
 
+        # ===== 1M / 3M 涨跌%（用同一份 close）=====
+        ret_1m = None
+        ret_3m = None
+        try:
+            if close is not None and len(close) >= 22:
+                ret_1m = (float(close.iloc[-1]) / float(close.iloc[-22]) - 1) * 100
+            if close is not None and len(close) >= 64:
+                ret_3m = (float(close.iloc[-1]) / float(close.iloc[-64]) - 1) * 100
+        except Exception:
+            pass
+
+        # ===== 距离 MA20 / MA60 % =====
+        dist_ma20 = None
+        dist_ma60 = None
+        try:
+            if price is not None and ma20:
+                dist_ma20 = (float(price) / float(ma20) - 1) * 100
+            if price is not None and ma60:
+                dist_ma60 = (float(price) / float(ma60) - 1) * 100
+        except Exception:
+            pass
+
+        # ===== ATR%（可选）=====
+        atr_pct = None
+        try:
+            # df 需要有 High/Low/Close；你用 yf.download(interval="1d") 通常都有
+            if df is not None and not df.empty and all(c in df.columns for c in ["High", "Low", "Close"]):
+                high = df["High"].dropna()
+                low = df["Low"].dropna()
+                c = df["Close"].dropna()
+                if len(c) >= 15:
+                    prev_close = c.shift(1)
+                    tr = (high - low).abs()
+                    tr2 = (high - prev_close).abs()
+                    tr3 = (low - prev_close).abs()
+                    true_range = pd.concat([tr, tr2, tr3], axis=1).max(axis=1)
+                    atr14 = true_range.rolling(14).mean().iloc[-1]
+                    if pd.notna(atr14) and price:
+                        atr_pct = float(atr14) / float(price) * 100
+        except Exception:
+            pass
+
+        # ===== 1周 支撑 / 压力（最近5个交易日）=====
+        week_support = None
+        week_resistance = None
+
+        try:
+            if df is not None and not df.empty and len(df) >= 5:
+                recent = df.tail(5)
+                week_support = float(recent["Low"].min())
+                week_resistance = float(recent["High"].max())
+        except Exception:
+            pass
+
+        # ===== 趋势标签（偏强/整理/偏弱）=====
+        trend_label = "整理"
+        trend_class = "tag-mid"
+        try:
+            if ma20 and ma60 and rsi14 is not None:
+                if float(ma20) > float(ma60) and float(rsi14) >= 55:
+                    trend_label = "偏强"
+                    trend_class = "tag-strong"
+                elif float(ma20) < float(ma60) and float(rsi14) <= 45:
+                    trend_label = "偏弱"
+                    trend_class = "tag-weak"
+        except Exception:
+            pass
+
+        # ===== 今日关键状态（一行总结）=====
+        key_status = None
+        try:
+            if trend_label == "偏强":
+                key_status = "多头结构，占优但留意回调"
+            elif trend_label == "偏弱":
+                key_status = "空方主导，反弹压力较大"
+            else:
+                key_status = "区间整理，等待方向确认"
+        except Exception:
+            pass
+
+        # ===== 今日关键状态（一行总结）=====
+        status_text = ""
+        status_class = "neutral"
+
+        try:
+            if price and ma20 and ma60:
+                if price > ma20 > ma60:
+                    status_text = "强势上行｜站稳 MA20 / MA60"
+                    status_class = "up"
+                elif price > ma60 and price < ma20:
+                    status_text = "回调中｜仍高于 MA60"
+                    status_class = "neutral"
+                elif price < ma20 < ma60:
+                    status_text = "偏弱｜跌破 MA20 / MA60"
+                    status_class = "down"
+                else:
+                    status_text = "区间震荡｜均线缠绕"
+                    status_class = "neutral"
+
+                if rsi14:
+                    if rsi14 >= 70:
+                        status_text += "｜偏热"
+                    elif rsi14 <= 30:
+                        status_text += "｜偏冷"
+
+        except Exception:
+            pass
+
+        dist_to_support = None
+        dist_to_resistance = None
+
+        try:
+            if price and week_support and week_resistance:
+                dist_to_support = (price / week_support - 1) * 100
+                dist_to_resistance = (price / week_resistance - 1) * 100
+        except Exception:
+            pass
+
         # ===== 20 日趋势（百分比）=====
         trend20_pct = None
         trend20_dir = None
@@ -587,6 +705,20 @@ def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = Tr
             "ma_cross": ma_cross,
             "sr_zone": sr_zone,
             "sr_text": sr_text,
+            "ret_1m": None if ret_1m is None else round(ret_1m, 2),
+            "ret_3m": None if ret_3m is None else round(ret_3m, 2),
+            "dist_ma20": None if dist_ma20 is None else round(dist_ma20, 2),
+            "dist_ma60": None if dist_ma60 is None else round(dist_ma60, 2),  
+            "atr_pct": None if atr_pct is None else round(atr_pct, 2),
+            "trend_label": trend_label,
+            "trend_class": trend_class,
+            "status_text": status_text,
+            "status_class": status_class,
+            "week_support": week_support,
+            "week_resistance": week_resistance,
+            "dist_to_support": dist_to_support,
+            "dist_to_resistance": dist_to_resistance,
+            "key_status": key_status,
         })
 
         # 👉 市場最新交易日（以三隻 ETF 入面最新為準）

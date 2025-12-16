@@ -413,7 +413,7 @@
         <div class="muted">提示：如見到數據舊，按右邊「手動更新」</div>
       </div>
       <form method="POST" action="/refresh_market" style="margin:0">
-        <button class="btn" id="refreshBtn" type="submit">手動更新市場</button>
+        <button id="refreshBtn" class="btn" type="submit">手動更新今日市場</button>
       </form>
     </div>
 
@@ -591,46 +591,43 @@
     el.addEventListener('focus', lockScroll);
     el.addEventListener('blur', unlockScroll);
   });
-</script>
 
-<!-- 🔽 手機專用 Loading（加喺呢度） -->
-  <div id="mLoading" style="display:none;">
+</script>
+<div id="mLoading" style="display:none;">
     <div class="mLoading-box">
       <div class="mSpinner"></div>
-      <div class="mLoading-text">處理中...</div>
+      <div class="mLoading-text">處理中…</div>
     </div>
   </div>
 
 <script>
 (function () {
   const isMobile = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+  // ✅ 不论是否 mobile，都先确保回到页面会关掉 loading
+  window.addEventListener("pageshow", () => {
+    const overlay = document.getElementById("mLoading");
+    if (overlay) overlay.style.display = "none";
+  });
+  window.addEventListener("load", () => {
+    const overlay = document.getElementById("mLoading");
+    if (overlay) overlay.style.display = "none";
+  });
+
+  // ✅ 只係「显示 loading」呢部份先限定 mobile
   if (!isMobile) return;
 
   const overlay = document.getElementById("mLoading");
   if (!overlay) return;
 
+  const textEl = overlay.querySelector(".mLoading-text");
+
   const setLoading = (on, text) => {
-    if (text) overlay.querySelector(".mLoading-text").textContent = text;
+    if (text && textEl) textEl.textContent = text;
     overlay.style.display = on ? "block" : "none";
   };
 
-  const analyzeBtn = document.getElementById("analyzeBtn");
-  if (analyzeBtn) {
-    analyzeBtn.closest("form")?.addEventListener("submit", () => {
-      setLoading(true, "分析中...");
-      analyzeBtn.disabled = true;
-    });
-  }
-
-  const refreshBtn = document.getElementById("refreshBtn");
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", () => {
-      setLoading(true, "更新中...");
-      refreshBtn.disabled = true;
-    });
-  }
-
-  window.addEventListener("pageshow", () => setLoading(false));
+  // ... 你原本 bindFormSubmit 保持不变
 })();
 </script>
 

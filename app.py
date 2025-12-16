@@ -276,7 +276,7 @@ def _download_daily(ticker: str) -> pd.DataFrame | None:
     try:
         df = yf.download(
             ticker,
-            period="12mo",
+            period="3mo",
             interval="1d",
             auto_adjust=True,
             progress=False,
@@ -292,7 +292,7 @@ def _download_weekly(ticker: str) -> pd.DataFrame | None:
     try:
         df = yf.download(
             ticker,
-            period="3y",
+            period="3mo",
             interval="1wk",
             auto_adjust=True,
             progress=False,
@@ -629,7 +629,7 @@ def index():
             try:
                 df = yf.download(
                     ticker,
-                    period="6mo",
+                    period="4mo",
                     interval="1d",
                     auto_adjust=True,
                     progress=False,
@@ -689,14 +689,14 @@ def index():
                 low_52w = None
                 try:
                     tkr = yf.Ticker(ticker)
-                    hist_1y = tkr.history(period="1y", interval="1d", auto_adjust=True)
-                    if hist_1y is not None and not hist_1y.empty and "Close" in hist_1y.columns:
-                        high_52w = float(hist_1y["Close"].max())
-                        low_52w = float(hist_1y["Close"].min())
+                    hist_4m = tkr.history(period="4m", interval="1d", auto_adjust=True)
+                    if hist_4m is not None and not hist_4m.empty and "Close" in hist_4m.columns:
+                        high_52w = float(hist_4m["Close"].max())
+                        low_52w = float(hist_4m["Close"].min())
                 except Exception:
                     pass
 
-                from_high_pct = ((last_close - high_52w) / high_52w * 100) if high_52w else None
+                from_high_pct = ((last_close - high_52w) / high_52w * 100) if high_52w else None                                        
 
                 rsi_val = round(float(rsi_series.iloc[-1]), 2) if (rsi_series is not None and not rsi_series.empty) else None
 

@@ -601,34 +601,40 @@
   </div>
 
 <script>
-(function () {
-  const isMobile = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-
-  // ✅ 不论是否 mobile，都先确保回到页面会关掉 loading
-  window.addEventListener("pageshow", () => {
-    const overlay = document.getElementById("mLoading");
-    if (overlay) overlay.style.display = "none";
-  });
-  window.addEventListener("load", () => {
-    const overlay = document.getElementById("mLoading");
-    if (overlay) overlay.style.display = "none";
-  });
-
-  // ✅ 只係「显示 loading」呢部份先限定 mobile
+document.addEventListener("DOMContentLoaded", () => {
+  // ✅ iPhone Safari 更穩：用 UA 判斷 mobile
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if (!isMobile) return;
 
   const overlay = document.getElementById("mLoading");
-  if (!overlay) return;
-
-  const textEl = overlay.querySelector(".mLoading-text");
+  const textEl = overlay ? overlay.querySelector(".mLoading-text") : null;
 
   const setLoading = (on, text) => {
+    if (!overlay) return;
     if (text && textEl) textEl.textContent = text;
     overlay.style.display = on ? "block" : "none";
   };
 
-  // ... 你原本 bindFormSubmit 保持不变
-})();
+  // ✅ 防 Safari 返回上一頁卡住
+  window.addEventListener("pageshow", () => setLoading(false));
+  window.addEventListener("load", () => setLoading(false));
+
+  const bindFormSubmit = (btnId, msg) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    const form = btn.closest("form");
+    if (!form) return;
+
+    form.addEventListener("submit", () => {
+      setLoading(true, msg);
+      btn.disabled = true;
+    });
+  };
+
+  // ✅ 你兩個掣（你張圖見到 ID 係 analyzeBtn / refreshBtn）
+  bindFormSubmit("analyzeBtn", "分析中...");
+  bindFormSubmit("refreshBtn", "更新中...");
+});
 </script>
 
 </body>

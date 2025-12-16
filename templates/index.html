@@ -128,11 +128,124 @@
     @media (max-width: 640px) {
       .grid3 { grid-template-columns: 1fr !important; }
     }
+
+    html, body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      overscroll-behavior: none;
+    }
+
+    input, textarea {
+      font-size: 16px !important;
+    }
+
+    input[type="text"], input[type="search"] {
+      height: 44px;
+      line-height: 44px;
+      padding: 0 12px;
+    }
   </style>
 </head>
 <body>
 <div class="wrap">
+  <!-- Single stock -->
+  <div class="card">
+    <h2>🔎 個股分析（技術指標 + AI）</h2>
 
+    <form method="POST" action="/" style="margin-top:10px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input class="input" name="ticker" placeholder="輸入代號，例如 NVDA / AAPL / TSLA / QQQ" value="{{ ticker }}" style="flex:1;min-width:220px">
+        <button class="btn" type="submit">分析</button>
+      </div>
+    </form>
+
+    {% if error %}
+      <div class="sep"></div>
+      <div class="muted">❌ {{ error }}</div>
+    {% endif %}
+
+    {% if indicators %}
+      <div class="sep"></div>
+
+      <h3 style="margin:0 0 8px 0">{{ indicators.ticker }}　${{ indicators.last_price }}　
+        {% if indicators.change_pct is not none %}
+          {% if indicators.change_pct >= 0 %}
+            <span class="chg up">▲ {{ indicators.change_pct }}%</span>
+          {% else %}
+            <span class="chg down">▼ {{ indicators.change_pct }}%</span>
+          {% endif %}
+        {% endif %}
+      </h3>
+      <div class="muted">收市日：{{ indicators.last_date }}｜趨勢分數：{{ indicators.trend_score }}</div>
+
+      <div style="margin-top:10px">
+        <span class="chip">RSI {{ indicators.rsi }}</span>
+        <span class="chip">MA5 {{ indicators.ma5 }}</span>
+        <span class="chip">MA20 {{ indicators.ma20 }}</span>
+        <span class="chip">MA60 {{ indicators.ma60 }}</span>
+        <span class="chip">MACD {{ indicators.macd }}</span>
+        <span class="chip">BOLL {{ indicators.boll_lower }} ~ {{ indicators.boll_upper }}</span>
+        <span class="chip">量 {{ indicators.volume_str }}（20日均 {{ indicators.avg20_volume_str }}）</span>
+      </div>
+
+      {% if indicators.high_52w and indicators.low_52w %}
+        <div class="muted" style="margin-top:8px">
+          52週：{{ indicators.low_52w }} ~ {{ indicators.high_52w }}｜距高位：{{ indicators.from_high_pct }}%
+        </div>
+      {% endif %}
+
+      {% if indicators.tech_signals %}
+        <div style="margin-top:10px">
+          {% for s in indicators.tech_signals %}
+            <span class="chip">{{ s.label }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if ai_summary %}
+        <div class="sep"></div>
+        <div class="muted">一句話總評：</div>
+        <pre>{{ ai_summary }}</pre>
+      {% endif %}
+
+      {% if ai_advice %}
+        <div class="sep"></div>
+        <div class="muted">AI 詳細分析：</div>
+        <pre>{{ ai_advice }}</pre>
+      {% endif %}
+
+      <div class="sep"></div>
+      <h3 style="margin:0 0 10px 0">📈 最近90日走勢</h3>
+      <canvas id="priceChart" height="110"></canvas>
+
+      <script>
+        const labels = {{ chart_labels|tojson }};
+        const prices = {{ chart_prices|tojson }};
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: '{{ indicators.ticker }} Close',
+              data: prices,
+              tension: 0.2,
+              pointRadius: 0,
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: true } },
+            scales: {
+              x: { ticks: { maxTicksLimit: 8 } }
+            }
+          }
+        });
+      </script>
+    {% endif %}
+  </div>
+  
   <!-- Market Overview -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -302,103 +415,24 @@
 
   <div style="height:14px"></div>
 
-  <!-- Single stock -->
-  <div class="card">
-    <h2>🔎 個股分析（技術指標 + AI）</h2>
-
-    <form method="POST" action="/" style="margin-top:10px">
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <input class="input" name="ticker" placeholder="輸入代號，例如 NVDA / AAPL / TSLA / QQQ" value="{{ ticker }}" style="flex:1;min-width:220px">
-        <button class="btn" type="submit">分析</button>
-      </div>
-    </form>
-
-    {% if error %}
-      <div class="sep"></div>
-      <div class="muted">❌ {{ error }}</div>
-    {% endif %}
-
-    {% if indicators %}
-      <div class="sep"></div>
-
-      <h3 style="margin:0 0 8px 0">{{ indicators.ticker }}　${{ indicators.last_price }}　
-        {% if indicators.change_pct is not none %}
-          {% if indicators.change_pct >= 0 %}
-            <span class="chg up">▲ {{ indicators.change_pct }}%</span>
-          {% else %}
-            <span class="chg down">▼ {{ indicators.change_pct }}%</span>
-          {% endif %}
-        {% endif %}
-      </h3>
-      <div class="muted">收市日：{{ indicators.last_date }}｜趨勢分數：{{ indicators.trend_score }}</div>
-
-      <div style="margin-top:10px">
-        <span class="chip">RSI {{ indicators.rsi }}</span>
-        <span class="chip">MA5 {{ indicators.ma5 }}</span>
-        <span class="chip">MA20 {{ indicators.ma20 }}</span>
-        <span class="chip">MA60 {{ indicators.ma60 }}</span>
-        <span class="chip">MACD {{ indicators.macd }}</span>
-        <span class="chip">BOLL {{ indicators.boll_lower }} ~ {{ indicators.boll_upper }}</span>
-        <span class="chip">量 {{ indicators.volume_str }}（20日均 {{ indicators.avg20_volume_str }}）</span>
-      </div>
-
-      {% if indicators.high_52w and indicators.low_52w %}
-        <div class="muted" style="margin-top:8px">
-          52週：{{ indicators.low_52w }} ~ {{ indicators.high_52w }}｜距高位：{{ indicators.from_high_pct }}%
-        </div>
-      {% endif %}
-
-      {% if indicators.tech_signals %}
-        <div style="margin-top:10px">
-          {% for s in indicators.tech_signals %}
-            <span class="chip">{{ s.label }}</span>
-          {% endfor %}
-        </div>
-      {% endif %}
-
-      {% if ai_summary %}
-        <div class="sep"></div>
-        <div class="muted">一句話總評：</div>
-        <pre>{{ ai_summary }}</pre>
-      {% endif %}
-
-      {% if ai_advice %}
-        <div class="sep"></div>
-        <div class="muted">AI 詳細分析：</div>
-        <pre>{{ ai_advice }}</pre>
-      {% endif %}
-
-      <div class="sep"></div>
-      <h3 style="margin:0 0 10px 0">📈 最近90日走勢</h3>
-      <canvas id="priceChart" height="110"></canvas>
-
-      <script>
-        const labels = {{ chart_labels|tojson }};
-        const prices = {{ chart_prices|tojson }};
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: '{{ indicators.ticker }} Close',
-              data: prices,
-              tension: 0.2,
-              pointRadius: 0,
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: true } },
-            scales: {
-              x: { ticks: { maxTicksLimit: 8 } }
-            }
-          }
-        });
-      </script>
-    {% endif %}
-  </div>
-
 </div>
+<!-- ✅ 必做②：锁 scroll JS（放这里） -->
+<script>
+  const lockScroll = () => {
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+  };
+
+  const unlockScroll = () => {
+    document.body.style.position = '';
+    document.body.style.width = '';
+  };
+
+  document.querySelectorAll('input, textarea').forEach(el => {
+    el.addEventListener('focus', lockScroll);
+    el.addEventListener('blur', unlockScroll);
+  });
+</script>
+
 </body>
 </html>

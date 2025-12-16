@@ -72,6 +72,62 @@
       color: #9ca3af;
       border: 1px solid #374151;
     }
+
+    /* ✅ 防止整頁橫向爆出去 */
+    html, body { overflow-x: hidden; }
+
+    /* ✅ 卡片內任何文字都要識換行 */
+    .card, .muted, .muted2, .ai-box, .ai-summary, .ai-advice {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    /* ✅ 如果你 AI 內容係用 <pre> 或 code 顯示，咁要特別處理 */
+    pre, code {
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    /* ✅ 圖表/內容唔好超出卡片 */
+    .card { overflow: hidden; }
+    canvas { max-width: 100% !important; height: auto !important; display:block; }
+
+    /* ✅ iPhone / 手機：防橫向爆版 */
+    html, body { max-width: 100%; overflow-x: hidden; }
+    * { box-sizing: border-box; }
+
+    /* ✅ 外框同卡片唔好硬性寬度 */
+    .wrap { width: 100%; max-width: 100%; padding: 14px; }
+    .card { width: 100%; max-width: 100%; overflow: hidden; }
+
+    /* ✅ 所有文字都允許斷行（尤其 AI 內容） */
+    .card, .muted, .muted2, .ai, .ai-box, .ai-summary, .ai-advice {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    /* ✅ chip / badge 會好多字：要可以換行＋唔好超出 */
+    .chips, .badges, .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip, .badge {
+      max-width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    /* ✅ 圖表/canvas 一定要跟容器縮放 */
+    canvas { max-width: 100% !important; height: auto !important; display: block; }
+
+    /* ✅ 手機：三格變一格，避免 grid 撐爆 */
+    @media (max-width: 640px) {
+      .grid3 { grid-template-columns: 1fr !important; }
+    }
   </style>
 </head>
 <body>

@@ -698,13 +698,31 @@ def index():
 
                 from_high_pct = ((last_close - high_52w) / high_52w * 100) if high_52w else None
 
+                rsi_val = round(float(rsi_series.iloc[-1]), 2) if (rsi_series is not None and not rsi_series.empty) else None
+
+                # RSI 颜色 class + 文案
+                if rsi_val is None:
+                    rsi_label, rsi_class = None, None
+                elif rsi_val < 30:
+                    rsi_label, rsi_class = f"RSI {rsi_val} 超卖", "rsi-low"
+                elif rsi_val < 45:
+                    rsi_label, rsi_class = f"RSI {rsi_val} 偏弱", "rsi-weak"
+                elif rsi_val <= 60:
+                    rsi_label, rsi_class = f"RSI {rsi_val} 中性", "rsi-mid"
+                elif rsi_val <= 70:
+                    rsi_label, rsi_class = f"RSI {rsi_val} 偏强", "rsi-strong"
+                else:
+                    rsi_label, rsi_class = f"RSI {rsi_val} 超买", "rsi-high"
+
                 indicators = {
                     "ticker": ticker,
                     "last_price": round(last_close, 2),
                     "last_date": last_date,
                     "change_pct": round(change_pct, 2),
                     "trend_text": trend_text,
-                    "rsi": round(float(rsi_series.iloc[-1]), 2) if rsi_series is not None and not rsi_series.empty else None,
+                    "rsi": rsi_val,
+                    "rsi_label": rsi_label,
+                    "rsi_class": rsi_class,
                     "ma5": round(float(ma5.iloc[-1]), 2) if len(ma5.dropna()) else None,
                     "ma20": round(float(ma20.iloc[-1]), 2) if len(ma20.dropna()) else None,
                     "ma60": round(float(ma60.iloc[-1]), 2) if len(ma60.dropna()) else None,

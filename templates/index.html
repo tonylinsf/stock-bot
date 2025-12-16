@@ -73,6 +73,118 @@
       border: 1px solid #374151;
     }
 
+    .rsi-low   { background:#3a1a1a; color:#ff9c9c; border:1px solid #e74c3c; }
+    .rsi-weak  { background:#2b2a15; color:#ffd36a; border:1px solid #e0b34a; }
+    .rsi-mid   { background:#1f2937; color:#9ca3af; border:1px solid #374151; }
+    .rsi-strong{ background:#123f2d; color:#7cffb2; border:1px solid #2ecc71; }
+    .rsi-high  { background:#2a1455; color:#c7b2ff; border:1px solid #8b5cf6; }
+
+    /* RSI 颜色分级 */
+    .rsi-low {
+      background: rgba(46, 204, 113, 0.18);
+      color: #2ecc71;
+      border: 1px solid #2ecc71;
+    }
+
+    .rsi-weak {
+      background: rgba(52, 152, 219, 0.18);
+      color: #5dade2;
+      border: 1px solid #5dade2;
+    }
+
+    .rsi-strong {
+      background: rgba(241, 196, 15, 0.18);
+      color: #f1c40f;
+      border: 1px solid #f1c40f;
+    }
+
+    .rsi-high {
+      background: rgba(231, 76, 60, 0.18);
+      color: #e74c3c;
+      border: 1px solid #e74c3c;
+    }
+
+    /* ===== 彩色 chips ===== */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      line-height: 1;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.92);
+      white-space: nowrap;
+    }
+
+    /* MA / 一般指標（藍色系） */
+    .chip-ma {
+      background: rgba(62, 152, 255, .18);
+      border-color: rgba(62, 152, 255, .35);
+      color: #bfe0ff;
+    }
+
+    /* RSI 顏色（跟你想要的：超買紅、接近超買黃、中性灰/藍、偏弱偏青、超賣綠） */
+    .chip-rsi-low {   /* <=30 超賣 */
+      background: rgba(46, 204, 113, .18);
+      border-color: rgba(46, 204, 113, .35);
+      color: #bff7d0;
+    }
+    .chip-rsi-weak {  /* 30~45 偏弱 */
+      background: rgba(0, 206, 201, .16);
+      border-color: rgba(0, 206, 201, .32);
+      color: #bffaf7;
+    }
+    .chip-rsi-mid {   /* 45~60 中性 */
+      background: rgba(170, 180, 200, .14);
+      border-color: rgba(170, 180, 200, .28);
+      color: #e7ecf6;
+    }
+    .chip-rsi-strong {/* 60~70 偏強（黃色） */
+      background: rgba(255, 193, 7, .18);
+      border-color: rgba(255, 193, 7, .35);
+      color: #ffe7a8;
+    }
+    .chip-rsi-high {  /* >=70 超買（紅色） */
+      background: rgba(255, 77, 79, .18);
+      border-color: rgba(255, 77, 79, .38);
+      color: #ffd0d0;
+    }
+
+    /* ===== 趨勢分數 bar ===== */
+    .score-wrap{
+      margin-top: 10px;
+    }
+    .score-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      color: rgba(255,255,255,.8);
+      font-size: 13px;
+    }
+    .score-num{
+      font-size: 20px;
+      font-weight: 800;
+      color: rgba(255,255,255,.95);
+    }
+    .score-bar{
+      margin-top: 8px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .score-fill{
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #2ecc71 0%, #f1c40f 55%, #ff4d4f 100%);
+    }
+
     /* ✅ 防止整頁橫向爆出去 */
     html, body { overflow-x: hidden; }
 
@@ -179,8 +291,23 @@
       </h3>
       <div class="muted">收市日：{{ indicators.last_date }}｜趨勢分數：{{ indicators.trend_score }}</div>
 
-      <div style="margin-top:10px">
-        <span class="chip">RSI {{ indicators.rsi }}</span>
+      <div class="score-wrap">
+        <div class="score-row">
+          <div>趨勢分數（0–100）：</div>
+          <div class="score-num">{{ indicators.trend_score }}/100</div>
+       </div>
+       <div class="score-bar">
+         <div class="score-fill" style="width: {{ indicators.trend_score }}%"></div>
+       </div>
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        {% if indicators.rsi is not none %}
+          <span class="chip {{ indicators.rsi_class }}">
+            RSI14 {{ indicators.rsi }}
+            {% if indicators.rsi_label %}<span style="opacity:.85">（{{ indicators.rsi_label.split(' ')[-1] }}）</span>{% endif %}
+          </span>
+        {% endif %}
         <span class="chip">MA5 {{ indicators.ma5 }}</span>
         <span class="chip">MA20 {{ indicators.ma20 }}</span>
         <span class="chip">MA60 {{ indicators.ma60 }}</span>
@@ -245,7 +372,7 @@
       </script>
     {% endif %}
   </div>
-  
+
   <!-- Market Overview -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -382,11 +509,11 @@
             <!-- 🔥 RSI 狀態 + 市場評級 -->
            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
 
-             {% if m.rsi_label %}
-                  <span class="badge {{ m.rsi_class }}">
-                   {{ m.rsi_label }}
-                  </span>
+             {% if m.rsi14 is not none %}
+               <span class="chip {{ m.rsi_class }}">RSI14 {{ "%.2f"|format(m.rsi14) }}</span>
              {% endif %}
+             {% if m.ma20 is not none %}<span class="chip chip-ma">MA20 {{ m.ma20 }}</span>{% endif %}
+             {% if m.ma60 is not none %}<span class="chip chip-ma">MA60 {{ m.ma60 }}</span>{% endif %}
 
              {% if m.grade %}
                   <span class="badge badge-grade">

@@ -363,6 +363,13 @@
         <span class="chip">BOLL {{ indicators.boll_lower }} ~ {{ indicators.boll_upper }}</span>
         <span class="chip">量 {{ indicators.volume_str }}（20日均 {{ indicators.avg20_volume_str }}）</span>
       </div>
+      {% if indicators.status_text %}
+        <div class="muted" style="margin-top:8px;">
+          <span class="pill {{ indicators.status_class }}">
+            {{ indicators.status_text }}
+          </span>
+        </div>
+      {% endif %}
 
       {% if indicators.high_52w and indicators.low_52w %}
         <div class="muted" style="margin-top:8px">
@@ -388,36 +395,8 @@
         <div class="sep"></div>
         <div class="muted">AI 詳細分析：</div>
         <pre>{{ ai_advice }}</pre>
-      {% endif %}
-
-      <div class="sep"></div>
-      <h3 style="margin:0 0 10px 0">📈 最近90日走勢</h3>
-      <canvas id="priceChart" height="110"></canvas>
-
-      <script>
-        const labels = {{ chart_labels|tojson }};
-        const prices = {{ chart_prices|tojson }};
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: '{{ indicators.ticker }} Close',
-              data: prices,
-              tension: 0.2,
-              pointRadius: 0,
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: true } },
-            scales: {
-              x: { ticks: { maxTicksLimit: 8 } }
-            }
-          }
-        });
-      </script>
+      {% endif %}   
+      <div>
     {% endif %}
   </div>
 

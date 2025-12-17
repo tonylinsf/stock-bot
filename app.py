@@ -24,6 +24,45 @@ MARKET_CACHE_DATE: str | None = None  # ET 日期字串，例如 "2025-12-15"
 # =========================================================
 # 技術指標
 # =========================================================
+def build_today_status(last_close, ma20, ma60, rsi14, macd=None, macd_signal=None):
+    if last_close is None or ma20 is None or ma60 is None or rsi14 is None:
+        return None, None
+
+    # 趨勢基礎
+    above20 = last_close >= ma20
+    above60 = last_close >= ma60
+    ma_bull = ma20 >= ma60
+
+    # RSI 狀態
+    if rsi14 >= 70:
+        rsi_tag = "RSI偏高(≥70)"
+    elif rsi14 <= 30:
+        rsi_tag = "RSI偏低(≤30)"
+    else:
+        rsi_tag = f"RSI中性({rsi14:.0f})"
+
+    # MACD（可選）
+    macd_tag = None
+    if macd is not None and macd_signal is not None:
+        macd_tag = "MACD偏多" if macd >= macd_signal else "MACD偏空"
+
+    # 一句總結
+    if ma_bull and above20 and above60 and rsi14 >= 50:
+        text = f"✅ 偏多：站上MA20/60，{rsi_tag}"
+        cls = "up"
+    elif (not ma_bull) and (not above20) and (not above60) and rsi14 <= 50:
+        text = f"⚠️ 偏空：跌破MA20/60，{rsi_tag}"
+        cls = "down"
+    else:
+        text = f"⏸️ 盤整：MA糾纏/方向未明，{rsi_tag}"
+        cls = "mid"
+
+    if macd_tag:
+        text += f"，{macd_tag}"
+
+    return text, cls
+
+
 def calc_atr_pct(df: pd.DataFrame, period: int = 14) -> float | None:
     """
     用 High/Low/Close 計 ATR，最後回傳 ATR%（ATR/Price*100）
@@ -743,11 +782,9 @@ def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = Tr
 @app.route("/", methods=["GET", "POST"])
 def index():
     ticker = ""
-    indicators = None
+    indicators = {}
     ai_advice = None
     ai_summary = None
-    chart_labels = []
-    chart_prices = []
     error = None
 
     market_overview = get_market_overview()
@@ -801,20 +838,41 @@ def index():
                 prev_close = float(close.iloc[-2])
                 change_pct = (last_close - prev_close) / prev_close * 100
 
-                # chart 90d
-                chart_df = close.tail(90)
-                chart_labels = [idx.strftime("%Y-%m-%d") for idx in chart_df.index]
-                chart_prices = [float(v) for v in chart_df.values]
+                # trend text（近 3 個月，用 df）
+                trend_text = ""
 
-                # trend text
-                first_90 = float(chart_df.iloc[0])
-                last_90 = float(chart_df.iloc[-1])
-                if last_90 > first_90 * 1.05:
-                    trend_text = "最近三個月整體屬於向上走勢。"
-                elif last_90 < first_90 * 0.95:
-                    trend_text = "最近三個月整體偏向下跌或調整。"
-                else:
-                    trend_text = "最近三個月大致屬於橫行或窄幅震盪。"
+                try:
+                    recent = close.tail(60)  # 約 3 個月交易日
+                    first_90 = float(recent.iloc[0])
+                    last_90 = float(recent.iloc[-1])
+
+                    if last_90 > first_90 * 1.05:
+                        trend_text = "最近三個月整體屬於向上走勢。"
+                    elif last_90 < first_90 * 0.95:
+                        trend_text = "最近三個月整體偏向下跌或調整。"
+                    else:
+                        trend_text = "最近三個月大致屬於橫行或區間震盪。"
+                except Exception:
+                    trend_text = ""
+
+                # =========================
+                # 今日关键状态（一行总结）
+                # =========================
+                try:
+                    status_text, status_class = build_today_status(
+                        last_close,
+                        float(ma20.iloc[-1]) if ma20 is not None else None,
+                        float(ma60.iloc[-1]) if ma60 is not None else None,
+                        float(rsi_series.iloc[-1]) if rsi_series is not None else None,
+                        float(dif.iloc[-1]) if dif is not None else None,
+                        float(dea.iloc[-1]) if dea is not None else None,
+                    )
+
+                    indicators["status_text"] = status_text
+                    indicators["status_class"] = status_class  
+                except Exception:
+                    indicators["status_text"] = None
+                    indicators["status_class"] = None 
 
                 # 52w
                 high_52w = None
@@ -907,8 +965,6 @@ def index():
         indicators=indicators,
         ai_advice=ai_advice,
         ai_summary=ai_summary,
-        chart_labels=chart_labels,
-        chart_prices=chart_prices,
         error=error,
         market_overview=market_overview,
     )

@@ -293,6 +293,18 @@
       }
       @keyframes mspin { to { transform: rotate(360deg); } }
     }
+
+    .btn.loading { opacity: .75; pointer-events: none; }
+    .spinner{
+      width:14px;height:14px;border-radius:50%;
+      border:2px solid rgba(255,255,255,.35);
+      border-top-color:#fff;
+      display:inline-block;
+      animation: spin .8s linear infinite;
+      vertical-align: -2px;
+      margin-right:8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -643,32 +655,58 @@
 
 <script>
 (function () {
-  const isMobile = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+  // ✅ 用更穩陣嘅手機判斷（iPhone/Safari 一定中）
+  const isMobile =
+    window.matchMedia("(max-width: 768px)").matches ||
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0;
 
-  // ✅ 不论是否 mobile，都先确保回到页面会关掉 loading
-  window.addEventListener("pageshow", () => {
+  // ✅ 無論係 mobile 定 desktop，返回頁面都要關掉 loading
+  function hideLoading() {
     const overlay = document.getElementById("mLoading");
     if (overlay) overlay.style.display = "none";
-  });
-  window.addEventListener("load", () => {
-    const overlay = document.getElementById("mLoading");
-    if (overlay) overlay.style.display = "none";
-  });
+    const btn1 = document.getElementById("analyzeBtn");
+    const btn2 = document.getElementById("refreshBtn");
+    if (btn1) { btn1.classList.remove("loading"); btn1.disabled = false; }
+    if (btn2) { btn2.classList.remove("loading"); btn2.disabled = false; }
+  }
+  window.addEventListener("pageshow", hideLoading);
+  window.addEventListener("load", hideLoading);
 
-  // ✅ 只係「显示 loading」呢部份先限定 mobile
+  // ✅ 只係「顯示 loading」先限制 mobile（你想 desktop 唔彈就保留）
   if (!isMobile) return;
 
   const overlay = document.getElementById("mLoading");
   if (!overlay) return;
 
-  const textEl = overlay.querySelector(".mLoading-text");
+  const textEL = overlay.querySelector(".mLoading-text");
 
-  const setLoading = (on, text) => {
-    if (text && textEl) textEl.textContent = text;
+  function setLoading(on, text) {
+    if (text && textEL) textEL.textContent = text;
     overlay.style.display = on ? "block" : "none";
-  };
+  }
 
-  // ... 你原本 bindFormSubmit 保持不变
+  // ✅ 綁「個股分析」form + button
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  const analyzeForm = analyzeBtn ? analyzeBtn.closest("form") : null;
+  if (analyzeForm && analyzeBtn) {
+    analyzeForm.addEventListener("submit", () => {
+      analyzeBtn.classList.add("loading");
+      analyzeBtn.disabled = true;
+      setLoading(true, "分析中…");
+    });
+  }
+
+  // ✅ 綁「手動更新今日市場」form + button
+  const refreshBtn = document.getElementById("refreshBtn");
+  const refreshForm = refreshBtn ? refreshBtn.closest("form") : null;
+  if (refreshForm && refreshBtn) {
+    refreshForm.addEventListener("submit", () => {
+      refreshBtn.classList.add("loading");
+      refreshBtn.disabled = true;
+      setLoading(true, "更新市場中…");
+    });
+  }
 })();
 </script>
 

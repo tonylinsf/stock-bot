@@ -82,6 +82,9 @@
     .pill.up { background:#1f6f43; color:#b9ffd9; }
     .pill.down { background:#5a1e1e; color:#ffb3b3; }
     .pill.neutral { background:#333; color:#ddd; }
+    .pill-buy { border:1px solid rgba(0,255,160,.35); }
+    .pill-stop { border:1px solid rgba(255,90,90,.45); }
+    .pill-res { border:1px solid rgba(255,200,0,.35); }
 
     /* RSI 颜色分级 */
     .rsi-low {
@@ -305,6 +308,13 @@
       margin-right:8px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-line{padding:10px 12px;border-radius:10px;margin-top:10px;border:1px solid rgba(255,255,255,.10);font-weight:700}
+    .status-good{background:rgba(34,197,94,.10);color:#bbf7d0}
+    .status-mid{background:rgba(234,179,8,.08);color:#fde68a}
+    .status-bad{background:rgba(239,68,68,.10);color:#fecaca}
+
+    .level-card{margin-top:10px;padding:10px 12px;border-radius:10px;background:#0b1220;border:1px solid rgba(255,255,255,.08);display:grid;gap:6px}
   </style>
 </head>
 <body>
@@ -325,7 +335,7 @@
       <div class="muted">❌ {{ error }}</div>
     {% endif %}
 
-    {% if indicators %}
+    {% if request.method == "POST" and indicators.get("last_price") is not none %}
       <div class="sep"></div>
 
       <h3 style="margin:0 0 8px 0">{{ indicators.ticker }}　${{ indicators.last_price }}　
@@ -345,7 +355,7 @@
           <div class="score-num">{{ indicators.trend_score }}/100</div>
        </div>
        <div class="score-bar">
-         <div class="score-fill" style="width: {{ indicators.trend_score }}%"></div>
+         <div class="score-fill" style="width: {{ indicators.trend_score or 0 }}%"></div>
        </div>
       </div>
 
@@ -368,6 +378,70 @@
           <span class="pill {{ indicators.status_class }}">
             {{ indicators.status_text }}
           </span>
+        </div>
+      {% endif %}
+
+      {% if indicators and indicators.status_text %}
+        <div class="status-line {{ indicators.status_class }}">
+          今日关键状态：{{ indicators.status_text }}
+        </div>
+      {% endif %}
+
+      {% set ws = indicators.get('week_support') %}
+      {% set wr = indicators.get('week_resistance') %}
+      {% set wm = indicators.get('week_mid') %}
+
+      {% if ws is not none or wr is not none or wm is not none %}
+        <div class="level-card">
+          <div>1周支持 <b>{{ ws if ws is not none else "-" }}</b></div>
+          <div>1周中 <b>{{ wm if wm is not none else "-" }}</b></div>
+          <div>1周阻力 <b>{{ wr if wr is not none else "-" }}</b></div>
+        </div>
+      {% endif %}
+
+      {% if indicators.st_buy_low or indicators.st_buy_high %}
+        <div class="sep"></div>
+
+        <div class="level-card" style="border-left:4px solid #22c55e">
+          <div><b>📌 短线买卖计划</b></div>
+
+          {% if indicators.st_buy_low and indicators.st_buy_high %}
+            <div>🟢 买入区间：
+              <b>{{ indicators.st_buy_low }} – {{ indicators.st_buy_high }}</b>
+            </div>
+          {% endif %}
+
+          {% if indicators.st_stop %}
+            <div>🔴 止损位：
+              <b>{{ indicators.st_stop }}</b>
+            </div>
+          {% endif %}
+
+          {% if indicators.st_resistance %}
+            <div>🟡 上方压力：
+              <b>{{ indicators.st_resistance }}</b>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# ===== 短線買入 / 止蝕 / 壓力（用 1 周支持阻力計） ===== #}
+      {% set bl = indicators.get('st_buy_low') %}
+      {% set bh = indicators.get('st_buy_high') %}
+      {% set stp = indicators.get('st_stop') %}
+      {% set pres = indicators.get('st_resistance') %}
+
+      {% if bl is not none or bh is not none or stp is not none or pres is not none %}
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          {% if bl is not none and bh is not none %}
+            <span class="chip pill-buy">🎯 短線買入：${{ bl }} - ${{ bh }}</span>
+          {% endif %}
+          {% if stp is not none %}
+            <span class="chip pill-stop">🛑 止蝕：${{ stp }}</span>
+          {% endif %}
+          {% if pres is not none %}
+            <span class="chip pill-res">⛳ 壓力：${{ pres }}</span>
+          {% endif %}
         </div>
       {% endif %}
 
@@ -455,6 +529,20 @@
               <span class="pill neutral">
                 周压力 {{ "%.2f"|format(m.week_resistance) }}
               </span>
+            </div>
+            {% endif %}
+
+            {% if indicators and indicators.st_buy_low and indicators.st_buy_high %}
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+              <span class="chip pill-buy">短線買入區：${{ indicators.st_buy_low }} – ${{ indicators.st_buy_high }}</span>
+
+              {% if indicators.st_stop %}
+              <span class="chip pill-stop">止蝕：${{ indicators.st_stop }}</span>
+              {% endif %}
+
+              {% if indicators.st_resistance %}
+              <span class="chip pill-res">壓力：${{ indicators.st_resistance }}</span>
+              {% endif %}
             </div>
             {% endif %}
 

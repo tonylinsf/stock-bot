@@ -24,43 +24,109 @@ MARKET_CACHE_DATE: str | None = None  # ET 日期字串，例如 "2025-12-15"
 # =========================================================
 # 技術指標
 # =========================================================
-def build_today_status(last_close, ma20, ma60, rsi14, macd=None, macd_signal=None):
-    if last_close is None or ma20 is None or ma60 is None or rsi14 is None:
-        return None, None
+def short_term_levels(last, support, resistance, risk_pct=0.02):
+    # fallback：用最近价格 ±%
+    if support is None or resistance is None:
+        buy_low = round(last * 0.97, 2)
+        buy_high = round(last * 0.99, 2)
+        stop = round(last * (1 - risk_pct), 2)
+        pressure = round(last * 1.03, 2)
+        return buy_low, buy_high, stop, pressure
 
-    # 趨勢基礎
-    above20 = last_close >= ma20
-    above60 = last_close >= ma60
-    ma_bull = ma20 >= ma60
+    buy_low = round(support * 0.995, 2)
+    buy_high = round(support * 1.01, 2)
+    stop = round(support * (1 - risk_pct), 2)
+    pressure = round(resistance, 2)
+    return buy_low, buy_high, stop, pressure
 
-    # RSI 狀態
-    if rsi14 >= 70:
-        rsi_tag = "RSI偏高(≥70)"
-    elif rsi14 <= 30:
-        rsi_tag = "RSI偏低(≤30)"
+
+def build_today_status(last: float|None, ma20: float|None, ma60: float|None,
+                       rsi14: float|None, macd_hist: float|None,
+                       wk_sup: float|None, wk_res: float|None) -> tuple[str|None, str|None, str|None, str|None, str|None]:
+    """
+    回传：loc_tag, risk_tag, action_tag, status_text, status_class
+    """
+    if last is None:
+        return None, None, None, None, None
+
+    # ---- 位置（Location）----
+    loc_tag = None
+    if wk_sup is not None and abs((last - wk_sup) / wk_sup) <= 0.02:
+        loc_tag = "🟢 接近支撑"
+    elif wk_res is not None and abs((last - wk_res) / wk_res) <= 0.02:
+        loc_tag = "🔴 接近阻力"
+    elif wk_sup is not None and wk_res is not None and wk_sup < last < wk_res:
+        loc_tag = "⚪ 区间中部"
+
+    # ---- 风险（Risk）----
+    risk_tag = None
+    if rsi14 is None:
+        risk_tag = "🟡 风险中性"
+    elif rsi14 < 40 and loc_tag == "🟢 接近支撑":
+        risk_tag = "🟢 风险偏低"
+    elif 40 <= rsi14 <= 60:
+        risk_tag = "🟡 风险中性"
     else:
-        rsi_tag = f"RSI中性({rsi14:.0f})"
+        risk_tag = "🔴 风险偏高"
 
-    # MACD（可選）
-    macd_tag = None
-    if macd is not None and macd_signal is not None:
-        macd_tag = "MACD偏多" if macd >= macd_signal else "MACD偏空"
+    # ---- 趋势（Trend）----
+    trend_tag = tag_trend(ma20, ma60, macd_hist)  # 直接用上面函数
 
-    # 一句總結
-    if ma_bull and above20 and above60 and rsi14 >= 50:
-        text = f"✅ 偏多：站上MA20/60，{rsi_tag}"
-        cls = "up"
-    elif (not ma_bull) and (not above20) and (not above60) and rsi14 <= 50:
-        text = f"⚠️ 偏空：跌破MA20/60，{rsi_tag}"
-        cls = "down"
-    else:
-        text = f"⏸️ 盤整：MA糾纏/方向未明，{rsi_tag}"
-        cls = "mid"
+    # ---- 行动（Action）----
+    action_tag = "观望"
+    if trend_tag and "多头" in trend_tag and loc_tag == "🟢 接近支撑" and "偏低" in risk_tag:
+        action_tag = "可小仓尝试"
+    elif trend_tag and "多头" in trend_tag and loc_tag == "🔴 接近阻力":
+        action_tag = "勿追"
+    elif trend_tag and "空头" in trend_tag and loc_tag == "🟢 接近支撑":
+        action_tag = "等确认"
+    elif "偏高" in risk_tag:
+        action_tag = "观望"
 
-    if macd_tag:
-        text += f"，{macd_tag}"
+    # ---- 一句话 ----
+    status_text = f"{trend_tag or '—'} ｜ {loc_tag or '—'} ｜ {risk_tag or '—'}（{action_tag}）"
 
-    return text, cls
+    # CSS class
+    status_class = "status-mid"
+    if "偏低" in risk_tag:
+        status_class = "status-good"
+    elif "偏高" in risk_tag:
+        status_class = "status-bad"
+
+    return loc_tag, risk_tag, action_tag, status_text, status_class
+
+
+def calc_week_levels(df: pd.DataFrame) -> tuple[float|None, float|None, float|None]:
+    """
+    用最近 5 个交易日（约1周）High/Low 估支撑/阻力
+    """
+    try:
+        if df is None or df.empty:
+            return None, None, None
+        need_cols = {"High", "Low"}
+        if not need_cols.issubset(set(df.columns)):
+            return None, None, None
+
+        w = df.tail(5)
+        if w.empty:
+            return None, None, None
+
+        support = float(w["Low"].min())
+        resistance = float(w["High"].max())
+        mid = (support + resistance) / 2.0
+        return support, resistance, mid
+    except Exception:
+        return None, None, None
+
+
+def tag_trend(ma20: float|None, ma60: float|None, macd_hist: float|None) -> str|None:
+    if ma20 is None or ma60 is None:
+        return None
+    if ma20 > ma60 and (macd_hist is None or macd_hist >= 0):
+        return "📈 多头结构"
+    if ma20 < ma60 and (macd_hist is None or macd_hist <= 0):
+        return "📉 空头结构"
+    return "↔️ 区间结构"
 
 
 def calc_atr_pct(df: pd.DataFrame, period: int = 14) -> float | None:
@@ -782,7 +848,34 @@ def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = Tr
 @app.route("/", methods=["GET", "POST"])
 def index():
     ticker = ""
-    indicators = {}
+    indicators = {
+        # 基础（个股）
+        "ticker": None,
+        "last_price": None,
+        "last_date": None,
+        "change_pct": None,
+        # 均线/指标（用于趋势+风险）
+        "rsi14": None,
+        "ma20": None,
+        "ma60": None,
+        "macd_hist": None,      # 你已经有 macd_hist
+        "macd_signal": None,    # ✅ 新增：给“关键状态”更稳
+        # 位置（周支撑/阻力）
+        "week_support": None,
+        "week_resistance": None,
+        "week_mid": None,
+        # 关键状态（最终一句话）
+        "trend_tag": None,      # 📈/📉/↔️
+        "loc_tag": None,        # 🟢/🔴/⚪/🚀
+        "risk_tag": None,       # 🟢/🟡/🔴
+        "action_tag": None,     # 可小仓/观望/勿追/等确认
+        "status_text": None,    # 一句话
+        "status_class": None,   # CSS class
+        "st_buy_low": None,
+        "st_buy_high": None,
+        "st_stop": None,
+        "st_resistance": None,
+    }
     ai_advice = None
     ai_summary = None
     error = None
@@ -838,6 +931,19 @@ def index():
                 prev_close = float(close.iloc[-2])
                 change_pct = (last_close - prev_close) / prev_close * 100
 
+                # ✅ 关键数值（if/then & status 用）
+                ma20_val = float(ma20.iloc[-1]) if ma20 is not None and not ma20.dropna().empty else None
+                ma60_val = float(ma60.iloc[-1]) if ma60 is not None and not ma60.dropna().empty else None
+                rsi14_val = float(rsi_series.iloc[-1]) if rsi_series is not None and not rsi_series.dropna().empty else None
+                macd_hist_val = float(macd_hist.iloc[-1]) if macd_hist is not None and not macd_hist.dropna().empty else None
+                macd_signal_val = float(dea.iloc[-1]) if dea is not None and not dea.dropna().empty else None
+
+                # ✅ 週線位（功能2）
+                try:
+                    wk_sup, wk_res, wk_mid = calc_week_levels(df)
+                except Exception:
+                    wk_sup, wk_res, wk_mid = None, None, None
+
                 # trend text（近 3 個月，用 df）
                 trend_text = ""
 
@@ -853,26 +959,7 @@ def index():
                     else:
                         trend_text = "最近三個月大致屬於橫行或區間震盪。"
                 except Exception:
-                    trend_text = ""
-
-                # =========================
-                # 今日关键状态（一行总结）
-                # =========================
-                try:
-                    status_text, status_class = build_today_status(
-                        last_close,
-                        float(ma20.iloc[-1]) if ma20 is not None else None,
-                        float(ma60.iloc[-1]) if ma60 is not None else None,
-                        float(rsi_series.iloc[-1]) if rsi_series is not None else None,
-                        float(dif.iloc[-1]) if dif is not None else None,
-                        float(dea.iloc[-1]) if dea is not None else None,
-                    )
-
-                    indicators["status_text"] = status_text
-                    indicators["status_class"] = status_class  
-                except Exception:
-                    indicators["status_text"] = None
-                    indicators["status_class"] = None 
+                    trend_text = "" 
 
                 # 52w
                 high_52w = None
@@ -904,28 +991,55 @@ def index():
                 else:
                     rsi_label, rsi_class = f"RSI {rsi_val} 超买", "rsi-high"
 
-                indicators = {
-                    "ticker": ticker,
-                    "last_price": round(last_close, 2),
-                    "last_date": last_date,
-                    "change_pct": round(change_pct, 2),
-                    "trend_text": trend_text,
-                    "rsi": rsi_val,
-                    "rsi_label": rsi_label,
-                    "rsi_class": rsi_class,
-                    "ma5": round(float(ma5.iloc[-1]), 2) if len(ma5.dropna()) else None,
-                    "ma20": round(float(ma20.iloc[-1]), 2) if len(ma20.dropna()) else None,
-                    "ma60": round(float(ma60.iloc[-1]), 2) if len(ma60.dropna()) else None,
-                    "macd": round(float(macd_hist.iloc[-1]), 4) if macd_hist is not None and not macd_hist.empty else None,
-                    "boll_upper": round(float(boll_upper.iloc[-1]), 2) if len(boll_upper.dropna()) else None,
-                    "boll_mid": round(float(boll_mid.iloc[-1]), 2) if len(boll_mid.dropna()) else None,
-                    "boll_lower": round(float(boll_lower.iloc[-1]), 2) if len(boll_lower.dropna()) else None,
-                    "volume_str": volume_str,
-                    "avg20_volume_str": avg20_volume_str,
-                    "high_52w": round(high_52w, 2) if high_52w else None,
-                    "low_52w": round(low_52w, 2) if low_52w else None,
-                    "from_high_pct": round(from_high_pct, 2) if from_high_pct is not None else None,
-                }
+                indicators.update({
+                     "ticker": ticker,
+                     "last_price": round(last_close, 2),
+                     "last_date": last_date,
+                     "change_pct": round(change_pct, 2),
+                     "trend_text": trend_text,
+                     "rsi": rsi_val,
+                     "rsi_label": rsi_label,
+                     "rsi_class": rsi_class,
+                     "ma5": round(float(ma5.iloc[-1]), 2) if len(ma5.dropna()) else None,
+                     "ma20": round(float(ma20.iloc[-1]), 2) if len(ma20.dropna()) else None,
+                     "ma60": round(float(ma60.iloc[-1]), 2) if len(ma60.dropna()) else None,
+                     "macd": round(float(macd_hist.iloc[-1]), 4) if macd_hist is not None and not macd_hist.empty else None,
+                     "boll_upper": round(float(boll_upper.iloc[-1]), 2) if len(boll_upper.dropna()) else None,
+                     "boll_mid": round(float(boll_mid.iloc[-1]), 2) if len(boll_mid.dropna()) else None,
+                     "boll_lower": round(float(boll_lower.iloc[-1]), 2) if len(boll_lower.dropna()) else None,
+                     "volume_str": volume_str,
+                     "avg20_volume_str": avg20_volume_str,
+                     "high_52w": round(high_52w, 2) if high_52w else None,
+                     "low_52w": round(low_52w, 2) if low_52w else None,
+                     "from_high_pct": round(from_high_pct, 2) if from_high_pct is not None else None,
+                     "week_support": indicators.get("week_support"),
+                     "week_resistance": indicators.get("week_resistance"),
+                     "week_mid": indicators.get("week_mid"),
+                })
+
+                # ✅ 今日關鍵狀態（一句）
+                loc_tag, risk_tag, action_tag, status_text, status_class = build_today_status(
+                    last_close, ma20_val, ma60_val, rsi14_val, macd_hist_val, wk_sup, wk_res
+                )
+                indicators.update({
+                    "trend_tag": tag_trend(ma20_val, ma60_val, macd_hist_val),
+                    "loc_tag": loc_tag,
+                    "risk_tag": risk_tag,
+                    "action_tag": action_tag,
+                    "status_text": status_text,
+                    "status_class": status_class,
+                })
+
+                # ✅ 短線買入/止蝕/壓力（用 1 周支撐阻力）
+                buy_low, buy_high, stop, pressure = short_term_levels(
+                    last_close, wk_sup, wk_res, risk_pct=0.02
+                )
+                indicators.update({
+                    "st_buy_low": buy_low,
+                    "st_buy_high": buy_high,
+                    "st_stop": stop,
+                   "st_resistance": pressure,
+                })
 
                 indicators["trend_score"] = compute_trend_score(indicators)
 

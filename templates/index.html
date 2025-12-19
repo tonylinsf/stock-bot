@@ -425,26 +425,6 @@
         </div>
       {% endif %}
 
-      {# ===== 短線買入 / 止蝕 / 壓力（用 1 周支持阻力計） ===== #}
-      {% set bl = indicators.get('st_buy_low') %}
-      {% set bh = indicators.get('st_buy_high') %}
-      {% set stp = indicators.get('st_stop') %}
-      {% set pres = indicators.get('st_resistance') %}
-
-      {% if bl is not none or bh is not none or stp is not none or pres is not none %}
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-          {% if bl is not none and bh is not none %}
-            <span class="chip pill-buy">🎯 短線買入：${{ bl }} - ${{ bh }}</span>
-          {% endif %}
-          {% if stp is not none %}
-            <span class="chip pill-stop">🛑 止蝕：${{ stp }}</span>
-          {% endif %}
-          {% if pres is not none %}
-            <span class="chip pill-res">⛳ 壓力：${{ pres }}</span>
-          {% endif %}
-        </div>
-      {% endif %}
-
       {% if indicators.high_52w and indicators.low_52w %}
         <div class="muted" style="margin-top:8px">
           52週：{{ indicators.low_52w }} ~ {{ indicators.high_52w }}｜距高位：{{ indicators.from_high_pct }}%
@@ -529,20 +509,6 @@
               <span class="pill neutral">
                 周压力 {{ "%.2f"|format(m.week_resistance) }}
               </span>
-            </div>
-            {% endif %}
-
-            {% if indicators and indicators.st_buy_low and indicators.st_buy_high %}
-            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-              <span class="chip pill-buy">短線買入區：${{ indicators.st_buy_low }} – ${{ indicators.st_buy_high }}</span>
-
-              {% if indicators.st_stop %}
-              <span class="chip pill-stop">止蝕：${{ indicators.st_stop }}</span>
-              {% endif %}
-
-              {% if indicators.st_resistance %}
-              <span class="chip pill-res">壓力：${{ indicators.st_resistance }}</span>
-              {% endif %}
             </div>
             {% endif %}
 

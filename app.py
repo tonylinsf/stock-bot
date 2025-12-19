@@ -25,18 +25,31 @@ MARKET_CACHE_DATE: str | None = None  # ET 日期字串，例如 "2025-12-15"
 # 技術指標
 # =========================================================
 def short_term_levels(last, support, resistance, risk_pct=0.02):
-    # fallback：用最近价格 ±%
+    # fallback：冇支撑/阻力 → 用最近价估
     if support is None or resistance is None:
-        buy_low = round(last * 0.97, 2)
+        buy_low  = round(last * 0.97, 2)
         buy_high = round(last * 0.99, 2)
-        stop = round(last * (1 - risk_pct), 2)
+
+        stop = round(buy_low * (1 - risk_pct), 2)   # ✅ 用 buy_low 算止损
         pressure = round(last * 1.03, 2)
+
+        # ✅ 保险：止损必须低过 buy_low
+        if stop >= buy_low:
+            stop = round(buy_low * 0.98, 2)
+
         return buy_low, buy_high, stop, pressure
 
-    buy_low = round(support * 0.995, 2)
+    # 有支撑/阻力 → 用支撑位为核心
+    buy_low  = round(support * 0.995, 2)
     buy_high = round(support * 1.01, 2)
-    stop = round(support * (1 - risk_pct), 2)
+
+    stop = round(buy_low * (1 - risk_pct), 2)       # ✅ 同样用 buy_low 算止损
     pressure = round(resistance, 2)
+
+    # ✅ 保险：止损必须低过 buy_low
+    if stop >= buy_low:
+        stop = round(buy_low * 0.98, 2)
+
     return buy_low, buy_high, stop, pressure
 
 

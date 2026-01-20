@@ -381,12 +381,6 @@
         </div>
       {% endif %}
 
-      {% if indicators and indicators.status_text %}
-        <div class="status-line {{ indicators.status_class }}">
-          今日关键状态：{{ indicators.status_text }}
-        </div>
-      {% endif %}
-
       {% set ws = indicators.get('week_support') %}
       {% set wr = indicators.get('week_resistance') %}
       {% set wm = indicators.get('week_mid') %}
@@ -424,6 +418,90 @@
           {% endif %}
         </div>
       {% endif %}
+
+      <div class="card">
+        <h3>估值區間</h3>
+
+        {# 估值：優先用 route 傳入嘅 valuation，其次用 indicators 入面嘅 valuation #}
+        {% set v = valuation if valuation else indicators.get('valuation') %}
+        {% set f = indicators.get('fundamentals') %}
+
+        {% if v %}
+          {# ===== 有 fair_low / fair_high 就顯示估值區間 ===== #}
+          {% if v.get('fair_low') is not none and v.get('fair_high') is not none %}
+            <div class="big">
+              ${{ "%.2f"|format(v.get('fair_low')) }} – ${{ "%.2f"|format(v.get('fair_high')) }}
+            </div>
+
+            {% if v.get('gap_pct') is not none %}
+              <div class="muted">偏離：{{ "%.1f"|format(v.get('gap_pct')) }}%</div>
+            {% endif %}
+
+            {% if v.get('pe_low') is not none and v.get('pe_high') is not none %}
+              <div class="muted">
+                PE 假設：{{ v.get('pe_low')|round(0)|int }} – {{ v.get('pe_high')|round(0)|int }}
+              </div>
+            {% endif %}
+
+            {# ✅ forward / ps 額外顯示（你加咗 forward + ps 就開返） #}
+            {% if v.get('fwd_pe_low') is not none and v.get('fwd_pe_high') is not none %}
+              <div class="muted">
+                Forward PE：{{ v.get('fwd_pe_low')|round(0)|int }} – {{ v.get('fwd_pe_high')|round(0)|int }}
+              </div>
+            {% endif %}
+
+            {% if v.get('ps_low') is not none and v.get('ps_high') is not none %}
+              <div class="muted">
+                PS 假設：{{ "%.1f"|format(v.get('ps_low')) }} – {{ "%.1f"|format(v.get('ps_high')) }}
+              </div>
+            {% endif %}
+
+            {% set extra = v.get('extra', {}) %}
+
+            <div class="muted">
+              Forward PE：{{ "%.1f"|format(extra.get('forward_pe')) if extra.get('forward_pe') is not none else "-" }}
+            </div>
+
+            <div class="muted">
+              PEG：{{ "%.2f"|format(extra.get('peg')) if extra.get('peg') is not none else "-" }}
+              {% if extra.get('growth_earnings') is not none %}
+               （Earnings Growth {{ "%.0f"|format(extra.get('growth_earnings')) }}%）
+              {% endif %}
+            </div>
+
+            <div class="muted">
+              FCF Yield：{{ "%.1f"|format(extra.get('fcf_yield')) if extra.get('fcf_yield') is not none else "-" }}%
+            </div>
+
+            <div class="muted">
+              EV/Sales：{{ "%.1f"|format(extra.get('ev_sales')) if extra.get('ev_sales') is not none else "-" }}
+            </div>
+
+            <div class="muted">
+              PB：{{ "%.1f"|format(extra.get('pb')) if extra.get('pb') is not none else "-" }}
+              | ROE：{{ "%.0f"|format(extra.get('roe')) if extra.get('roe') is not none else "-" }}%
+            </div>
+
+          {# ===== 有 v 但計唔到 fair_low/high：就顯示基礎面數值 ===== #}
+          {% else %}
+            <div class="muted">
+              已取得基本面資料，但估值未能計算（通常 EPS / Forward EPS / RevenueShare 取得不到或 <= 0）
+            </div>
+
+            <div class="muted">Price：{{ f.get('price') if f else '-' }}</div>
+            <div class="muted">EPS(TTM)：{{ f.get('eps_ttm') if f else '-' }}</div>
+            <div class="muted">PE(TTM)：{{ f.get('pe_ttm') if f else '-' }}</div>
+            <div class="muted">Forward EPS：{{ f.get('forward_eps') if f else '-' }}</div>
+            <div class="muted">Forward PE：{{ f.get('forward_pe') if f else '-' }}</div>
+            <div class="muted">RPS(TTM)：{{ f.get('revenue_per_share_ttm') if f else '-' }}</div>
+            <div class="muted">PS(TTM)：{{ f.get('ps_ttm') if f else '-' }}</div>
+          {% endif %}
+
+        {# ===== v 都無：完全無估值資料 ===== #}
+        {% else %}
+          <div class="muted">未有估值資料：請先提交分析。</div>
+        {% endif %}
+      </div>
 
       {% if indicators.high_52w and indicators.low_52w %}
         <div class="muted" style="margin-top:8px">

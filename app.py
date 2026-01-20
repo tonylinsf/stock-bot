@@ -1,4 +1,5 @@
 import os
+import requests
 from datetime import datetime as _dt
 from zoneinfo import ZoneInfo
 
@@ -7,9 +8,10 @@ import yfinance as yf
 import pandas as pd
 from openai import OpenAI
 from dotenv import load_dotenv
+from pathlib import Path
 
 # 載入 .env（如有）
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
 client = OpenAI()  # 用環境變數 OPENAI_API_KEY
 app = Flask(__name__)
@@ -107,6 +109,319 @@ def build_today_status(last: float|None, ma20: float|None, ma60: float|None,
         status_class = "status-bad"
 
     return loc_tag, risk_tag, action_tag, status_text, status_class
+
+
+def get_fundamentals_yf(ticker: str):
+    t = yf.Ticker(ticker)
+
+    # 1) price：用 fast_info -> history
+    price = None
+    try:
+        fi = getattr(t, "fast_info", {}) or {}
+        price = fi.get("last_price") or fi.get("lastPrice")
+    except Exception:
+        fi = {}
+    if not price:
+        try:
+            h = t.history(period="5d")
+            if not h.empty:
+                price = float(h["Close"].iloc[-1])
+        except Exception:
+            price = None
+
+    # 2) info（yfinance 新版用 get_info() 會穩啲）
+    try:
+        info = t.get_info() or {}
+    except Exception:
+        info = {}
+
+    # 3) shares
+    shares = (
+        (fi.get("shares") if isinstance(fi, dict) else None)
+        or info.get("sharesOutstanding")
+    )
+
+    # 4) EPS(TTM)
+    eps_ttm = (
+        info.get("trailingEps")
+        or info.get("epsTrailingTwelveMonths")
+        or info.get("trailingEPS")
+    )
+
+    # 5) PE(TTM)（如果 trailingPE 冇，就自己用 price/eps 算）
+    pe_ttm = info.get("trailingPE")
+    if (pe_ttm is None) and price and eps_ttm and eps_ttm > 0:
+        pe_ttm = float(price) / float(eps_ttm)
+
+    # 6) Revenue/Share(TTM)
+    rps_ttm = info.get("revenuePerShare")
+
+    # 7) Forward
+    forward_eps = info.get("forwardEps")
+    forward_pe = info.get("forwardPE")
+
+    # 若 revenuePerShare 冇：用 totalRevenue / shares
+    if (rps_ttm is None) and shares:
+        total_rev = info.get("totalRevenue")
+        if total_rev:
+            try:
+                rps_ttm = float(total_rev) / float(shares)
+            except Exception:
+                rps_ttm = None
+
+    # 再唔得：試 quarterly revenue *4（估算）
+    if (rps_ttm is None) and shares:
+        try:
+            q = t.quarterly_financials
+            # yfinance 有時係 "Total Revenue" 或 "TotalRevenue"
+            for key in ["Total Revenue", "TotalRevenue", "totalRevenue"]:
+                if q is not None and (key in q.index):
+                    series = q.loc[key].dropna()
+                    if len(series) >= 1:
+                        # 用最近一季 *4 當作 rough TTM
+                        approx_ttm = float(series.iloc[0]) * 4.0
+                        rps_ttm = approx_ttm / float(shares)
+                        break
+        except Exception:
+            pass
+
+    # ✅ forward（加喺 funda = { } 之前）
+    eps_fwd = info.get("forwardEps")
+    pe_fwd  = info.get("forwardPE")
+
+    # ✅ 用 forward 优先（冇就用 trailing）
+    eps_use = eps_fwd if eps_fwd not in (None, 0, "0") else eps_ttm
+    pe_use  = pe_fwd  if pe_fwd  not in (None, 0, "0") else pe_ttm  
+
+    # ===== PS（新，optional）
+    ps_ttm = info.get("priceToSalesTrailing12Months")
+    revenue_ttm = info.get("totalRevenue")  # optiona 
+
+    # ====== extra fundamentals (valuation add-ons) ======
+    market_cap = info.get("marketCap")
+    enterprise_value = info.get("enterpriseValue")
+
+    free_cashflow = info.get("freeCashflow")
+    total_revenue = info.get("totalRevenue")
+
+    price_to_book = info.get("priceToBook")
+    roe = info.get("returnOnEquity")  # 通常係 0.25 = 25%
+
+    earnings_growth = info.get("earningsGrowth")  # 0.3 = 30%
+    revenue_growth = info.get("revenueGrowth")
+    peg_ratio = info.get("pegRatio")  # yfinance 有時直接有
+    forward_pe = info.get("forwardPE")
+
+    funda = {
+        "source": "yfinance",
+        "price": float(price) if price else None,
+        "shares": float(shares) if shares else None,
+        "eps_ttm": float(eps_ttm) if eps_ttm is not None else None,
+        "pe_ttm": float(pe_ttm) if pe_ttm is not None else None,
+        "forward_eps": float(forward_eps) if forward_eps is not None else None,
+        "forward_pe": float(forward_pe) if forward_pe is not None else None,
+        "revenue_per_share_ttm": float(rps_ttm) if rps_ttm is not None else None,
+        "ps_ttm": float(ps_ttm) if ps_ttm is not None else None,
+        "revenue_ttm": float(revenue_ttm) if revenue_ttm is not None else None,
+        "market_cap": float(market_cap) if market_cap else None,
+        "enterprise_value": float(enterprise_value) if enterprise_value else None,
+        "free_cashflow": float(free_cashflow) if free_cashflow else None,
+        "total_revenue": float(total_revenue) if total_revenue else None,
+        "peg_ratio": float(peg_ratio) if peg_ratio else None,
+        "earnings_growth": float(earnings_growth) if earnings_growth else None,
+        "revenue_growth": float(revenue_growth) if revenue_growth else None,
+        "price_to_book": float(price_to_book) if price_to_book else None,
+        "roe": float(roe) if roe is not None else None,
+    }
+
+    # ✅ 你想 debug 就放呢度（最有用）
+    print("YF FUNDA:", funda)
+
+    return funda
+    
+
+def _clamp(x, lo, hi):
+    try:
+        x = float(x)
+        return max(lo, min(hi, x))
+    except Exception:
+        return None
+
+
+def _range_from_eps_pe(eps, pe_low, pe_high):
+    if eps is None:
+        return None
+    try:
+        eps = float(eps)
+        if eps <= 0:
+            return None
+        return (eps * float(pe_low), eps * float(pe_high))
+    except Exception:
+        return None
+
+
+def _range_from_rps_ps(rps, ps_low, ps_high):
+    if rps is None:
+        return None
+    try:
+        rps = float(rps)
+        if rps <= 0:
+            return None
+        return (rps * float(ps_low), rps * float(ps_high))
+    except Exception:
+        return None
+
+
+def calc_fair_value(funda: dict, ma20: float = None, ma60: float = None):
+    price = funda.get("price")
+    eps_ttm = funda.get("eps_ttm")
+    pe_ttm = funda.get("pe_ttm")
+
+    fwd_eps = funda.get("forward_eps")
+    fwd_pe = funda.get("forward_pe")
+
+    rps = funda.get("revenue_per_share_ttm")
+    ps_ttm = funda.get("ps_ttm")
+
+    # ===== 1) TTM PE range（你原本：18-26）
+    pe_low, pe_high = 18, 26
+
+    # 如果 yfinance 有 trailingPE，用嚟微調（但唔好誇張）
+    if pe_ttm is not None:
+        pe_ttm_c = _clamp(pe_ttm, 8, 60)  # <- 重要：避免你見到 53.03765759 呢啲亂飛
+        if pe_ttm_c:
+            pe_low = max(12, min(pe_low, pe_ttm_c * 0.85))
+            pe_high = max(pe_high, pe_ttm_c * 1.15)
+
+    ttm_range = _range_from_eps_pe(eps_ttm, pe_low, pe_high)
+
+    # ===== 2) Forward range（新）
+    # 用 forwardPE 做 anchor：但一樣 clamp，避免離地
+    f_pe_low, f_pe_high = 18, 30
+    if fwd_pe is not None:
+        fwd_pe_c = _clamp(fwd_pe, 8, 80)
+        if fwd_pe_c:
+            f_pe_low = max(12, fwd_pe_c * 0.85)
+            f_pe_high = min(80, fwd_pe_c * 1.15)
+            # 如果 range 太窄就拉返少少
+            if (f_pe_high - f_pe_low) < 6:
+                f_pe_low = max(10, f_pe_low - 3)
+                f_pe_high = min(80, f_pe_high + 3)
+
+    forward_range = _range_from_eps_pe(fwd_eps, f_pe_low, f_pe_high)
+
+    # ===== 3) PS range（新）
+    # PS range 建議：大盤科技 4-10；成熟股 3-7；成長股 6-12
+    # 我哋用 ps_ttm 作 anchor + clamp
+    ps_low, ps_high = 4, 10
+    if ps_ttm is not None:
+        ps_c = _clamp(ps_ttm, 1, 30)
+        if ps_c:
+            ps_low = max(2, ps_c * 0.75)
+            ps_high = min(25, ps_c * 1.25)
+            if (ps_high - ps_low) < 2:
+                ps_low = max(1.5, ps_low - 1)
+                ps_high = min(25, ps_high + 1)
+
+    ps_range = _range_from_rps_ps(rps, ps_low, ps_high)
+
+    # ===== 主顯示：優先 forward，其次 ttm，其次 ps
+    main = forward_range or ttm_range or ps_range
+    fair_low = fair_high = None
+    if main:
+        fair_low, fair_high = main
+
+    # gap%
+    gap_pct = None
+    if price and fair_low and fair_high:
+        mid = (fair_low + fair_high) / 2
+        try:
+            gap_pct = (mid - float(price)) / float(price) * 100
+        except Exception:
+            gap_pct = None
+
+    return {
+        "fair_low": fair_low,
+        "fair_high": fair_high,
+        "gap_pct": gap_pct,
+
+        # ✅ 三個模型都回傳（模板顯示用）
+        "ttm_fair_low": ttm_range[0] if ttm_range else None,
+        "ttm_fair_high": ttm_range[1] if ttm_range else None,
+        "pe_low": pe_low,
+        "pe_high": pe_high,
+
+        "fwd_fair_low": forward_range[0] if forward_range else None,
+        "fwd_fair_high": forward_range[1] if forward_range else None,
+        "fwd_pe_low": f_pe_low,
+        "fwd_pe_high": f_pe_high,
+
+        "ps_fair_low": ps_range[0] if ps_range else None,
+        "ps_fair_high": ps_range[1] if ps_range else None,
+        "ps_low": ps_low,
+        "ps_high": ps_high,
+
+        # debug/顯示
+        "ps_ttm": ps_ttm,
+        "pe_ttm": pe_ttm,
+        "fwd_pe": fwd_pe,
+    }
+
+
+def calc_extra_valuation(funda: dict):
+    if not funda:
+        return {}
+
+    mc = funda.get("market_cap")
+    ev = funda.get("enterprise_value")
+    fcf = funda.get("free_cashflow")
+    rev = funda.get("total_revenue")
+
+    pe = funda.get("pe_ttm")
+    fwd_pe = funda.get("forward_pe")
+
+    peg = funda.get("peg_ratio")
+    eg = funda.get("earnings_growth")
+    rg = funda.get("revenue_growth")
+
+    pb = funda.get("price_to_book")
+    roe = funda.get("roe")
+
+    # --- PEG ---
+    # 1) 优先用 yfinance pegRatio
+    # 2) 如果没有，用 PE / earningsGrowth（growth 用 % 即 0.25）
+    peg_calc = None
+    if peg:
+        peg_calc = peg
+    elif pe and eg and eg > 0:
+        peg_calc = pe / (eg * 100)  # eg=0.25 => 25%
+
+    # --- FCF Yield ---
+    fcf_yield = None
+    if fcf and mc and mc > 0:
+        fcf_yield = (fcf / mc) * 100
+
+    # --- EV/Sales ---
+    ev_sales = None
+    if ev and rev and rev > 0:
+        ev_sales = ev / rev
+
+    # --- PB & ROE ---
+    roe_pct = None
+    if roe is not None:
+        roe_pct = roe * 100
+
+    return {
+        "pe_ttm": pe,
+        "forward_pe": fwd_pe,
+        "peg": peg_calc,
+        "fcf_yield": fcf_yield,
+        "ev_sales": ev_sales,
+        "pb": pb,
+        "roe": roe_pct,
+        "growth_earnings": (eg * 100) if eg else None,
+        "growth_revenue": (rg * 100) if rg else None,
+    }
 
 
 def calc_week_levels(df: pd.DataFrame) -> tuple[float|None, float|None, float|None]:
@@ -257,9 +572,8 @@ def format_volume(v: float) -> str:
 def compute_trend_score(ind: dict) -> int:
     score = 50
 
-    rsi = ind.get("rsi")
-    macd = ind.get("macd")
-    ma5 = ind.get("ma5")
+    rsi = ind.get("rsi14") or ind.get("rsi")
+    macd_hist = ind.get("macd_hist")
     ma20 = ind.get("ma20")
     ma60 = ind.get("ma60")
     last_price = ind.get("last_price")
@@ -283,15 +597,15 @@ def compute_trend_score(ind: dict) -> int:
         elif dist < -15 or dist > 15:
             score -= 10
 
-    if ma5 and ma20 and ma60:
-        if ma5 > ma20 > ma60:
-            score += 10
-        elif ma5 < ma20 < ma60:
-            score -= 10
+    # MA20 vs MA60 结构
+    if ma20 and ma60:
+        score += 10 if ma20 > ma60 else -10
 
-    if macd is not None:
-        score += 5 if macd > 0 else -5
+    # MACD hist
+    if macd_hist is not None:
+        score += 5 if macd_hist >= 0 else -5
 
+    # Boll 宽度
     if boll_up and boll_low and last_price:
         width = (boll_up - boll_low) / last_price * 100
         if width > 25:
@@ -889,6 +1203,9 @@ def index():
         "st_stop": None,
         "st_resistance": None,
     }
+    result = None
+    valuation = None
+    funda = None
     ai_advice = None
     ai_summary = None
     error = None
@@ -904,7 +1221,7 @@ def index():
             try:
                 df = yf.download(
                     ticker,
-                    period="4mo",
+                    period="6mo",
                     interval="1d",
                     auto_adjust=True,
                     progress=False,
@@ -951,6 +1268,16 @@ def index():
                 macd_hist_val = float(macd_hist.iloc[-1]) if macd_hist is not None and not macd_hist.dropna().empty else None
                 macd_signal_val = float(dea.iloc[-1]) if dea is not None and not dea.dropna().empty else None
 
+                # ===== 估值 =====
+                funda = get_fundamentals_yf(ticker)
+                valuation = calc_fair_value(funda, ma20=ma20_val, ma60=ma60_val) if funda else None
+
+                # ✅ 新增：extra valuation
+                extra_val = calc_extra_valuation(funda) if funda else {}
+                if valuation is None:
+                    valuation = {}
+                valuation["extra"] = extra_val
+
                 # ✅ 週線位（功能2）
                 try:
                     wk_sup, wk_res, wk_mid = calc_week_levels(df)
@@ -979,10 +1306,10 @@ def index():
                 low_52w = None
                 try:
                     tkr = yf.Ticker(ticker)
-                    hist_4m = tkr.history(period="4m", interval="1d", auto_adjust=True)
-                    if hist_4m is not None and not hist_4m.empty and "Close" in hist_4m.columns:
-                        high_52w = float(hist_4m["Close"].max())
-                        low_52w = float(hist_4m["Close"].min())
+                    hist_6mo = tkr.history(period="6mo", interval="1d", auto_adjust=True)
+                    if hist_6mo is not None and not hist_6mo.empty and "Close" in hist_6mo.columns:
+                        high_52w = float(hist_6mo["Close"].max())
+                        low_52w = float(hist_6mo["Close"].min())
                 except Exception:
                     pass
 
@@ -1028,6 +1355,8 @@ def index():
                      "week_support": indicators.get("week_support"),
                      "week_resistance": indicators.get("week_resistance"),
                      "week_mid": indicators.get("week_mid"),
+                     "fundamentals": funda,
+                     "valuation": valuation,
                 })
 
                 # ✅ 今日關鍵狀態（一句）
@@ -1051,7 +1380,7 @@ def index():
                     "st_buy_low": buy_low,
                     "st_buy_high": buy_high,
                     "st_stop": stop,
-                   "st_resistance": pressure,
+                    "st_resistance": pressure,
                 })
 
                 indicators["trend_score"] = compute_trend_score(indicators)
@@ -1088,6 +1417,8 @@ def index():
 
     return render_template(
         "index.html",
+        result=result,
+        valuation=valuation,
         ticker=ticker,
         indicators=indicators,
         ai_advice=ai_advice,

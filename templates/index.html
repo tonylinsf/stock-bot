@@ -315,10 +315,134 @@
     .status-bad{background:rgba(239,68,68,.10);color:#fecaca}
 
     .level-card{margin-top:10px;padding:10px 12px;border-radius:10px;background:#0b1220;border:1px solid rgba(255,255,255,.08);display:grid;gap:6px}
+
+    /* ====== Market Tape（跑馬燈） ====== */
+    .tape{
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(11,18,32,.92);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+    }
+    .tape-track{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+      animation: tapeMove 24s linear infinite;
+    }
+    .tape:hover .tape-track{ animation-play-state: paused; }
+
+    @keyframes tapeMove{
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .tape-item{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      font-size: 13px;
+    }
+    .tape-sym{ font-weight: 800; letter-spacing:.2px; }
+    .tape-val{ opacity: .92; }
+
+    .tape-chg.up{ color: var(--good); font-weight: 800; }
+    .tape-chg.down{ color: var(--bad); font-weight: 800; }
+    .tape-chg.neutral{ color: rgba(255,255,255,.75); font-weight: 700; }
+
+    .tape-note{ opacity:.75; font-size:12px; margin-left:6px; }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+    }
   </style>
 </head>
 <body>
 <div class="wrap">
+  
+  <!-- ✅ Market Tape -->
+  {% if tape %}
+  <div class="tape">
+    {# 做兩份一樣嘅 track，先可以無縫循環 #}
+    <div class="tape-track">
+      {% for _ in range(2) %}
+        {% set spy = tape.get('SPY', {}) %}
+        {% set qqq = tape.get('QQQ', {}) %}
+        {% set vix = tape.get('VIX', {}) %}
+        {% set tnx = tape.get('TNX', {}) %}
+
+        <!-- SPY -->
+        <span class="tape-item">
+          <span class="tape-sym">SPY</span>
+          <span class="tape-val">
+            {% if spy.price is not none %}${{ "%.2f"|format(spy.price) }}{% else %}--{% endif %}
+          </span>
+          {% set c = spy.chg_pct %}
+          <span class="tape-chg {% if c is not none and c>0 %}up{% elif c is not none and c<0 %}down{% else %}neutral{% endif %}">
+            {% if c is not none %}{{ "%.2f"|format(c) }}%{% else %}--{% endif %}
+          </span>
+        </span>
+
+        <!-- QQQ -->
+        <span class="tape-item">
+          <span class="tape-sym">QQQ</span>
+          <span class="tape-val">
+            {% if qqq.price is not none %}${{ "%.2f"|format(qqq.price) }}{% else %}--{% endif %}
+          </span>
+          {% set c = qqq.chg_pct %}
+          <span class="tape-chg {% if c is not none and c>0 %}up{% elif c is not none and c<0 %}down{% else %}neutral{% endif %}">
+            {% if c is not none %}{{ "%.2f"|format(c) }}%{% else %}--{% endif %}
+          </span>
+        </span>
+
+        <!-- VIX -->
+        <span class="tape-item">
+          <span class="tape-sym">VIX</span>
+          <span class="tape-val">
+            {% if vix.price is not none %}{{ "%.2f"|format(vix.price) }}{% else %}--{% endif %}
+          </span>
+          {% set c = vix.chg_pct %}
+          <span class="tape-chg {% if c is not none and c>0 %}up{% elif c is not none and c<0 %}down{% else %}neutral{% endif %}">
+            {% if c is not none %}{{ "%.2f"|format(c) }}%{% else %}--{% endif %}
+          </span>
+          {% if vix.price is not none and vix.price > 20 %}
+            <span class="tape-note">⚠️ 波動偏大</span>
+          {% endif %}
+        </span>
+
+        <!-- TNX (10Y) -->
+        <span class="tape-item">
+          <span class="tape-sym">10Y</span>
+          <span class="tape-val">
+            {% if tnx.yield_pct is not none %}{{ "%.2f"|format(tnx.yield_pct) }}%{% else %}--{% endif %}
+          </span>
+          {% set c = tnx.chg_pct %}
+          <span class="tape-chg {% if c is not none and c>0 %}up{% elif c is not none and c<0 %}down{% else %}neutral{% endif %}">
+            {% if c is not none %}{{ "%.2f"|format(c) }}%{% else %}--{% endif %}
+          </span>
+        </span>
+
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Single stock -->
   <div class="card">
     <h2>🔎 個股分析（技術指標 + AI）</h2>
@@ -590,16 +714,18 @@
             </div>
             {% endif %}
 
-            {% if m.dist_to_support is not none %}
-            <span class="pill up">
-              距支撑 {{ "%.2f"|format(m.dist_to_support) }}%
-            </span>
+            {% set dts = m.get('dist_to_support') %}
+            {% if dts is not none %}
+              <span class="pill up">
+                距支撑 {{ "%.2f"|format(dts) }}%
+              </span>
             {% endif %}
 
-            {% if m.dist_to_resistance is not none %}
-            <span class="pill down">
-              距压力 {{ "%.2f"|format(m.dist_to_resistance) }}%
-            </span>
+            {% set dtr = m.get('dist_to_resistance') %}
+            {% if dtr is not none %}
+              <span class="pill down">
+                距压力 {{ "%.2f"|format(dtr) }}%
+              </span>
             {% endif %}
                 
             {% if m.status_text %}
@@ -610,15 +736,15 @@
             </div>
             {% endif %} 
 
-            {% if m.trend20_pct is not none %}
-            <div class="muted" style="margin-top:6px">
-              20日趋势：
-              {% if m.trend20_dir == "up" %}
-                <span style="color:#4ade80">↑ {{ m.trend20_pct }}%</span>
-              {% elif m.trend20_dir == "down" %}
-                <span style="color:#f87171">↓ {{ m.trend20_pct }}%</span>
+            {% if m.trend_pct is not none %}
+            <div class="muted" style="margin-top:6px;">
+              {{ m.trend_days }}日趋势：
+              {% if m.trend_dir == "up" %}
+                <span style="color:#4ade80">↑ {{ "%.2f"|format(m.trend_pct) }}%</span>
+              {% elif m.trend_dir == "down" %}
+                <span style="color:#f87171">↓ {{ "%.2f"|format(m.trend_pct) }}%</span>
               {% else %}
-                <span style="color:#a3a3a3">→ {{ m.trend20_pct }}%</span>
+                <span style="color:#a3a3a3">→ {{ "%.2f"|format(m.trend_pct) }}%</span>
               {% endif %}
             </div>
             {% endif %}
@@ -688,7 +814,7 @@
             {% endif %}
 
             <div class="muted" style="margin-top:6px">
-              支撑/阻力(20日)：{{ m.support20 if m.support20 is not none else "--" }} ~ {{ m.resist20 if m.resist20 is not none else "--" }}
+              支撑/阻力(90日)：{{ m.support90 if m.support90 is not none else "--" }} ~ {{ m.resist90 if m.resist90 is not none else "--" }}
             </div>
 
             <div class="muted" style="margin-top:6px">

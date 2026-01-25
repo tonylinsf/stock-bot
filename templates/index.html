@@ -497,12 +497,14 @@
         <span class="chip">BOLL {{ indicators.boll_lower }} ~ {{ indicators.boll_upper }}</span>
         <span class="chip">量 {{ indicators.volume_str }}（20日均 {{ indicators.avg20_volume_str }}）</span>
       </div>
-      {% if indicators.status_text %}
-        <div class="muted" style="margin-top:8px;">
-          <span class="pill {{ indicators.status_class }}">
-            {{ indicators.status_text }}
-          </span>
-        </div>
+      {% if indicators.high_52w and indicators.low_52w %}
+        <span class="chip">
+          52周 {{ indicators.low_52w }} – {{ indicators.high_52w }}
+          ｜ 距高位 
+        <span style="color:{% if indicators.from_high_pct < 0 %}#ff6b6b{% else %}#4cd964{% endif %}">
+          {{ "%.2f"|format(indicators.from_high_pct) }}%
+        </span>
+      </span>
       {% endif %}
 
       {% set ws = indicators.get('week_support') %}
@@ -540,98 +542,147 @@
               <b>{{ indicators.st_resistance }}</b>
             </div>
           {% endif %}
-        </div>
-      {% endif %}
+
+          {% if supports %}
+          <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08);">
+            <div style="color:#9aa4b2; font-size:13px; margin-bottom:6px;">📉 中线分批支撑位</div>
+
+            {% if supports.support_60 %}
+            <div>🟡 第二买入位（60日支撑）： 
+              <b>{{ "%.2f"|format(supports.support_60) }}</b>
+            </div>
+            {% endif %}
+
+            {% if supports.support_120 %}
+            <div>🟠 第三买入位（120日支撑）： 
+              <b>{{ "%.2f"|format(supports.support_120) }}</b>
+            </div>
+            {% endif %}
+
+            {% if supports.support_365 %}
+            <div>🔴 第四买入位（365日支撑）： 
+              <b>{{ "%.2f"|format(supports.support_365) }}</b>
+            </div>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        </div>  {# ✅ level-card 结束 #}
+      {% endif %} {# ✅ 最外层 if 结束 #}
 
       <div class="card">
         <h3>估值區間</h3>
 
-        {# 估值：優先用 route 傳入嘅 valuation，其次用 indicators 入面嘅 valuation #}
+        {# 優先用 route 傳入 valuation，其次 indicators 入面 valuation #}
         {% set v = valuation if valuation else indicators.get('valuation') %}
         {% set f = indicators.get('fundamentals') %}
+        {% set extra = (v.get('extra') if v and v.get('extra') else {}) %}
 
         {% if v %}
-          {# ===== 有 fair_low / fair_high 就顯示估值區間 ===== #}
+
+          {# 1) fair value range #}
           {% if v.get('fair_low') is not none and v.get('fair_high') is not none %}
             <div class="big">
               ${{ "%.2f"|format(v.get('fair_low')) }} – ${{ "%.2f"|format(v.get('fair_high')) }}
             </div>
+          {% endif %}
 
-            {% if v.get('gap_pct') is not none %}
-              <div class="muted">偏離：{{ "%.1f"|format(v.get('gap_pct')) }}%</div>
-            {% endif %}
+          {# 2) 市場情緒估值（你後端 key 係 mkt_low/mkt_high/mkt_tag） #}
+          {% set mk = v.get('market') %}
+          {% if mk %}
+            {% set mk_low  = mk.get('low',  mk.get('mkt_low')) %}
+            {% set mk_high = mk.get('high', mk.get('mkt_high')) %}
+            {% set mk_tag  = mk.get('tag',  mk.get('mkt_tag')) %}
+            {% set mk_gap  = mk.get('gap_pct', mk.get('mkt_gap_pct')) %}
 
-            {% if v.get('pe_low') is not none and v.get('pe_high') is not none %}
-              <div class="muted">
-                PE 假設：{{ v.get('pe_low')|round(0)|int }} – {{ v.get('pe_high')|round(0)|int }}
+            {% if mk_low is not none and mk_high is not none %}
+              <div style="margin-top:8px;">
+                <span class="muted">市場情緒估值：</span>
+                <span class="big">
+                  ${{ "%.2f"|format(mk_low) }} – ${{ "%.2f"|format(mk_high) }}
+                </span>
+                {% if mk_tag %}<span class="pill">{{ mk_tag }}</span>{% endif %}
               </div>
+
+              {% if mk_gap is not none %}
+                <div class="muted">市場偏離：{{ "%.1f"|format(mk_gap) }}%</div>
+              {% endif %}
             {% endif %}
+          {% endif %}
 
-            {# ✅ forward / ps 額外顯示（你加咗 forward + ps 就開返） #}
-            {% if v.get('fwd_pe_low') is not none and v.get('fwd_pe_high') is not none %}
-              <div class="muted">
-                Forward PE：{{ v.get('fwd_pe_low')|round(0)|int }} – {{ v.get('fwd_pe_high')|round(0)|int }}
-              </div>
-            {% endif %}
+          {# 3) gap pct #}
+          {% if v.get('gap_pct') is not none %}
+            <div class="muted">偏離：{{ "%.1f"|format(v.get('gap_pct')) }}%</div>
+          {% endif %}
 
-            {% if v.get('ps_low') is not none and v.get('ps_high') is not none %}
-              <div class="muted">
-                PS 假設：{{ "%.1f"|format(v.get('ps_low')) }} – {{ "%.1f"|format(v.get('ps_high')) }}
-              </div>
-            {% endif %}
+          {# 4) PE range #}
+          {% if v.get('pe_low') is not none and v.get('pe_high') is not none %}
+            <div class="muted">PE 假設：{{ v.get('pe_low')|round(0)|int }} – {{ v.get('pe_high')|round(0)|int }}</div>
+          {% endif %}
 
-            {% set extra = v.get('extra', {}) %}
+          {# 5) Forward PE range（如果你後端有 fwd_pe_low/high） #}
+          {% if v.get('fwd_pe_low') is not none and v.get('fwd_pe_high') is not none %}
+            <div class="muted">Forward PE：{{ v.get('fwd_pe_low')|round(0)|int }} – {{ v.get('fwd_pe_high')|round(0)|int }}</div>
+          {% endif %}
 
+          {# 6) PS range（如果你後端有 ps_low/high） #}
+          {% if v.get('ps_low') is not none and v.get('ps_high') is not none %}
+            <div class="muted">PS 假設：{{ "%.1f"|format(v.get('ps_low')) }} – {{ "%.1f"|format(v.get('ps_high')) }}</div>
+          {% endif %}
+
+          {# 7) extra 指標（你而家 screenshot 想要嗰堆） #}
+          {% if extra %}
+
+          {% if extra.get('forward_pe') is not none %}
+            <div class="muted">Forward PE：{{ "%.1f"|format(extra.get('forward_pe')) }}</div>
+          {% endif %}
+
+          {% if extra.get('peg') is not none %}
             <div class="muted">
-              Forward PE：{{ "%.1f"|format(extra.get('forward_pe')) if extra.get('forward_pe') is not none else "-" }}
-            </div>
-
-            <div class="muted">
-              PEG：{{ "%.2f"|format(extra.get('peg')) if extra.get('peg') is not none else "-" }}
+              PEG：{{ "%.2f"|format(extra.get('peg')) }}
               {% if extra.get('growth_earnings') is not none %}
                （Earnings Growth {{ "%.0f"|format(extra.get('growth_earnings')) }}%）
               {% endif %}
             </div>
-
-            <div class="muted">
-              FCF Yield：{{ "%.1f"|format(extra.get('fcf_yield')) if extra.get('fcf_yield') is not none else "-" }}%
-            </div>
-
-            <div class="muted">
-              EV/Sales：{{ "%.1f"|format(extra.get('ev_sales')) if extra.get('ev_sales') is not none else "-" }}
-            </div>
-
-            <div class="muted">
-              PB：{{ "%.1f"|format(extra.get('pb')) if extra.get('pb') is not none else "-" }}
-              | ROE：{{ "%.0f"|format(extra.get('roe')) if extra.get('roe') is not none else "-" }}%
-            </div>
-
-          {# ===== 有 v 但計唔到 fair_low/high：就顯示基礎面數值 ===== #}
-          {% else %}
-            <div class="muted">
-              已取得基本面資料，但估值未能計算（通常 EPS / Forward EPS / RevenueShare 取得不到或 <= 0）
-            </div>
-
-            <div class="muted">Price：{{ f.get('price') if f else '-' }}</div>
-            <div class="muted">EPS(TTM)：{{ f.get('eps_ttm') if f else '-' }}</div>
-            <div class="muted">PE(TTM)：{{ f.get('pe_ttm') if f else '-' }}</div>
-            <div class="muted">Forward EPS：{{ f.get('forward_eps') if f else '-' }}</div>
-            <div class="muted">Forward PE：{{ f.get('forward_pe') if f else '-' }}</div>
-            <div class="muted">RPS(TTM)：{{ f.get('revenue_per_share_ttm') if f else '-' }}</div>
-            <div class="muted">PS(TTM)：{{ f.get('ps_ttm') if f else '-' }}</div>
           {% endif %}
 
-        {# ===== v 都無：完全無估值資料 ===== #}
+          {% if extra.get('fcf_yield') is not none %}
+            <div class="muted">FCF Yield：{{ "%.1f"|format(extra.get('fcf_yield')) }}%</div>
+          {% endif %}
+
+          {% if extra.get('ev_sales') is not none %}
+            <div class="muted">EV/Sales：{{ "%.1f"|format(extra.get('ev_sales')) }}</div>
+          {% endif %}
+
+          {% if extra.get('pb') is not none or extra.get('roe') is not none %}
+            <div class="muted">
+              PB：{{ "%.1f"|format(extra.get('pb')) if extra.get('pb') is not none else "--" }}
+              | ROE：{{ "%.0f"|format(extra.get('roe')) if extra.get('roe') is not none else "--" }}%
+            </div>
+          {% endif %}
+
+          {% endif %}
+
+          {# 如果 v 有，但 fair_low/high 冇（有時 fundamentals 拎唔到）就提示 #}
+          {% if v.get('fair_low') is none or v.get('fair_high') is none %}
+            <div class="muted" style="margin-top:8px;">
+              已取得基本面資料，但估值未能計算（常見：EPS / Forward EPS / RevenueShare 取得不到或 <= 0）
+            </div>
+            {% if f %}
+              <div class="muted">Price：{{ f.get('price', '-') }}</div>
+              <div class="muted">EPS(TTM)：{{ f.get('eps_ttm', '-') }}</div>
+              <div class="muted">PE(TTM)：{{ f.get('pe_ttm', '-') }}</div>
+              <div class="muted">Forward EPS：{{ f.get('forward_eps', '-') }}</div>
+              <div class="muted">Forward PE：{{ f.get('forward_pe', '-') }}</div>
+              <div class="muted">RPS(TTM)：{{ f.get('revenue_per_share_ttm', '-') }}</div>
+              <div class="muted">PS(TTM)：{{ f.get('ps_ttm', '-') }}</div>
+            {% endif %}
+          {% endif %}
+
         {% else %}
           <div class="muted">未有估值資料：請先提交分析。</div>
         {% endif %}
       </div>
-
-      {% if indicators.high_52w and indicators.low_52w %}
-        <div class="muted" style="margin-top:8px">
-          52週：{{ indicators.low_52w }} ~ {{ indicators.high_52w }}｜距高位：{{ indicators.from_high_pct }}%
-        </div>
-      {% endif %}
 
       {% if indicators.tech_signals %}
         <div style="margin-top:10px">

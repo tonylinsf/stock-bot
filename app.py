@@ -298,6 +298,37 @@ def calc_week_levels(df: pd.DataFrame):
         return support, resistance, mid
     except Exception:
         return None, None, None
+    
+
+def calc_support_levels(df: pd.DataFrame):
+    if df is None or df.empty or "Low" not in df.columns:
+        return {"support_60": None, "support_120": None, "support_365": None}
+
+    lows = df["Low"].dropna().copy()
+
+    # --- 防止極端 outlier：用分位數剪裁（好實用，唔會俾一兩日怪數拖死）---
+    # 例如低過 1% 分位數嘅當作異常，直接剪走
+    q01 = lows.quantile(0.01)
+    lows = lows[lows >= q01]
+
+    def tail_min(n):
+        if len(lows) == 0:
+            return None
+
+        n = min(n, len(lows))
+        m = lows.tail(n).min()
+
+        # ✅ 如果 m 係 Series（例如 multiindex / dataframe 情况），拎第一粒数值先
+        if hasattr(m, "iloc"):
+            m = m.iloc[0]
+
+        return float(m)
+
+    return {
+        "support_60": tail_min(60),
+        "support_120": tail_min(120),
+        "support_365": tail_min(365),
+    }  
 
 
 # =========================
@@ -505,6 +536,59 @@ def calc_fair_value(funda: dict, ma20: float = None, ma60: float = None):
         "fwd_pe": fwd_pe,
     }
 
+def calc_market_sentiment_value(valuation: dict) -> dict:
+    """
+    用你現有估值區間，做一個偏樂觀（市場情緒 / 成長溢價）版本
+    - 不用外部 API
+    - 只係把 PE/PS 上限拉高少少，模擬市場願意畀溢價
+    """
+    if not valuation:
+        return {"mkt_low": None, "mkt_high": None, "mkt_gap_pct": None}
+
+    # 先拎基本面主區間（你 calc_fair_value() 已經揀咗 forward/ttm/ps 做 main）
+    fair_low = valuation.get("fair_low")
+    fair_high = valuation.get("fair_high")
+
+    # 你原本各自方法嘅區間（可用就用）
+    ttm_low, ttm_high = valuation.get("ttm_fair_low"), valuation.get("ttm_fair_high")
+    fwd_low, fwd_high = valuation.get("fwd_fair_low"), valuation.get("fwd_fair_high")
+    ps_low,  ps_high  = valuation.get("ps_fair_low"),  valuation.get("ps_fair_high")
+
+    # 用邊個做 base：優先 forward，其次 ttm，再其次 ps，再 fallback main
+    base_low = fwd_low or ttm_low or ps_low or fair_low
+    base_high = fwd_high or ttm_high or ps_high or fair_high
+
+    if base_low is None or base_high is None:
+        return {"mkt_low": None, "mkt_high": None, "mkt_gap_pct": None}
+
+    # ✅ 市場情緒溢價倍率（你可以之後再微調）
+    # SaaS / 成長股：high 端通常會比「合理」再高 15%~35%
+    low_mult = 1.08
+    high_mult = 1.30
+
+    mkt_low = float(base_low) * low_mult
+    mkt_high = float(base_high) * high_mult
+
+    # 同時算「距離現價偏離」
+    price = None
+    # 你 valuation 無 price，就從 extra 或 funda 搵；你現有 funda 在外面，這裡先容錯
+    # 你等下會喺 compute_stock_bundle() 自己傳 price 入去（見下面）
+    if "price" in valuation:
+        price = valuation.get("price")
+
+    mkt_gap_pct = None
+    if price and mkt_low and mkt_high:
+        mid = (mkt_low + mkt_high) / 2.0
+        try:
+            mkt_gap_pct = (mid - float(price)) / float(price) * 100
+        except Exception:
+            mkt_gap_pct = None
+
+    return {
+        "mkt_low": round(mkt_low, 2),
+        "mkt_high": round(mkt_high, 2),
+        "mkt_gap_pct": round(mkt_gap_pct, 2) if mkt_gap_pct is not None else None,
+    }
 
 def calc_extra_valuation(funda: dict):
     if not funda:
@@ -564,7 +648,7 @@ def _download_daily(ticker: str) -> pd.DataFrame | None:
     try:
         df = yf.download(
             ticker,
-            period="6mo",
+            period="1y",
             interval="1d",
             auto_adjust=True,
             progress=False,
@@ -787,9 +871,9 @@ def compute_stock_bundle(ticker: str):
     try:
         df = yf.download(
             ticker,
-            period="6mo",
+            period="2y",
             interval="1d",
-            auto_adjust=True,
+            auto_adjust=False,
             progress=False,
         )
 
@@ -841,6 +925,10 @@ def compute_stock_bundle(ticker: str):
             valuation = {}
         valuation["extra"] = extra_val
 
+        # ===== 新增：市场情绪估值 =====
+        valuation["price"] = funda.get("price") if funda else None
+        valuation["market"] = calc_market_sentiment_value(valuation)
+
         # ===== 周支撑阻力 =====
         wk_sup, wk_res, wk_mid = calc_week_levels(df)
 
@@ -860,14 +948,14 @@ def compute_stock_bundle(ticker: str):
         except Exception:
             trend_text = ""
 
-        # 52w（你本來用 6mo，照舊）
+        # 52w（你本來用 2y，照舊）
         high_52w = low_52w = None
         try:
             tkr = yf.Ticker(ticker)
-            hist_6mo = tkr.history(period="6mo", interval="1d", auto_adjust=True)
-            if hist_6mo is not None and not hist_6mo.empty and "Close" in hist_6mo.columns:
-                high_52w = to_float(hist_6mo["Close"].max())
-                low_52w = to_float(hist_6mo["Close"].min())
+            hist_2y = tkr.history(period="2y", interval="1d", auto_adjust=True)
+            if hist_2y is not None and not hist_2y.empty and "Close" in hist_2y.columns:
+                high_52w = to_float(hist_2y["Close"].max())
+                low_52w = to_float(hist_2y["Close"].min())
         except Exception:
             pass
 
@@ -1001,6 +1089,7 @@ def index():
     funda = None
     error = None
     moat = None
+    supports = None
     load_13f_flag = False
 
     market_overview = get_market_overview()
@@ -1022,7 +1111,15 @@ def index():
             indicators = ind
             valuation = val
             funda = fu
-        
+            
+            try:
+                import yfinance as yf
+                df_daily = yf.download(ticker, period="2y", interval="1d", progress=False)
+                supports = calc_support_levels(df_daily) if df_daily is not None and not df_daily.empty else None
+            except Exception as e:
+                print("DEBUG support error:", e)
+                supports = None
+
             if load_13f_flag:
                 moat = get_institutional_moat_sec13f(ticker)
                 print("DEBUG moat:", moat)
@@ -1037,6 +1134,7 @@ def index():
         tape=tape,
         moat=moat,
         load_13f_flag=load_13f_flag,
+        supports=supports,
     )
     
 

@@ -44,3 +44,4 @@ websockets==15.0.1
 Werkzeug==3.1.4
 yfinance==0.2.66
 gunicorn==21.2.0
+lxml==5.2.2

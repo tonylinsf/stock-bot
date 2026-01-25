@@ -445,7 +445,7 @@
 
   <!-- Single stock -->
   <div class="card">
-    <h2>🔎 個股分析（技術指標 + AI）</h2>
+    <h2>🔎 個股分析（技術指標）</h2>
 
     <form method="POST" action="/" style="margin-top:10px">
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -639,22 +639,44 @@
             <span class="chip">{{ s.label }}</span>
           {% endfor %}
         </div>
-      {% endif %}
-
-      {% if ai_summary %}
-        <div class="sep"></div>
-        <div class="muted">一句話總評：</div>
-        <pre>{{ ai_summary }}</pre>
-      {% endif %}
-
-      {% if ai_advice %}
-        <div class="sep"></div>
-        <div class="muted">AI 詳細分析：</div>
-        <pre>{{ ai_advice }}</pre>
       {% endif %}   
       <div>
     {% endif %}
   </div>
+
+  {% if moat %}
+    <h3>{{ moat.title }}</h3>
+    <div class="muted">{{ moat.summary }}</div>
+
+    {% if moat.rows %}
+      <div style="margin-top:12px;">
+        {% for r in moat.rows %}
+          <div>{{ r.label }}：<b>{{ r.value }}</b></div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="muted" style="margin-top:10px;">
+       （未返回可显示的机构变动行）
+      </div>
+    {% endif %}
+
+    <div class="muted" style="margin-top:8px;font-size:12px;">
+      {{ moat.note }}
+    </div>
+
+  {% else %}
+    <form method="POST" style="margin-top:10px;">
+      <input type="hidden" name="ticker" value="{{ ticker }}">
+      <input type="hidden" name="load_13f" value="1">
+      <button class="btn" type="submit">查看机构持仓动向（SEC 13F）</button>
+    </form>
+
+    {% if load_13f_flag %}
+      <div class="muted" style="margin-top:10px;">
+        已提交查询，但后端未返回 moat（请看终端 DEBUG form / DEBUG moat）。
+      </div>
+    {% endif %}
+  {% endif %}
 
   <!-- Market Overview -->
   <div class="card">

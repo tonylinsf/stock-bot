@@ -3,11 +3,16 @@ import requests
 from datetime import datetime as _dt
 from zoneinfo import ZoneInfo
 from pathlib import Path
+import re
+import time
+import json
+import xml.etree.ElementTree as ET
+
+from sec13f_moat import get_institutional_moat_sec13f
 
 from flask import Flask, render_template, request, redirect, url_for
 import yfinance as yf
 import pandas as pd
-from openai import OpenAI
 from dotenv import load_dotenv
 
 
@@ -16,7 +21,6 @@ from dotenv import load_dotenv
 # =========================
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
-client = OpenAI()  # 用環境變數 OPENAI_API_KEY
 app = Flask(__name__)
 
 ET = ZoneInfo("America/New_York")
@@ -30,6 +34,10 @@ MARKET_CACHE_DATE: str | None = None  # ET 日期字串，例如 "2026-01-21"
 MARKET_SNAPSHOT_CACHE = None
 MARKET_SNAPSHOT_TS = 0
 
+# ===== 個股分析 cache（避免同一隻 ticker 重覆 download）======
+IND_CACHE: dict[str, dict] = {}
+IND_CACHE_TS: dict[str, float] = {}
+IND_CACHE_TTL = 600  # 10分鐘
 
 # =========================
 # 工具：安全取值 / 避免 warnings
@@ -123,7 +131,7 @@ def fmp_stock_news(ticker: str, limit: int = 6):
         return out
     except Exception:
         return []
-
+    
 
 # =========================
 # 技術指標 / 計算
@@ -545,91 +553,6 @@ def calc_extra_valuation(funda: dict):
         "growth_revenue": (rg * 100) if rg else None,
     }
 
-
-# =========================
-# AI（個股分析用）
-# =========================
-def build_ai_prompt(ticker: str, ind: dict) -> str:
-    return f"""
-你係一位專業股票技術分析顧問，請用簡單中文（廣東話風格）、條理清晰，幫我分析以下股票：
-
-股票代號：{ticker}
-最新收市價：{ind.get("last_price")}（日期：{ind.get("last_date")}）
-最近三個月走勢概要：{ind.get("trend_text")}
-
-技術指標（最近一日）：
-- RSI14：{ind.get("rsi")}
-- MA5 / MA20 / MA60：{ind.get("ma5")} / {ind.get("ma20")} / {ind.get("ma60")}
-- MACD：{ind.get("macd")}
-- 布林帶：上軌 {ind.get("boll_upper")}，中軌 {ind.get("boll_mid")}，下軌 {ind.get("boll_lower")}
-- 成交量：{ind.get("volume_str")}，20 日平均量：{ind.get("avg20_volume_str")}
-- 52 週區間：{ind.get("low_52w")} ~ {ind.get("high_52w")}
-- 現價距離 52 週高位：約 {ind.get("from_high_pct")}%
-- （如有）最新新聞：{len(ind.get("news") or [])} 條
-
-系統計算趨勢分數（0–100）：{ind.get("trend_score")}
-
-請你：
-1) 用 2–3 句描述最近三個月走勢（偏強、偏弱、定係橫行），可引用 RSI/均線/MACD。
-2) 估計「可能買入區間」同「大約止蝕位」（風險太大可建議觀望）。
-3) 提醒 1–2 點要留意嘅風險（例如跌穿支持、消息風險、大市）。
-4) 最後加一句：以上只係參考，唔係任何投資建議。
-
-用分段輸出，換行排版清晰。
-"""
-
-
-def get_ai_advice(prompt: str) -> str:
-    try:
-        resp = client.responses.create(
-            model="gpt-5-mini",
-            input=prompt,
-        )
-        return resp.output_text
-    except Exception as e:
-        return f"AI 分析出錯：{e}"
-
-
-def build_ai_short_prompt(ticker: str, indicators: dict) -> str:
-    return f"""
-你係一個專業股票短線交易顧問。
-
-根據以下最新技術指標，請用 **一句話** 總結呢隻股票短線情況：
-必須包含：
-1）偏強 / 偏弱 / 橫行
-2）觀望 / 分段吸納 / 減持
-3）一句風險提示
-
-只輸出一句話，不要分點。
-
-股票：{ticker}
-最新收市價：{indicators.get("last_price")}
-當日漲跌：{indicators.get("change_pct")}%
-RSI：{indicators.get("rsi")}
-MACD：{indicators.get("macd")}
-MA5：{indicators.get("ma5")}
-MA20：{indicators.get("ma20")}
-MA60：{indicators.get("ma60")}
-BOLL 上軌：{indicators.get("boll_upper")}
-BOLL 中軌：{indicators.get("boll_mid")}
-BOLL 下軌：{indicators.get("boll_lower")}
-成交量：{indicators.get("volume_str")}（20 日平均：{indicators.get("avg20_volume_str")}）
-52 週高低：{indicators.get("low_52w")} ~ {indicators.get("high_52w")}
-趨勢分數：{indicators.get("trend_score")}
-"""
-
-
-def get_ai_short_summary(prompt: str) -> str:
-    try:
-        resp = client.responses.create(
-            model="gpt-5-mini",
-            input=prompt,
-        )
-        return resp.output_text
-    except Exception as e:
-        return f"短評生成失敗：{e}"
-
-
 # =========================
 # Market Overview（SPY/QQQ/DIA）— 修正 df/ddf + 去重 keys
 # =========================
@@ -843,8 +766,207 @@ def compute_trend_score(ind: dict) -> int:
     return max(0, min(100, int(round(score))))
 
 
+def _now_ts() -> float:
+    return _dt.now().timestamp()
+
+
+def compute_stock_bundle(ticker: str):
+    """
+    回傳：indicators, valuation, funda, error
+    - 會用 IND_CACHE
+    """
+    ticker = (ticker or "").strip().upper()
+    if not ticker:
+        return None, None, None, "請輸入股票代號，例如 NVDA、AAPL、QQQ。"
+
+    now = _now_ts()
+    if ticker in IND_CACHE and (now - IND_CACHE_TS.get(ticker, 0)) < IND_CACHE_TTL:
+        cached = IND_CACHE[ticker]
+        return cached["indicators"], cached["valuation"], cached["funda"], None
+
+    try:
+        df = yf.download(
+            ticker,
+            period="6mo",
+            interval="1d",
+            auto_adjust=True,
+            progress=False,
+        )
+
+        if df is None or df.empty:
+            raise ValueError(f"找不到代號 {ticker} 的數據，可能打錯或者冇上市。")
+        if "Close" not in df.columns:
+            raise ValueError("數據缺少 Close 價。")
+
+        close = df["Close"].dropna()
+        if len(close) < 2:
+            raise ValueError("數據太少，冇辦法計算漲跌。")
+
+        # volume
+        if "Volume" in df.columns and not df["Volume"].dropna().empty:
+            vol_series = df["Volume"].dropna()
+            last_vol = to_float(vol_series.iloc[-1]) or 0.0
+            avg20_vol = to_float(vol_series.tail(20).mean()) or 0.0
+        else:
+            last_vol = 0.0
+            avg20_vol = 0.0
+
+        volume_str = format_volume(last_vol)
+        avg20_volume_str = format_volume(avg20_vol)
+
+        # indicators
+        rsi_series = calc_rsi(close)
+        dif, dea, macd_hist = calc_macd(close)
+        ma5 = close.rolling(5).mean()
+        ma20 = close.rolling(20).mean()
+        ma60 = close.rolling(60).mean()
+        boll_upper, boll_mid, boll_lower = calc_boll(close, 20)
+
+        last_close = to_float(close.iloc[-1])
+        last_date = close.index[-1].strftime("%Y-%m-%d")
+        prev_close = to_float(close.iloc[-2])
+        change_pct = ((last_close - prev_close) / prev_close * 100) if (last_close is not None and prev_close) else None
+
+        ma20_val = to_float(ma20.dropna().iloc[-1]) if not ma20.dropna().empty else None
+        ma60_val = to_float(ma60.dropna().iloc[-1]) if not ma60.dropna().empty else None
+        rsi14_val = to_float(rsi_series.dropna().iloc[-1]) if not rsi_series.dropna().empty else None
+        macd_hist_val = to_float(macd_hist.dropna().iloc[-1]) if not macd_hist.dropna().empty else None
+        macd_signal_val = to_float(dea.dropna().iloc[-1]) if not dea.dropna().empty else None
+
+        # ===== 估值 =====
+        funda = get_fundamentals_yf(ticker)
+        valuation = calc_fair_value(funda, ma20=ma20_val, ma60=ma60_val) if funda else None
+        extra_val = calc_extra_valuation(funda) if funda else {}
+        if valuation is None:
+            valuation = {}
+        valuation["extra"] = extra_val
+
+        # ===== 周支撑阻力 =====
+        wk_sup, wk_res, wk_mid = calc_week_levels(df)
+
+        # trend text（近 3 個月）
+        trend_text = ""
+        try:
+            recent = close.tail(60)
+            first_90 = to_float(recent.iloc[0])
+            last_90 = to_float(recent.iloc[-1])
+            if first_90 and last_90:
+                if last_90 > first_90 * 1.05:
+                    trend_text = "最近三個月整體屬於向上走勢。"
+                elif last_90 < first_90 * 0.95:
+                    trend_text = "最近三個月整體偏向下跌或調整。"
+                else:
+                    trend_text = "最近三個月大致屬於橫行或區間震盪。"
+        except Exception:
+            trend_text = ""
+
+        # 52w（你本來用 6mo，照舊）
+        high_52w = low_52w = None
+        try:
+            tkr = yf.Ticker(ticker)
+            hist_6mo = tkr.history(period="6mo", interval="1d", auto_adjust=True)
+            if hist_6mo is not None and not hist_6mo.empty and "Close" in hist_6mo.columns:
+                high_52w = to_float(hist_6mo["Close"].max())
+                low_52w = to_float(hist_6mo["Close"].min())
+        except Exception:
+            pass
+
+        from_high_pct = ((last_close - high_52w) / high_52w * 100) if (last_close is not None and high_52w) else None
+        rsi_val = round(rsi14_val, 2) if rsi14_val is not None else None
+
+        # RSI label/class
+        if rsi_val is None:
+            rsi_label, rsi_class = None, None
+        elif rsi_val < 30:
+            rsi_label, rsi_class = f"RSI {rsi_val} 超卖", "rsi-low"
+        elif rsi_val < 45:
+            rsi_label, rsi_class = f"RSI {rsi_val} 偏弱", "rsi-weak"
+        elif rsi_val <= 60:
+            rsi_label, rsi_class = f"RSI {rsi_val} 中性", "rsi-mid"
+        elif rsi_val <= 70:
+            rsi_label, rsi_class = f"RSI {rsi_val} 偏强", "rsi-strong"
+        else:
+            rsi_label, rsi_class = f"RSI {rsi_val} 超买", "rsi-high"
+
+        # ✅ FMP 新闻
+        news = fmp_stock_news(ticker, limit=6)
+
+        indicators = {
+            "ticker": ticker,
+            "last_price": round(last_close, 2) if last_close is not None else None,
+            "last_date": last_date,
+            "change_pct": round(change_pct, 2) if change_pct is not None else None,
+            "trend_text": trend_text,
+
+            "rsi": rsi_val,
+            "rsi14": rsi_val,
+            "rsi_label": rsi_label,
+            "rsi_class": rsi_class,
+
+            "ma5": round(to_float(ma5.dropna().iloc[-1]), 2) if not ma5.dropna().empty else None,
+            "ma20": round(to_float(ma20.dropna().iloc[-1]), 2) if not ma20.dropna().empty else None,
+            "ma60": round(to_float(ma60.dropna().iloc[-1]), 2) if not ma60.dropna().empty else None,
+
+            "macd": round(to_float(macd_hist.dropna().iloc[-1]), 4) if not macd_hist.dropna().empty else None,
+            "macd_hist": macd_hist_val,
+            "macd_signal": macd_signal_val,
+
+            "boll_upper": round(to_float(boll_upper.dropna().iloc[-1]), 2) if not boll_upper.dropna().empty else None,
+            "boll_mid": round(to_float(boll_mid.dropna().iloc[-1]), 2) if not boll_mid.dropna().empty else None,
+            "boll_lower": round(to_float(boll_lower.dropna().iloc[-1]), 2) if not boll_lower.dropna().empty else None,
+
+            "volume_str": volume_str,
+            "avg20_volume_str": avg20_volume_str,
+
+            "high_52w": round(high_52w, 2) if high_52w is not None else None,
+            "low_52w": round(low_52w, 2) if low_52w is not None else None,
+            "from_high_pct": round(from_high_pct, 2) if from_high_pct is not None else None,
+
+            "week_support": wk_sup,
+            "week_resistance": wk_res,
+            "week_mid": wk_mid,
+
+            "fundamentals": funda,
+            "valuation": valuation,
+            "news": news,
+        }
+
+        # ✅ 今日關鍵狀態
+        loc_tag, risk_tag, action_tag, status_text, status_class = build_today_status(
+            last_close, ma20_val, ma60_val, rsi14_val, macd_hist_val, wk_sup, wk_res
+        )
+        indicators.update({
+            "trend_tag": tag_trend(ma20_val, ma60_val, macd_hist_val),
+            "loc_tag": loc_tag,
+            "risk_tag": risk_tag,
+            "action_tag": action_tag,
+            "status_text": status_text,
+            "status_class": status_class,
+        })
+
+        # ✅ 短線買入/止蝕/壓力
+        buy_low, buy_high, stop, pressure = short_term_levels(last_close, wk_sup, wk_res, risk_pct=0.02)
+        indicators.update({
+            "st_buy_low": buy_low,
+            "st_buy_high": buy_high,
+            "st_stop": stop,
+            "st_resistance": pressure,
+        })
+
+        indicators["trend_score"] = compute_trend_score(indicators)
+
+        # 寫入 cache
+        IND_CACHE[ticker] = {"indicators": indicators, "valuation": valuation, "funda": funda}
+        IND_CACHE_TS[ticker] = now
+
+        return indicators, valuation, funda, None
+
+    except Exception as e:
+        return None, None, None, f"後端錯誤：{e}"
+
+
 # =========================
-# Flask Routes
+# Flask Routes（移走 AI）
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -875,225 +997,48 @@ def index():
         "news": [],
     }
 
-    result = None
     valuation = None
     funda = None
-    ai_advice = None
-    ai_summary = None
     error = None
+    moat = None
+    load_13f_flag = False
 
     market_overview = get_market_overview()
-    tape = get_market_snapshot()  # ✅ 跑馬燈資料
+    tape = get_market_snapshot()
 
+    # ✅ POST 才做個股分析
     if request.method == "POST":
         ticker = request.form.get("ticker", "").strip().upper()
+        load_13f = request.form.get("load_13f", "").strip()
+        load_13f_flag = (load_13f == "1")
 
-        if not ticker:
-            error = "請輸入股票代號，例如 NVDA、AAPL、QQQ。"
+        print("DEBUG form:", dict(request.form))
+        print("DEBUG load_13f_flag:", load_13f_flag, "ticker:", ticker)
+
+        ind, val, fu, err = compute_stock_bundle(ticker)
+        if err:
+            error = err
         else:
-            try:
-                df = yf.download(
-                    ticker,
-                    period="6mo",
-                    interval="1d",
-                    auto_adjust=True,
-                    progress=False,
-                )
-
-                if df is None or df.empty:
-                    raise ValueError(f"找不到代號 {ticker} 的數據，可能打錯或者冇上市。")
-                if "Close" not in df.columns:
-                    raise ValueError("數據缺少 Close 價。")
-
-                close = df["Close"].dropna()
-                if len(close) < 2:
-                    raise ValueError("數據太少，冇辦法計算漲跌。")
-
-                # volume
-                if "Volume" in df.columns and not df["Volume"].dropna().empty:
-                    vol_series = df["Volume"].dropna()
-                    last_vol = to_float(vol_series.iloc[-1]) or 0.0
-                    avg20_vol = to_float(vol_series.tail(20).mean()) or 0.0
-                else:
-                    last_vol = 0.0
-                    avg20_vol = 0.0
-
-                volume_str = format_volume(last_vol)
-                avg20_volume_str = format_volume(avg20_vol)
-
-                # indicators
-                rsi_series = calc_rsi(close)
-                dif, dea, macd_hist = calc_macd(close)
-                ma5 = close.rolling(5).mean()
-                ma20 = close.rolling(20).mean()
-                ma60 = close.rolling(60).mean()
-                boll_upper, boll_mid, boll_lower = calc_boll(close, 20)
-
-                last_close = to_float(close.iloc[-1])
-                last_date = close.index[-1].strftime("%Y-%m-%d")
-                prev_close = to_float(close.iloc[-2])
-                change_pct = ((last_close - prev_close) / prev_close * 100) if (last_close is not None and prev_close) else None
-
-                ma20_val = to_float(ma20.dropna().iloc[-1]) if not ma20.dropna().empty else None
-                ma60_val = to_float(ma60.dropna().iloc[-1]) if not ma60.dropna().empty else None
-                rsi14_val = to_float(rsi_series.dropna().iloc[-1]) if not rsi_series.dropna().empty else None
-                macd_hist_val = to_float(macd_hist.dropna().iloc[-1]) if not macd_hist.dropna().empty else None
-                macd_signal_val = to_float(dea.dropna().iloc[-1]) if not dea.dropna().empty else None
-
-                # ===== 估值 =====
-                funda = get_fundamentals_yf(ticker)
-                valuation = calc_fair_value(funda, ma20=ma20_val, ma60=ma60_val) if funda else None
-
-                extra_val = calc_extra_valuation(funda) if funda else {}
-                if valuation is None:
-                    valuation = {}
-                valuation["extra"] = extra_val
-
-                # ===== 周支撑阻力 =====
-                wk_sup, wk_res, wk_mid = calc_week_levels(df)
-
-                # trend text（近 3 個月）
-                trend_text = ""
-                try:
-                    recent = close.tail(60)
-                    first_90 = to_float(recent.iloc[0])
-                    last_90 = to_float(recent.iloc[-1])
-                    if first_90 and last_90:
-                        if last_90 > first_90 * 1.05:
-                            trend_text = "最近三個月整體屬於向上走勢。"
-                        elif last_90 < first_90 * 0.95:
-                            trend_text = "最近三個月整體偏向下跌或調整。"
-                        else:
-                            trend_text = "最近三個月大致屬於橫行或區間震盪。"
-                except Exception:
-                    trend_text = ""
-
-                # 52w（你本來用 6mo，照舊）
-                high_52w = low_52w = None
-                try:
-                    tkr = yf.Ticker(ticker)
-                    hist_6mo = tkr.history(period="6mo", interval="1d", auto_adjust=True)
-                    if hist_6mo is not None and not hist_6mo.empty and "Close" in hist_6mo.columns:
-                        high_52w = to_float(hist_6mo["Close"].max())
-                        low_52w = to_float(hist_6mo["Close"].min())
-                except Exception:
-                    pass
-
-                from_high_pct = ((last_close - high_52w) / high_52w * 100) if (last_close is not None and high_52w) else None
-
-                rsi_val = round(rsi14_val, 2) if rsi14_val is not None else None
-
-                # RSI label/class
-                if rsi_val is None:
-                    rsi_label, rsi_class = None, None
-                elif rsi_val < 30:
-                    rsi_label, rsi_class = f"RSI {rsi_val} 超卖", "rsi-low"
-                elif rsi_val < 45:
-                    rsi_label, rsi_class = f"RSI {rsi_val} 偏弱", "rsi-weak"
-                elif rsi_val <= 60:
-                    rsi_label, rsi_class = f"RSI {rsi_val} 中性", "rsi-mid"
-                elif rsi_val <= 70:
-                    rsi_label, rsi_class = f"RSI {rsi_val} 偏强", "rsi-strong"
-                else:
-                    rsi_label, rsi_class = f"RSI {rsi_val} 超买", "rsi-high"
-
-                # ✅ FMP 新闻
-                news = fmp_stock_news(ticker, limit=6)
-
-                indicators.update({
-                    "ticker": ticker,
-                    "last_price": round(last_close, 2) if last_close is not None else None,
-                    "last_date": last_date,
-                    "change_pct": round(change_pct, 2) if change_pct is not None else None,
-                    "trend_text": trend_text,
-
-                    "rsi": rsi_val,
-                    "rsi14": rsi_val,
-                    "rsi_label": rsi_label,
-                    "rsi_class": rsi_class,
-
-                    "ma5": round(to_float(ma5.dropna().iloc[-1]), 2) if not ma5.dropna().empty else None,
-                    "ma20": round(to_float(ma20.dropna().iloc[-1]), 2) if not ma20.dropna().empty else None,
-                    "ma60": round(to_float(ma60.dropna().iloc[-1]), 2) if not ma60.dropna().empty else None,
-
-                    "macd": round(to_float(macd_hist.dropna().iloc[-1]), 4) if not macd_hist.dropna().empty else None,
-                    "macd_hist": macd_hist_val,
-                    "macd_signal": macd_signal_val,
-
-                    "boll_upper": round(to_float(boll_upper.dropna().iloc[-1]), 2) if not boll_upper.dropna().empty else None,
-                    "boll_mid": round(to_float(boll_mid.dropna().iloc[-1]), 2) if not boll_mid.dropna().empty else None,
-                    "boll_lower": round(to_float(boll_lower.dropna().iloc[-1]), 2) if not boll_lower.dropna().empty else None,
-
-                    "volume_str": volume_str,
-                    "avg20_volume_str": avg20_volume_str,
-
-                    "high_52w": round(high_52w, 2) if high_52w is not None else None,
-                    "low_52w": round(low_52w, 2) if low_52w is not None else None,
-                    "from_high_pct": round(from_high_pct, 2) if from_high_pct is not None else None,
-
-                    "week_support": wk_sup,
-                    "week_resistance": wk_res,
-                    "week_mid": wk_mid,
-
-                    "fundamentals": funda,
-                    "valuation": valuation,
-                    "news": news,
-                })
-
-                # ✅ 今日關鍵狀態（一句）
-                loc_tag, risk_tag, action_tag, status_text, status_class = build_today_status(
-                    last_close, ma20_val, ma60_val, rsi14_val, macd_hist_val, wk_sup, wk_res
-                )
-                indicators.update({
-                    "trend_tag": tag_trend(ma20_val, ma60_val, macd_hist_val),
-                    "loc_tag": loc_tag,
-                    "risk_tag": risk_tag,
-                    "action_tag": action_tag,
-                    "status_text": status_text,
-                    "status_class": status_class,
-                })
-
-                # ✅ 短線買入/止蝕/壓力
-                buy_low, buy_high, stop, pressure = short_term_levels(last_close, wk_sup, wk_res, risk_pct=0.02)
-                indicators.update({
-                    "st_buy_low": buy_low,
-                    "st_buy_high": buy_high,
-                    "st_stop": stop,
-                    "st_resistance": pressure,
-                })
-
-                indicators["trend_score"] = compute_trend_score(indicators)
-
-                # ✅ VIX / TNX 聯動：放入 AI prompt 最前面
-                snapshot = get_market_snapshot()
-                vix = snapshot.get("VIX", {}).get("price")
-                tnx_yield = snapshot.get("TNX", {}).get("yield_pct")
-
-                risk_line = ""
-                if vix is not None and vix > 20:
-                    risk_line += f"【市場風險】VIX={vix:.2f} (>20)，波動偏大，建議收緊止損、減少追價。\n"
-                if tnx_yield is not None:
-                    risk_line += f"【利率】10年期美債約 {tnx_yield:.2f}%：若利率上行，科技股估值壓力會較大。\n"
-
-                ai_advice = get_ai_advice(risk_line + build_ai_prompt(ticker, indicators))
-                ai_summary = get_ai_short_summary(risk_line + build_ai_short_prompt(ticker, indicators))
-
-            except Exception as e:
-                error = f"後端錯誤：{e}"
+            indicators = ind
+            valuation = val
+            funda = fu
+        
+            if load_13f_flag:
+                moat = get_institutional_moat_sec13f(ticker)
+                print("DEBUG moat:", moat)
 
     return render_template(
         "index.html",
-        result=result,
         valuation=valuation,
         ticker=ticker,
         indicators=indicators,
-        ai_advice=ai_advice,
-        ai_summary=ai_summary,
         error=error,
         market_overview=market_overview,
-        tape=tape,  # ✅ 新增：跑馬燈資料
+        tape=tape,
+        moat=moat,
+        load_13f_flag=load_13f_flag,
     )
-
+    
 
 @app.post("/refresh_market")
 def refresh_market():

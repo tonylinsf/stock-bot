@@ -695,6 +695,30 @@
     {% endif %}
   </div>
 
+  {% if insider_trades %}
+  <div class="card">
+    <h3>🕵️ 內部人交易（Yahoo Finance）</h3>
+    {% for t in insider_trades %}
+      <p>
+        {{ t.date }} - {{ t.name }} {% if t.relation %} ({{ t.relation }}) {% endif %}
+        <b style="color: {{ 'lime' if t.type == 'Buy' else 'red' }}">
+          {{ t.type }}
+        </b>
+        {% if t.shares %}
+          {{ "{:,}".format(t.shares) }} 股
+        {% else %}
+          -
+        {% endif %}
+      </p>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card">
+    <h3>🕵️ 內部人交易</h3>
+    <p>暫無公開內部人交易記錄</p>
+  </div>
+  {% endif %}
+
   {% if moat %}
     <h3>{{ moat.title }}</h3>
     <div class="muted">{{ moat.summary }}</div>

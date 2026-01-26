@@ -1,6 +1,6 @@
 import os
 import requests
-from datetime import datetime as _dt
+from datetime import datetime as _dt, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
 import re
@@ -24,6 +24,10 @@ load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 app = Flask(__name__)
 
 ET = ZoneInfo("America/New_York")
+
+def _et_now():
+    return datetime.now(ET)
+
 FMP_API_KEY = os.getenv("FMP_API_KEY", "").strip()
 
 # ====== 大盤概覽缓存（SPY/QQQ/DIA）======
@@ -130,6 +134,103 @@ def fmp_stock_news(ticker: str, limit: int = 6):
             })
         return out
     except Exception:
+        return []
+
+
+# =========================
+# Insider Trading 内部人交易
+# =========================
+def get_insider_trades_yf(ticker: str, days: int = 90, limit: int = 12):
+    """
+    從 yfinance 取 insider transactions
+    回傳 list[dict]，每個 dict 會有：date, name, relation, type, shares
+    """
+    try:
+        import yfinance as yf
+        import pandas as pd
+    except Exception:
+        return []
+
+    try:
+        tk = yf.Ticker(ticker)
+        df = getattr(tk, "insider_transactions", None)
+
+        if df is None or (hasattr(df, "empty") and df.empty):
+            return []
+
+        # yfinance 有時會返 DataFrame / 有時會返 list-like；統一轉 DataFrame
+        if not isinstance(df, pd.DataFrame):
+            df = pd.DataFrame(df)
+
+        if df is None or df.empty:
+            return []
+
+        # 盡量兼容欄位名（Yahoo 會唔同）
+        cols = {c.lower(): c for c in df.columns}
+
+        def pick(*cands):
+            for k in cands:
+                if k.lower() in cols:
+                    return cols[k.lower()]
+            return None
+
+        c_date = pick("Date", "Start Date", "Transaction Date")
+        c_name = pick("Insider", "Name", "Insider Name", "Reporting Name")
+        c_rel  = pick("Position", "Relation", "Title")
+        c_type = pick("Transaction", "Type", "Transaction Type")
+        c_shr  = pick("Shares", "Shares Transacted", "Shares Traded", "Shares Change", "Shares Owned")
+
+        # 過濾 days
+        cutoff = _dt.now(ZoneInfo("UTC")) - timedelta(days=days)
+
+        if c_date:
+            df[c_date] = pd.to_datetime(df[c_date], errors="coerce", utc=True)
+            df = df[df[c_date].notna()]
+            df = df[df[c_date] >= cutoff]
+
+            df = df.sort_values(c_date, ascending=False)
+        else:
+            # 冇日期欄就唔做 cutoff，但照返頭幾行
+            df = df.head(limit)
+
+        rows = []
+        for _, r in df.head(limit).iterrows():
+            d = r.get(c_date) if c_date else None
+            if d is not None and hasattr(d, "to_pydatetime"):
+                d = d.to_pydatetime()
+            date_str = d.strftime("%Y-%m-%d") if d else ""
+
+            name = str(r.get(c_name, "")).strip() if c_name else ""
+            relation = str(r.get(c_rel, "")).strip() if c_rel else ""
+            tx_type = str(r.get(c_type, "")).strip() if c_type else ""
+
+            shares_val = r.get(c_shr) if c_shr else None
+            try:
+                shares_val = int(float(shares_val)) if shares_val is not None and shares_val != "" else None
+            except Exception:
+                shares_val = None
+
+            # 做個簡單 normalize（方便前端上色）
+            tx_l = tx_type.lower()
+            if "buy" in tx_l or "purchase" in tx_l:
+                tx_norm = "Buy"
+            elif "sell" in tx_l or "sale" in tx_l:
+                tx_norm = "Sell"
+            else:
+                tx_norm = tx_type if tx_type else ""
+
+            rows.append({
+                "date": date_str,
+                "name": name,
+                "relation": relation,
+                "type": tx_norm,
+                "shares": shares_val
+            })
+
+        return rows
+
+    except Exception as e:
+        print("DEBUG insider_transactions error:", e)
         return []
     
 
@@ -1090,7 +1191,10 @@ def index():
     error = None
     moat = None
     supports = None
+    insider = None
     load_13f_flag = False
+
+    insider_trades = []
 
     market_overview = get_market_overview()
     tape = get_market_snapshot()
@@ -1100,9 +1204,6 @@ def index():
         ticker = request.form.get("ticker", "").strip().upper()
         load_13f = request.form.get("load_13f", "").strip()
         load_13f_flag = (load_13f == "1")
-
-        print("DEBUG form:", dict(request.form))
-        print("DEBUG load_13f_flag:", load_13f_flag, "ticker:", ticker)
 
         ind, val, fu, err = compute_stock_bundle(ticker)
         if err:
@@ -1120,9 +1221,16 @@ def index():
                 print("DEBUG support error:", e)
                 supports = None
 
+            # ✅ insider：包住 try，錯就用 []
+            try:
+                insider_trades = get_insider_trades_yf(ticker, days=90, limit=12)
+                print("DEBUG insider trades:", len(insider_trades))
+            except Exception as e:
+                print("DEBUG insider error:", e)
+                insider_trades = []
+
             if load_13f_flag:
                 moat = get_institutional_moat_sec13f(ticker)
-                print("DEBUG moat:", moat)
 
     return render_template(
         "index.html",
@@ -1135,6 +1243,8 @@ def index():
         moat=moat,
         load_13f_flag=load_13f_flag,
         supports=supports,
+        insider=insider,
+        insider_trades=insider_trades,
     )
     
 

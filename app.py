@@ -1148,16 +1148,23 @@ def get_daily_picks_sp500_cached(top_n: int = 5) -> dict:
         # ===== B1 止损（MA20 -3%）=====
         stop_ma = round(ma20 * 0.97, 2)
 
-        # ===== 统一止损（优先 ATR，其次 MA20-3%）=====
-        stop_used = stop_atr if stop_atr is not None else stop_ma
+        # ===== 统一止损：ATR 只可用喺低過入场区，否则改用 MA20-3% =====
+        stop_used = stop_ma  # default
 
-        # ===== 目标位：2R（reward = 2 * risk）=====
-        # 用 close 做基准会更稳定（入场区只做参考）
+        if stop_atr is not None:
+            # 只有當 ATR 止損低過入場區下沿，先採用
+            if stop_atr < entry_low:
+                stop_used = stop_atr
+
+        # ===== 目标位：2R（用 entry_high 做基準）=====
         target = None
-        if stop_used is not None:
-           risk = close - stop_used
-           if risk > 0:
-               target = round(close + 2 * risk, 2)
+        risk = entry_high - stop_used
+        if risk > 0:
+            target = round(entry_high + 2 * risk, 2)
+        else:
+            # 理論上唔會入到呢度，但保險
+            stop_used = None
+            target = None
 
 
         picks.append({

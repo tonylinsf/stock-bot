@@ -13,6 +13,7 @@ from sec13f_moat import get_institutional_moat_sec13f
 from flask import Flask, render_template, request, redirect, url_for
 import yfinance as yf
 import pandas as pd
+from flask import jsonify
 from dotenv import load_dotenv
 
 
@@ -23,10 +24,10 @@ load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
 app = Flask(__name__)
 
-ET = ZoneInfo("America/New_York")
+TZ_ET = ZoneInfo("America/New_York")
 
 def _et_now():
-    return datetime.now(ET)
+    return _dt.now(TZ_ET)
 
 FMP_API_KEY = os.getenv("FMP_API_KEY", "").strip()
 
@@ -742,7 +743,7 @@ def calc_extra_valuation(funda: dict):
 # Market Overview（SPY/QQQ/DIA）— 修正 df/ddf + 去重 keys
 # =========================
 def _et_now():
-    return _dt.now(ET)
+    return _dt.now(TZ_ET)
 
 
 def _download_daily(ticker: str) -> pd.DataFrame | None:
@@ -760,6 +761,213 @@ def _download_daily(ticker: str) -> pd.DataFrame | None:
     except Exception:
         return None
 
+# ====== Fear & Greed 快取 (10分鐘) ======
+_FG_CACHE = {"ts": 0, "data": None}
+FG_TTL_SEC = 600
+
+def _clamp(x, lo=0, hi=100):
+    try:
+        x = float(x)
+    except Exception:
+        return lo
+    return max(lo, min(hi, x))
+
+def _label_from_score(score: float) -> str:
+    if score < 20:  return "極度恐懼"
+    if score < 40:  return "恐懼"
+    if score < 60:  return "中性"
+    if score < 80:  return "貪婪"
+    return "極度貪婪"
+
+def _trend_vote_from_m(m: dict) -> int:
+    """
+    用市場概覽入面已有數據投票：
+    +1 偏強：Close > MA20 且 MA20 > MA60
+    -1 偏弱：Close < MA20 且 MA20 < MA60
+     0 震盪：其它
+    """
+    try:
+        lastp = float(m.get("last_price"))
+        ma20  = float(m.get("ma20"))
+        ma60  = float(m.get("ma60"))
+    except Exception:
+        return 0
+
+    if lastp > ma20 and ma20 > ma60:
+        return 1
+    if lastp < ma20 and ma20 < ma60:
+        return -1
+    return 0
+
+def get_market_total_signal() -> dict:
+    """
+    取 get_market_overview()（你本身已經有cache），做 SPY/QQQ/DIA 趨勢投票
+    回傳：{ok, total, label, signal:{emoji,name,cls,hint}, votes:[...], updated}
+    """
+    mos = get_market_overview(force_refresh=False, auto_refresh_945=True)  # 用你現成cache
+    if not mos:
+        return {"ok": False, "error": "market_overview 為空"}
+
+    pick = {}
+    for m in mos:
+        t = (m.get("ticker") or "").upper()
+        if t in ("SPY", "QQQ", "DIA"):
+            pick[t] = m
+
+    if not pick:
+        return {"ok": False, "error": "找不到 SPY/QQQ/DIA 資料"}
+
+    votes = []
+    total = 0
+    for t in ("SPY", "QQQ", "DIA"):
+        m = pick.get(t)
+        if not m:
+            votes.append({"ticker": t, "vote": 0, "status": "無資料"})
+            continue
+        v = _trend_vote_from_m(m)
+        total += v
+        status = "偏強" if v == 1 else ("偏弱" if v == -1 else "震盪")
+        votes.append({"ticker": t, "vote": v, "status": status})
+
+    # 總燈號（你想要：🟢偏強 / 🟡震盪 / 🔴偏弱）
+    if total >= 2:
+        signal = {"emoji": "🟢", "name": "偏強", "cls": "sig-good", "hint": "三大指數趨勢偏強，可用順勢策略"}
+    elif total <= -2:
+        signal = {"emoji": "🔴", "name": "偏弱", "cls": "sig-danger", "hint": "三大指數偏弱，控制風險/減槓桿"}
+    else:
+        signal = {"emoji": "🟡", "name": "震盪", "cls": "sig-warn", "hint": "多空拉鋸，宜等突破或做區間"}
+
+    return {
+        "ok": True,
+        "total": total,
+        "label": signal["name"],
+        "signal": signal,
+        "votes": votes,
+        "updated": _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+def get_fear_greed_vix_spy(lookback_days: int = 252) -> dict:
+    """
+    用 VIX 分位 + SPY 趨勢（Close vs MA50）合成 0-100
+    回傳：{ok,score,label,components:{...}, updated}
+    """
+
+    def _get_close_series(df):
+        """
+        yfinance 有時會返 MultiIndex 欄位，或 df["Close"] 變 DataFrame
+        呢個 helper 保證返 Series
+        """
+        if df is None or df.empty:
+            return pd.Series(dtype="float64")
+
+        if "Close" not in df.columns:
+            # MultiIndex 或奇怪欄位：嘗試揾包含 Close 嘅層
+            # 常見 MultiIndex: ('Close', 'SPY') / ('Close', '^VIX')
+            try:
+                close = df.xs("Close", axis=1, level=0)
+            except Exception:
+                return pd.Series(dtype="float64")
+        else:
+            close = df["Close"]
+
+        # 如果 close 係 DataFrame（多一層 ticker），攞第一欄
+        if isinstance(close, pd.DataFrame):
+            close = close.iloc[:, 0]
+
+        return close.dropna()
+
+    # 下載 1y 夠用（252交易日）
+    try:
+        vix_df = yf.download("^VIX", period="1y", interval="1d", progress=False, auto_adjust=True)
+        spy_df = yf.download("SPY",  period="1y", interval="1d", progress=False, auto_adjust=True)
+    except Exception as e:
+        return {"ok": False, "error": f"yfinance 下載失敗: {e}"}
+
+    vix_close = _get_close_series(vix_df)
+    spy_close = _get_close_series(spy_df)
+
+    if vix_close.empty or spy_close.empty:
+        return {"ok": False, "error": "VIX 或 SPY 數據為空"}
+
+    # --- VIX 分位（越高越恐懼，所以反轉成越高越貪婪）---
+    n = len(vix_close)
+    lb = max(60, min(int(lookback_days), n))
+    vix_close_lb = vix_close.tail(lb)
+
+    vix_now = float(vix_close_lb.iloc[-1])
+    pct_vix = float(vix_close_lb.rank(pct=True).iloc[-1])   # 0(低) -> 1(高)
+    vix_score = 100.0 - (pct_vix * 100.0)                   # 反轉：vix 越低 -> 分數越高
+
+    # --- SPY 趨勢（Close vs MA50）---
+    # 確保至少有 60-80 日資料先計 MA50
+    if len(spy_close) < 55:
+        return {"ok": False, "error": "SPY 數據不足，無法計 MA50"}
+
+    spy_close_lb = spy_close.tail(max(80, len(spy_close)))  # 你原本寫法保留（實際上會攞全段）
+    ma50 = spy_close_lb.rolling(50).mean()
+
+    ma50_last = ma50.iloc[-1]
+    if pd.isna(ma50_last):
+        return {"ok": False, "error": "MA50 計算失敗（數據不足）"}
+
+    spy_now = float(spy_close_lb.iloc[-1])
+    ma50_now = float(ma50_last)
+    diff_pct = (spy_now / ma50_now - 1.0) * 100.0  # 距離 MA50 %
+
+    # <= -2% 視為偏弱(0)，>= +2% 視為偏強(100)
+    trend_score = _clamp((diff_pct + 2.0) / 4.0 * 100.0)
+
+    # --- 合成（VIX 60%，趨勢 40%）---
+    score = _clamp(vix_score * 0.6 + trend_score * 0.4)
+    label = _label_from_score(score)
+
+    return {
+        "ok": True,
+        "score": round(float(score), 1),
+        "label": label,
+        "components": {
+            "vix_score": round(float(vix_score), 1),
+            "trend_score": round(float(trend_score), 1),
+            "vix": round(float(vix_now), 2),
+            "spy": round(float(spy_now), 2),
+            "ma50": round(float(ma50_now), 2),
+            "pct_vix": round(float(pct_vix) * 100.0, 1),
+            "diff_pct_vs_ma50": round(float(diff_pct), 2),
+        },
+        # ✅ 用 ET / 你已有 _et_now() 就用佢
+        "updated": _et_now().strftime("%Y-%m-%d %H:%M:%S ET") if "ET" in globals() else _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+_PULSE_CACHE = {"ts": 0, "data": None}
+PULSE_TTL_SEC = 600  # 10分鐘
+
+def get_pulse_cached() -> dict:
+    if _PULSE_CACHE["data"] is not None and (time.time() - _PULSE_CACHE["ts"] < PULSE_TTL_SEC):
+        return _PULSE_CACHE["data"]
+
+    fg = get_fear_greed_vix_spy()          # 你已經整好嗰個
+    mk = get_market_total_signal()         # 新增
+
+    data = {
+        "ok": True,
+        "feargreed": fg,
+        "market": mk,
+        "updated": _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    _PULSE_CACHE["ts"] = time.time()
+    _PULSE_CACHE["data"] = data
+    return data
+
+def get_fear_greed_cached():
+    now = time.time()
+    if _FG_CACHE["data"] is not None and (now - _FG_CACHE["ts"] < FG_TTL_SEC):
+        return _FG_CACHE["data"]
+
+    data = get_fear_greed_vix_spy()
+    _FG_CACHE["ts"] = now
+    _FG_CACHE["data"] = data
+    return data
 
 def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = True):
     global MARKET_CACHE, MARKET_CACHE_DATE
@@ -775,20 +983,29 @@ def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = Tr
         if now_et.hour < 9 or (now_et.hour == 9 and now_et.minute < 45):
             if MARKET_CACHE:
                 return MARKET_CACHE
+            
+    DISPLAY_NAME = {
+        "SPY": "SPY",
+        "QQQ": "QQQ",
+        "DIA": "DIA",
+        "BTC-USD": "BTC",
+        "GLD": "GLD",
+   }        
 
-    tickers = ["SPY", "QQQ", "DIA"]
+    tickers = ["SPY", "QQQ", "DIA", "BTC-USD", "GLD"]
     results: list[dict] = []
     dates: list[str] = []
 
     for t in tickers:
+        t_display = DISPLAY_NAME.get(t, t) 
         ddf = _download_daily(t)
         if ddf is None or ddf.empty or "Close" not in ddf.columns:
-            results.append({"ticker": t, "error": "no data"})
+            results.append({"ticker": t, "ticker_display": t_display, "error": "no data"})
             continue
 
         close = ddf["Close"].dropna()
         if close.empty:
-            results.append({"ticker": t, "error": "no close"})
+            results.append({"ticker": t, "ticker_display": t_display, "error": "no close"})
             continue
 
         price = to_float(close.iloc[-1])
@@ -869,6 +1086,7 @@ def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = Tr
 
         results.append({
             "ticker": t,
+            "ticker_display": t_display,
             "last_price": round(price, 2) if price is not None else None,
             "change_pct": round(change_pct, 2) if change_pct is not None else None,
             "updated_date": updated_date,
@@ -1252,6 +1470,14 @@ def index():
 def refresh_market():
     get_market_overview(force_refresh=True, auto_refresh_945=False)
     return redirect(url_for("index"))
+
+@app.route("/api/feargreed")
+def api_feargreed():
+    return jsonify(get_fear_greed_cached())
+
+@app.route("/api/pulse")
+def api_pulse():
+    return jsonify(get_pulse_cached())
 
 
 if __name__ == "__main__":

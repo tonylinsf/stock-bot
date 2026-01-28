@@ -20,7 +20,24 @@
     .btn{background:var(--btn);border:none;color:white;padding:10px 12px;border-radius:10px;cursor:pointer}
     .btn:active{transform:translateY(1px)}
     .input{width:100%;padding:12px 12px;border-radius:10px;border:1px solid var(--border);background:#081021;color:var(--text)}
-    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .grid3{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:12px;
+    }
+
+    @media (max-width: 1100px){
+      .grid3{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 700px){
+      .grid3{ grid-template-columns: 1fr; }
+    }
+
+    /* 補位用：佔位但唔顯示 */
+    .card.ghost{
+      opacity:0;
+      pointer-events:none;
+    }
     @media(max-width:900px){.grid3{grid-template-columns:1fr}}
     .price{font-size:22px;font-weight:700}
     .chg.up{color:var(--good);font-weight:700}
@@ -371,6 +388,20 @@
       border:1px solid rgba(255,255,255,.10);
       background: rgba(255,255,255,.06);
     }
+
+    .fg-badge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px; border-radius:999px;
+      font-size:13px; font-weight:700;
+      border:1px solid rgba(255,255,255,.12);
+    }
+    .sig-good    { background: rgba( 46, 204, 113, .15); color: #7CFFB2; }
+    .sig-warn    { background: rgba(241, 196, 15, .15);  color: #FFE08A; }
+    .sig-neutral { background: rgba(189, 195, 199, .15); color: #E2E6EA; }
+    .sig-hot     { background: rgba(230, 126, 34, .15);  color: #FFC59B; }
+    .sig-danger  { background: rgba(231, 76, 60,  .15);  color: #FF9B9B; }
+
+    .fg-hint { font-size:12px; opacity:.8; margin-top:6px; line-height:1.5; }
   </style>
 </head>
 <body>
@@ -767,17 +798,27 @@
 
     <div class="sep"></div>
 
+    <!-- ✅ 先放「市場脈搏」卡（唔入 grid3） -->
+    <div class="card" style="margin-top:12px;">
+      <h3>📍 市場脈搏（Fear&Greed + 今日總燈號）</h3>
+
+      <div id="pulseTop" style="font-size:16px; margin:6px 0;">讀取中...</div>
+      <div id="pulseBadges" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;"></div>
+      <div id="pulseHint" class="fg-hint"></div>
+
+      <div style="font-size:13px; opacity:.85; line-height:1.6; margin-top:8px;">
+        <div id="pulseDetail"></div>
+        <div id="pulseUpdated" style="opacity:.7;"></div>
+      </div>
+    </div>
+
+    <!-- ✅ 再開一個 grid3，只放 ticker 卡 -->
     <div class="grid3">
       {% for m in market_overview %}
         <div class="card" style="padding:12px">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <h3 style="margin:0">{{ m.ticker }}</h3>
+            <h3 style="margin:0">{{ m.ticker_display or m.ticker }}</h3>
             <div class="muted">更新：{{ m.updated_date if m.updated_date else "-" }}</div>
-              {% if m.is_stale %}
-                <span class="badge bg-warning text-dark" style="margin-left:6px;">
-                  資料未更新
-                </span>
-              {% endif %}
           </div>
 
           {% if m.error %}
@@ -956,6 +997,15 @@
           {% endif %}
         </div>
       {% endfor %}
+
+      {% set n = market_overview|length %}
+      {% if n % 3 != 0 %}
+        {% for _ in range(3 - (n % 3)) %}
+          <div class="card" style="padding:12px; opacity:.15; border-style:dashed;">
+            <div class="muted"> </div>
+          </div>
+        {% endfor %}
+      {% endif %}
     </div>
   </div>
 
@@ -1042,6 +1092,81 @@
     });
   }
 })();
+</script>
+
+<script>
+async function loadPulse(){
+  const topEl = document.getElementById("pulseTop");
+  const badgesEl = document.getElementById("pulseBadges");
+  const hintEl = document.getElementById("pulseHint");
+  const detailEl = document.getElementById("pulseDetail");
+  const updEl = document.getElementById("pulseUpdated");
+
+  try{
+    topEl.textContent = "讀取中...";
+    badgesEl.innerHTML = "";
+    hintEl.textContent = "";
+    detailEl.textContent = "";
+    updEl.textContent = "";
+
+    const r = await fetch("/api/pulse", {cache:"no-store"});
+    const data = await r.json();
+
+    const fg = data.feargreed || {};
+    const mk = data.market || {};
+
+    // 1) 頂部一句總覽
+    if (fg.ok && mk.ok){
+      topEl.textContent = `FG：${fg.score}/100（${fg.label}）｜今日總燈號：${mk.signal.emoji}${mk.signal.name}`;
+    } else {
+      topEl.textContent = "讀取失敗（網絡或後端錯誤）";
+    }
+
+    // 2) badges：恐慌貪婪燈號 + 今日總燈號
+    let hints = [];
+
+    if (fg.ok && fg.signal){
+      badgesEl.innerHTML += `
+        <span class="fg-badge ${fg.signal.cls}">
+          ${fg.signal.emoji} 恐慌貪婪：${fg.signal.name}（${fg.score}）
+        </span>
+      `;
+      if (fg.signal.hint) hints.push(fg.signal.hint);
+    }
+
+    if (mk.ok && mk.signal){
+      badgesEl.innerHTML += `
+        <span class="fg-badge ${mk.signal.cls}">
+          ${mk.signal.emoji} 今日總燈號：${mk.signal.name}（總分 ${mk.total}）
+        </span>
+      `;
+      if (mk.signal.hint) hints.push(mk.signal.hint);
+    }
+
+    hintEl.textContent = hints.join(" ｜ ");
+
+    // 3) 詳細（可選：顯示VIX、MA50、三票結果）
+    if (fg.ok){
+      const c = fg.components || {};
+      detailEl.innerHTML =
+        `VIX：${c.vix}（分位 ${c.pct_vix}%）｜SPY：${c.spy}｜MA50：${c.ma50}｜距MA50：${c.diff_pct_vs_ma50}%`;
+    }
+
+    if (mk.ok){
+      const vv = (mk.votes || []).map(x => `${x.ticker}:${x.status}`).join(" / ");
+      detailEl.innerHTML += `<br>投票：${vv}`;
+    }
+
+    updEl.textContent = `更新：${data.updated || ""}`;
+
+  }catch(e){
+    topEl.textContent = "讀取失敗（網絡或後端錯誤）";
+    detailEl.textContent = String(e);
+  }
+}
+
+// 頁面載入就跑一次
+document.addEventListener("DOMContentLoaded", loadPulse);
 </script>
 
 </body>

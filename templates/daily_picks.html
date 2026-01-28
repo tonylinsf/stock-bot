@@ -57,6 +57,13 @@
         white-space: nowrap;
       }
    }
+
+   .reason-cell{
+     font-size:12px;
+     color:#9fb3c8;
+     line-height:1.3em;
+     max-width:140px;
+    }
   </style>
 </head>
 <body>
@@ -88,12 +95,13 @@
               <tr>
                 <th>Ticker</th>
                 <th>Price</th>
+                <th>Entry 入场区</th>   
+                <th>Target 目标</th>
+                <th>Stop 止损位</th> 
                 <th>RSI</th>
                 <th>5D%</th>
                 <th>MA20</th>
                 <th>MA60</th>
-                <th>Entry 入场区</th>   
-                <th>Stop 止损位</th> 
                 <th>Reason</th>
               </tr>
             </thead>
@@ -102,22 +110,33 @@
               <tr>
                 <td><a href="/?ticker={{ p.ticker }}">{{ p.ticker }}</a></td>
                 <td>{{ p.price }}</td>
+
+                <!-- Entry -->
+                <td>${{ p.entry_low }} ~ ${{ p.entry_high }}</td>
+
+                <!-- Target -->
+                <td>
+                  {% if p.target %}
+                    ${{ p.target }}
+                  {% else %}
+                    --
+                  {% endif %}
+                </td>
+
+                <!-- Stop -->
+                <td>
+                  {% if p.stop_used %}
+                    ${{ p.stop_used }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+
                 <td>{{ p.rsi }}</td>
                 <td>{{ p.ret5 }}</td>
                 <td>{{ p.ma20 }}</td>
                 <td>{{ p.ma60 }}</td>
-                <!-- ⭐ Entry -->
-                <td>
-                    ${{ p.entry_low }} ~ ${{ p.entry_high }}
-                </td>
-
-                <!-- ⭐ Stop -->
-                <td>
-                    MA: {{ p.stop_ma }}<br>
-                    ATR: {{ p.stop_atr if p.stop_atr else '—' }}
-                </td>
-
-                <td class="muted">{{ p.reason }}</td>
+                <td class="reason-cell">{{ p.reason }}</td>
               </tr>
             {% endfor %}
           </tbody>

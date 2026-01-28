@@ -1148,6 +1148,18 @@ def get_daily_picks_sp500_cached(top_n: int = 5) -> dict:
         # ===== B1 止损（MA20 -3%）=====
         stop_ma = round(ma20 * 0.97, 2)
 
+        # ===== 统一止损（优先 ATR，其次 MA20-3%）=====
+        stop_used = stop_atr if stop_atr is not None else stop_ma
+
+        # ===== 目标位：2R（reward = 2 * risk）=====
+        # 用 close 做基准会更稳定（入场区只做参考）
+        target = None
+        if stop_used is not None:
+           risk = close - stop_used
+           if risk > 0:
+               target = round(close + 2 * risk, 2)
+
+
         picks.append({
             "ticker": t,
             "price": round(close, 2),
@@ -1161,7 +1173,9 @@ def get_daily_picks_sp500_cached(top_n: int = 5) -> dict:
             "entry_high": round(entry_high, 2),
             "stop_ma": round(stop_ma, 2),
             "atr14": round(atr14, 2) if atr14 is not None else None,
-            "stop_atr": stop_atr
+            "stop_atr": stop_atr,
+            "stop_used": round(stop_used, 2) if stop_used is not None else None,
+            "target": target,
         })
 
     picks.sort(key=lambda x: x["score"], reverse=True)

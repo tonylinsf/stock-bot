@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from sec13f_moat import get_institutional_moat_sec13f
 
 from flask import Flask, render_template, request, redirect, url_for
+from bs4 import BeautifulSoup
 import yfinance as yf
 import pandas as pd
 from flask import jsonify
@@ -969,6 +970,214 @@ def get_fear_greed_cached():
     _FG_CACHE["data"] = data
     return data
 
+# ====== S&P500 成份股快取（每日更新一次即可）======
+_SP500_CACHE = {"date": None, "tickers": []}
+
+def get_sp500_tickers_cached() -> list[str]:
+    """
+    用稳定CSV来源抓 S&P500 tickers（每日更新一次）
+    """
+    today = _dt.now(ZoneInfo("UTC")).date().isoformat()
+    if _SP500_CACHE["date"] == today and _SP500_CACHE["tickers"]:
+        return _SP500_CACHE["tickers"]
+
+    url = "https://datahub.io/core/s-and-p-500-companies/r/constituents.csv"
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    r = requests.get(url, headers=headers, timeout=20)
+    r.raise_for_status()
+
+    # 读CSV（避免你再引入新库）
+    import io
+    df = pd.read_csv(io.StringIO(r.text))
+
+    tickers = []
+    for t in df["Symbol"].dropna().astype(str).tolist():
+        # yfinance 用 '-' 代表 '.'（例如 BRK.B -> BRK-B）
+        t = t.replace(".", "-").strip().upper()
+        tickers.append(t)
+
+    _SP500_CACHE["date"] = today
+    _SP500_CACHE["tickers"] = tickers
+    return tickers
+
+# ====== 每日推荐快取（10分钟）======
+_PICKS_CACHE = {"ts": 0, "data": None}
+PICKS_TTL_SEC = 600
+
+def _safe_float(x, default=None):
+    try:
+        if x is None: 
+            return default
+        return float(x)
+    except Exception:
+        return default
+
+def get_daily_picks_sp500_cached(top_n: int = 5) -> dict:
+    """
+    每日推荐（S&P500）：顺势 + 不追高
+    条件：
+      - Close > MA20 > MA60（趋势向上）
+      - RSI 50~70（有动能但未过热）
+      - 近5日收益 > 0
+    返回：{ok, picks:[...], updated, error}
+    """
+    now = time.time()
+    if _PICKS_CACHE["data"] is not None and (now - _PICKS_CACHE["ts"] < PICKS_TTL_SEC):
+        return _PICKS_CACHE["data"]
+
+    try:
+        tickers = get_sp500_tickers_cached()
+    except Exception as e:
+        data = {"ok": False, "error": f"获取S&P500成份股失败: {e}", "picks": [], "updated": ""}
+        _PICKS_CACHE["ts"] = now
+        _PICKS_CACHE["data"] = data
+        return data
+
+    # 为了速度：一次性批量下载最近 90 天（够算 MA60/RSI）
+    # yfinance 会返回 MultiIndex columns
+    try:
+        df = yf.download(
+            tickers=tickers,
+            period="6mo",
+            interval="1d",
+            group_by="ticker",
+            auto_adjust=True,
+            progress=False,
+            threads=True
+        )
+    except Exception as e:
+        data = {"ok": False, "error": f"yfinance 批量下载失败: {e}", "picks": [], "updated": ""}
+        _PICKS_CACHE["ts"] = now
+        _PICKS_CACHE["data"] = data
+        return data
+
+    picks = []
+
+    # helper：取某 ticker 的 close series
+    def _get_close_for(t: str) -> pd.Series:
+        # 两种可能：
+        # 1) df columns 是 MultiIndex (field, ticker) 或 (ticker, field)
+        # 2) group_by="ticker" 通常是 df[ticker]["Close"]
+        try:
+            sub = df[t]
+            close = sub["Close"]
+            if isinstance(close, pd.DataFrame):
+                close = close.iloc[:, 0]
+            return close.dropna()
+        except Exception:
+            return pd.Series(dtype="float64")
+        
+    def _get_ohlc_for(t: str) -> pd.DataFrame:
+        """
+        从批量 df 取返某只 ticker 的 OHLC dataframe（High/Low/Close）
+        """
+        try:
+            sub = df[t]  # group_by="ticker" 时通常可用
+            # 保证列名一致
+            need = ["High", "Low", "Close"]
+            if not all(k in sub.columns for k in need):
+                return pd.DataFrame()
+            out = sub[need].copy()
+            return out.dropna()
+        except Exception:
+            return pd.DataFrame()    
+
+    # RSI 简版（14）
+    def _rsi14(s: pd.Series, period: int = 14) -> float | None:
+        if len(s) < period + 5:
+            return None
+        delta = s.diff()
+        gain = delta.clip(lower=0).rolling(period).mean()
+        loss = (-delta.clip(upper=0)).rolling(period).mean()
+        rs = gain / loss.replace(0, pd.NA)
+        rsi = 100 - (100 / (1 + rs))
+        v = rsi.iloc[-1]
+        return None if pd.isna(v) else float(v)
+
+    for t in tickers:
+        c = _get_close_for(t)
+        if len(c) < 80:
+            continue
+
+        close = float(c.iloc[-1])
+        ma20 = float(c.rolling(20).mean().iloc[-1])
+        ma60 = float(c.rolling(60).mean().iloc[-1])
+
+        if pd.isna(ma20) or pd.isna(ma60):
+            continue
+
+        # 趋势条件
+        if not (close > ma20 > ma60):
+            continue
+
+        rsi = _rsi14(c)
+        if rsi is None:
+            continue
+        if not (50 <= rsi <= 70):
+            continue
+
+        # 近5日收益
+        if len(c) < 6:
+            continue
+        ret5 = (close / float(c.iloc[-6]) - 1.0) * 100.0
+        if ret5 <= 0:
+            continue
+
+        # 评分：更强趋势 + 更健康 RSI
+        diff20 = (close / ma20 - 1.0) * 100.0
+        diff60 = (close / ma60 - 1.0) * 100.0
+        score = diff20 * 0.4 + diff60 * 0.4 + ret5 * 0.2 - abs(rsi - 60) * 0.1
+
+        # ===== B2 ATR 止损（需要 df）=====
+        ohlc = _get_ohlc_for(t)
+        atr_series = calc_atr(ohlc, 14)
+
+        atr14 = None
+        stop_atr = None
+        if atr_series is not None:
+            atr_series = atr_series.dropna()
+            if not atr_series.empty:
+                atr14 = float(atr_series.iloc[-1])
+                stop_atr = round(close - 2 * atr14, 2)
+
+        # ===== A 入场区间（MA20 回踩）=====
+        entry_low = round(ma20 * 0.995, 2)
+        entry_high = round(ma20 * 1.015, 2)
+
+        # ===== B1 止损（MA20 -3%）=====
+        stop_ma = round(ma20 * 0.97, 2)
+
+        picks.append({
+            "ticker": t,
+            "price": round(close, 2),
+            "rsi": round(rsi, 1),
+            "ret5": round(ret5, 2),
+            "ma20": round(ma20, 2),
+            "ma60": round(ma60, 2),
+            "score": round(float(score), 3),
+            "reason": "Close > MA20 > MA60，RSI 50-70，近5日上涨",
+            "entry_low": round(entry_low, 2),
+            "entry_high": round(entry_high, 2),
+            "stop_ma": round(stop_ma, 2),
+            "atr14": round(atr14, 2) if atr14 is not None else None,
+            "stop_atr": stop_atr
+        })
+
+    picks.sort(key=lambda x: x["score"], reverse=True)
+    picks = picks[:top_n]
+
+    data = {
+        "ok": True,
+        "picks": picks,
+        "count": len(picks),
+        "updated": _dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "universe": "S&P 500"
+    }
+    _PICKS_CACHE["ts"] = now
+    _PICKS_CACHE["data"] = data
+    return data
+
 def get_market_overview(force_refresh: bool = False, auto_refresh_945: bool = True):
     global MARKET_CACHE, MARKET_CACHE_DATE
 
@@ -1478,6 +1687,15 @@ def api_feargreed():
 @app.route("/api/pulse")
 def api_pulse():
     return jsonify(get_pulse_cached())
+
+@app.route("/api/daily-picks")
+def api_daily_picks():
+    return jsonify(get_daily_picks_sp500_cached(top_n=3))
+
+@app.route("/daily-picks")
+def daily_picks_page():
+    data = get_daily_picks_sp500_cached(top_n=3)
+    return render_template("daily_picks.html", data=data)
 
 
 if __name__ == "__main__":

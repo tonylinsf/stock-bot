@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>每日推荐 | Daily Picks</title>
+  <style>
+    body{ background:#0b0f14; color:#e8eaed; font-family:system-ui,-apple-system,Segoe UI,Roboto; margin:0; }
+    a{ color:#8ab4ff; text-decoration:none; }
+    .wrap{ max-width:1100px; margin:0 auto; padding:18px; }
+    .card{ background:#121821; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:14px; }
+    .muted{ opacity:.75; font-size:13px; }
+    table{ width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td{ padding:10px; border-bottom:1px solid rgba(255,255,255,.08); text-align:left; font-size:14px; }
+    th{ opacity:.85; font-weight:700; }
+    .tag{ display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); font-size:12px; opacity:.9; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap;">
+        <div>
+          <h2 style="margin:0;">📌 每日股票推荐 | Daily Picks</h2>
+          <div class="muted">
+            Universe: {{ data.universe }} ｜ Updated: {{ data.updated }}
+          </div>
+        </div>
+        <div>
+          <a class="tag" href="/">← 返回首页</a>
+          <a class="tag" href="/api/daily-picks" target="_blank">API JSON</a>
+        </div>
+      </div>
+
+      {% if not data.ok %}
+        <p style="margin-top:12px;">❌ {{ data.error }}</p>
+      {% else %}
+        <p class="muted" style="margin-top:12px;">
+          规则（Rule）：Close > MA20 > MA60 + RSI 50-70 + 近5日上涨（5-day > 0）
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Price</th>
+              <th>RSI</th>
+              <th>5D%</th>
+              <th>MA20</th>
+              <th>MA60</th>
+              <th>Entry 入场区</th>   
+              <th>Stop 止损位</th> 
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in data.picks %}
+              <tr>
+                <td><a href="/?ticker={{ p.ticker }}">{{ p.ticker }}</a></td>
+                <td>{{ p.price }}</td>
+                <td>{{ p.rsi }}</td>
+                <td>{{ p.ret5 }}</td>
+                <td>{{ p.ma20 }}</td>
+                <td>{{ p.ma60 }}</td>
+                <!-- ⭐ Entry -->
+                <td>
+                    ${{ p.entry_low }} ~ ${{ p.entry_high }}
+                </td>
+
+                <!-- ⭐ Stop -->
+                <td>
+                    MA: {{ p.stop_ma }}<br>
+                    ATR: {{ p.stop_atr if p.stop_atr else '—' }}
+                </td>
+
+                <td class="muted">{{ p.reason }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

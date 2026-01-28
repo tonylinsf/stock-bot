@@ -476,7 +476,7 @@
 
   <!-- 🔔 功能入口 -->
   <div class="card" style="padding:10px 12px;">
-    <a class="tag" href="/daily-picks">📌 每日推荐</a>
+    <a class="tag" href="/daily-picks" onclick="showLoading('正在生成每日推荐…','Generating Daily Picks…')">📌 每日推荐</a>
   </div>
 
 
@@ -1173,6 +1173,26 @@ async function loadPulse(){
 
 // 頁面載入就跑一次
 document.addEventListener("DOMContentLoaded", loadPulse);
+</script>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#0b1220; padding:16px 18px; border:1px solid rgba(255,255,255,.15); border-radius:12px; width:min(340px, 92vw); text-align:center;">
+    <div id="loadingTitle" style="font-size:16px; font-weight:800;">运行中…</div>
+    <div id="loadingSub" style="margin-top:6px; font-size:13px; opacity:.82;">Loading…</div>
+    <div style="margin-top:12px; font-size:12px; opacity:.65;">首次可能需要 5–15 秒</div>
+  </div>
+</div>
+
+<script>
+function showLoading(title, sub){
+  const el = document.getElementById("loadingOverlay");
+  const t = document.getElementById("loadingTitle");
+  const s = document.getElementById("loadingSub");
+  if(t) t.textContent = title || "运行中…";
+  if(s) s.textContent = sub || "Loading…";
+  if(el) el.style.display = "flex";
+}
 </script>
 
 </body>

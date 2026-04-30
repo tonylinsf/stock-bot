@@ -392,7 +392,7 @@ def analyze_ticker(ticker):
         "target1": fmt_money(target1),
         "target2": fmt_money(target2),
         "notes": notes,
-        "price_date": str(last.name.date())
+        "price_date": datetime.now().strftime("%Y-%m-%d")
     }
 
     chart = build_chart(df)

@@ -258,15 +258,15 @@ def get_market_filter():
 def analyze_ticker(ticker):
     df, err = get_polygon_daily_bars(ticker)
     if err:
-        return None, None, err
+        return None, None, None, err
 
     if df is None or len(df) < 150:
-        return None, None, "数据不足，至少需要150根日K"
+        return None, None, None, "数据不足，至少需要150根日K"
 
     df = add_indicators(df).dropna()
 
     if df.empty:
-        return None, None, "技术指标计算失败"
+        return None, None, None, "技术指标计算失败"
 
     last = df.iloc[-1]
     prev = df.iloc[-2]
@@ -486,52 +486,40 @@ def get_market_cards():
     return cards
 
 
-def get_top_picks():
-    market_filter = get_market_filter()
+def get_rebound_signals():
     picks = []
 
     for ticker in UNIVERSE:
-        analysis, _, err = analyze_ticker(ticker)
-        if err:
+        analysis, _, _, err = analyze_ticker(ticker)
+        if err or not analysis:
             continue
 
-        # 大盘红灯时，降低全部信号
-        if not market_filter["allow_long"] and analysis["score"] < 6:
+        try:
+            price = float(analysis["price"])
+            rsi = float(analysis["rsi"])
+            macd_hist = float(analysis["macd_hist"])
+            ma20 = float(str(analysis["ma20"]).replace("$", "").replace(",", ""))
+
+            near_ma20 = abs(price - ma20) / ma20 <= 0.04  # 距离MA20 4%内
+
+            if 20 <= rsi <= 30 and macd_hist > 0 and near_ma20:
+                picks.append({
+                    "ticker": analysis["ticker"],
+                    "price": analysis["price_fmt"],
+                    "rsi": analysis["rsi"],
+                    "macd": analysis["macd_hist"],
+                    "ma20": analysis["ma20"],
+                    "decision": analysis["decision"],
+                    "setup": "低位反弹信号",
+                    "buy_low": analysis["buy_low"],
+                    "buy_high": analysis["buy_high"],
+                    "stop": analysis["stop"],
+                })
+
+        except Exception:
             continue
 
-        # 只选高质量信号
-        if analysis["score"] < 5:
-            continue
-
-        # 第二步：只做趋势突破型
-        if analysis["setup"] != "趋势突破型":
-            continue
-
-        # 第三步：不要追太接近52周高位
-        high_52w = float(analysis["high_52w"].replace("$", "").replace(",", ""))
-        if analysis["price"] > high_52w * 0.97:
-            continue
-
-        # RSI 不要太热
-        if analysis["rsi"] >= 68:
-            continue
-
-            picks.append({
-                "ticker": analysis["ticker"],
-                "price": analysis["price_fmt"],
-                "change_pct": analysis["change_pct"],
-                "score": analysis["score"],
-                "setup": analysis["setup"],
-                "decision": analysis["decision"],
-                "rsi": analysis["rsi"],
-                "buy_zone": analysis["buy_zone"],
-                "stop": analysis["stop"],
-                "target1": analysis["target1"],
-                "risk": analysis["risk"],
-            })
-
-    picks = sorted(picks, key=lambda x: (x["score"], x["rsi"] < 70), reverse=True)
-    return picks[:5]
+    return picks[:3]
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -592,6 +580,11 @@ def market():
         top_picks=[],
         market_cards=market_cards,
     )
+
+@app.route("/scan_rebound")
+def scan_rebound():
+    picks = get_rebound_signals()
+    return render_template("rebound.html", picks=picks)
 
 
 if __name__ == "__main__":

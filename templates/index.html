@@ -350,6 +350,16 @@
       </div>
   </div>
 
+    <div style="margin-top:10px;">
+      <a href="/scan_rebound" onclick="showScanLoading()">
+        <button type="button">🔥 扫描低位反弹机会</button>
+      </a>
+      <div id="scanLoading" style="display:none; margin-top:10px; color:#93c5fd;">
+        ⏳ 正在扫描低位反弹机会，请稍等...
+      </div>
+    </div>
+  </div>
+
   {% if error %}
   <div class="card">
     <div class="error">
@@ -465,38 +475,38 @@
   {% endif %}
 
   <div class="card">
-    <h2 class="section-title">今日 Top 5 自动选股</h2>
+    <h2 class="section-title">低位反弹信号 Top 3</h2>
     {% if top_picks %}
     <table>
       <thead>
         <tr>
           <th>股票</th>
-          <th>决定</th>
-          <th>Setup</th>
-          <th>分数</th>
+          <th>价格</th>
           <th>RSI</th>
-          <th>买入区</th>
+          <th>MACD</th>
+          <th>MA20</th>
+          <th>买入低</th>
+          <th>买入高</th>
           <th>止损</th>
-          <th>目标</th>
         </tr>
       </thead>
       <tbody>
         {% for p in top_picks %}
         <tr>
-          <td><b>{{ p.ticker }}</b><br><span class="small">{{ p.price }} / {{ p.change_pct }}</span></td>
-          <td>{{ p.decision }}</td>
-          <td>{{ p.setup }}</td>
-          <td>{{ p.score }}/6</td>
+          <td><b>{{ p.ticker }}</b></td>
+          <td>{{ p.price }}</td>
           <td>{{ p.rsi }}</td>
-          <td>{{ p.buy_zone }}</td>
+          <td>{{ p.macd }}</td>
+          <td>{{ p.ma20 }}</td>
+          <td>{{ p.buy_low }}</td>
+          <td>{{ p.buy_high }}</td>
           <td>{{ p.stop }}</td>
-          <td>{{ p.target1 }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <div class="sub">暂时没有符合条件的股票。大盘红灯或信号不足时，系统会自动减少推荐。</div>
+    <div class="sub">暂时没有符合条件的低位反弹信号。</div>
     {% endif %}
   </div>
 
@@ -547,6 +557,23 @@ function showMarketLoading() {
 
   if (msg) msg.style.display = "block";
   if (btn) btn.innerText = "加载中...";
+}
+</script>
+
+<script>
+function showLoading() {
+  const msg = document.getElementById("loadingMsg");
+  if (msg) msg.style.display = "block";
+}
+
+function showMarketLoading() {
+  const msg = document.getElementById("marketLoading");
+  if (msg) msg.style.display = "block";
+}
+
+function showScanLoading() {
+  const msg = document.getElementById("scanLoading");
+  if (msg) msg.style.display = "block";
 }
 </script>
 

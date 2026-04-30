@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>低位反弹信号</title>
+</head>
+<body style="background:#0b1220; color:white; font-family:sans-serif">
+
+<h2>🔥 低位反弹信号 Top 3</h2>
+
+{% if picks %}
+<table border="1" cellpadding="10" style="width:100%">
+<tr>
+  <th>股票</th>
+  <th>价格</th>
+  <th>RSI</th>
+  <th>MACD</th>
+  <th>MA20</th>
+  <th>买入区</th>
+  <th>止损</th>
+</tr>
+
+{% for p in picks %}
+<tr>
+  <td>{{ p.ticker }}</td>
+  <td>{{ p.price }}</td>
+  <td>{{ p.rsi }}</td>
+  <td>{{ p.macd }}</td>
+  <td>{{ p.ma20 }}</td>
+  <td>{{ p.buy_low }} - {{ p.buy_high }}</td>
+  <td>{{ p.stop }}</td>
+</tr>
+{% endfor %}
+
+</table>
+{% else %}
+<p>暂无符合条件</p>
+{% endif %}
+
+<br>
+<a href="/"><button>⬅ 返回</button></a>
+
+</body>
+</html>

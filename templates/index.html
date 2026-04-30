@@ -250,57 +250,6 @@
       color: #9ca3af;
     }
 
-    .stock-header {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .stock-title {
-      font-size: 18px;
-      font-weight: 800;
-    }
-
-    .stock-center {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .stock-symbol {
-      margin-right: 28px;   /* 👉 加大间距（现在太挤） */
-      font-size: 20px;      /* 👉 放大 */
-      font-weight: 600;
-      color: #e5e7eb;
-      letter-spacing: 1px;
-    }
-
-    .stock-price {
-      margin-right: 16px;   /* 👉 价格和涨跌再拉开一点 */
-      font-size: 22px;      /* 👉 比 symbol 再大一点（主视觉） */
-      font-weight: 700;
-    }
-
-    .stock-change {
-       min-width: 60px;
-       text-align: right;    
-    }
-
-    .stock-date {
-      text-align: right;
-      font-size: 12px;
-      color: #9ca3af;
-    }
-
-    .stock-symbol {
-      min-width: 70px;   /* 👉 固定宽度 */
-    }
-
-    .stock-price {
-      min-width: 100px;  /* 👉 固定价格宽度 */
-    }
-
     @keyframes priceFlash {
       0% { transform: scale(1.08); opacity: 0.5; }
       100% { transform: scale(1); opacity: 1; }
@@ -359,8 +308,51 @@
       border-bottom: 1px solid rgba(255,255,255,0.05);
     }
 
+    .stock-head-top {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .stock-head-bottom {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 32px;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .stock-symbol {
+      font-size: 26px;      /* 👉 原来20 → 放大 */
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .stock-price {
+      font-size: 30px;      /* 👉 主视觉最大 */
+      font-weight: 900;
+      text-shadow: 0 0 8px rgba(255,255,255,0.05);  /* 微光 */
+    }
+
+    .stock-change {
+      font-size: 18px;      /* 👉 比价格小一点 */
+      font-weight: 700;
+    }
+
     /* 📱 手机优化 */
     @media (max-width: 600px) {
+
+       .stock-symbol {
+         font-size: 22px;
+       }
+
+       .stock-price {
+         font-size: 26px;
+       }
+
+       .stock-change {
+         font-size: 16px;
+       }
 
        body {
            font-size: 14px;
@@ -469,9 +461,12 @@
   {% if analysis %}
   <div class="card">
     <div class="stock-header">
-      <div class="stock-title">个股分析</div>
+      <div class="stock-head-top">
+        <span>个股分析</span>
+        <span class="stock-date">{{ analysis.price_date }}</span>
+      </div>
 
-      <div class="stock-center">
+      <div class="stock-head-bottom">
         <span class="stock-symbol">{{ analysis.ticker }}</span>
         <span class="stock-price" style="color: {{ analysis.change_color }}">
           {{ analysis.price_fmt }}
@@ -479,10 +474,6 @@
         <span class="stock-change" style="color: {{ analysis.change_color }}">
           {{ analysis.change_pct }}
         </span>
-      </div>
-
-      <div class="stock-date">
-        {{ analysis.price_date }}
       </div>
     </div>
 

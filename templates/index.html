@@ -203,6 +203,19 @@
       color: var(--muted);
     }
 
+    .chart-wrap {
+      height: 220px;
+      max-height: 220px;
+      position: relative;
+    }
+
+    @media (max-width: 600px) {
+      .chart-wrap {
+        height: 240px;
+        max-height: 240px;
+      }
+    }
+
     @media (max-width: 900px) {
       .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -217,7 +230,91 @@
       table { font-size: 13px; }
       th, td { padding: 9px; }
     }
-  </style>
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 10px;
+    }
+
+    .card {
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 12px;
+    }
+
+    .market-table {
+      width: 100%;
+      border-collapse: collapse;
+     margin-top: 10px;
+    }
+
+    .market-table th {
+      text-align: left;
+      color: #8fb3ff;
+      font-size: 13px;
+      padding: 6px 8px;
+    }
+
+    .market-table td {
+      padding: 10px 8px;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* 📱 手机优化 */
+    @media (max-width: 600px) {
+
+       body {
+           font-size: 14px;
+       }
+
+       h1 {
+           font-size: 20px;
+       }
+
+       h2 {
+           font-size: 16px;
+       }
+
+       .card {
+           padding: 10px;
+       }
+
+       /* ✅ 关键：这里才会生效 */
+       .grid4 {
+           grid-template-columns: repeat(3, 1fr);
+           gap: 8px;
+       }
+
+       .grid3 {
+           grid-template-columns: repeat(3, 1fr);
+           gap: 8px;
+       }
+
+       .mini {
+           padding: 8px;
+       }
+
+       .label {
+           font-size: 11px;
+       }
+
+       .value {
+           font-size: 15px;
+       }
+
+       input {
+           width: 100%;
+           font-size: 16px;
+       }
+
+       button {
+           width: 100%;
+           font-size: 16px;
+       }
+    }
+ </style>
 </head>
 
 <body>
@@ -237,10 +334,20 @@
   </div>
 
   <div class="card">
-    <form method="post" class="search">
+    <form method="post" class="search" onsubmit="showLoading()">
       <input name="ticker" value="{{ ticker }}" placeholder="输入股票：NVDA / TSLA / MSFT">
       <button type="submit">分析股票</button>
+      <div id="loadingMsg" style="display:none; margin-top:10px; color:#93c5fd; font-weight:700;">
+        ⏳ 正在分析中，请稍等...
+      </div>
     </form>
+    <div style="margin-top:10px;">
+      <a href="/market" onclick="showMarketLoading()">
+        <button type="button">📊 查看大盘状态</button>
+      </a>
+      <div id="marketLoading" style="display:none; margin-top:10px; color:#93c5fd;">
+        ⏳ 正在加载大盘数据...
+      </div>
   </div>
 
   {% if error %}
@@ -254,54 +361,92 @@
 
   {% if analysis %}
   <div class="card">
-    <h2 class="section-title">{{ analysis.ticker }} 系统结论</h2>
-    <div class="grid4">
-      <div class="mini">
-        <div class="label">现价</div>
-        <div class="value">{{ analysis.price_fmt }}</div>
-        <div class="small">{{ analysis.change_pct }}</div>
-      </div>
-      <div class="mini">
-        <div class="label">系统决定</div>
-        <div class="value decision">{{ analysis.decision }}</div>
-      </div>
-      <div class="mini">
-        <div class="label">Setup</div>
-        <div class="value">{{ analysis.setup }}</div>
-      </div>
-      <div class="mini">
-        <div class="label">技术分</div>
-        <div class="value">{{ analysis.score }}/6</div>
-      </div>
-    </div>
+    <h2 class="section-title">{{ analysis.ticker }} 个股分析</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>代码</th>
+          <th>价格</th>
+          <th>涨跌</th>
+          <th>决定</th>
+          <th>Setup</th>
+          <th>分数</th>
+        </tr>
+      </thead>
+     <tbody>
+        <tr>
+          <td>{{ analysis.ticker }}</td>
+          <td>{{ analysis.price_fmt }}</td>
+          <td>{{ analysis.change_pct }}</td>
+          <td><b>{{ analysis.decision }}</b></td>
+          <td>{{ analysis.setup }}</td>
+          <td>{{ analysis.score }}/6</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="card">
     <h2 class="section-title">技术指标</h2>
-    <div class="grid4">
-      <div class="mini"><div class="label">RSI</div><div class="value">{{ analysis.rsi }}</div></div>
-      <div class="mini"><div class="label">MACD柱体</div><div class="value">{{ analysis.macd_hist }}</div></div>
-      <div class="mini"><div class="label">MA20</div><div class="value">{{ analysis.ma20 }}</div></div>
-      <div class="mini"><div class="label">MA60</div><div class="value">{{ analysis.ma60 }}</div></div>
-      <div class="mini"><div class="label">MA120</div><div class="value">{{ analysis.ma120 }}</div></div>
-      <div class="mini"><div class="label">成交量倍率</div><div class="value">{{ analysis.volume_ratio }}x</div></div>
-      <div class="mini"><div class="label">52周高</div><div class="value">{{ analysis.high_52w }}</div></div>
-      <div class="mini"><div class="label">52周低</div><div class="value">{{ analysis.low_52w }}</div></div>
-    </div>
+
+    <table class="market-table">
+      <thead>
+        <tr>
+          <th>RSI</th>
+          <th>MACD</th>
+          <th>MA20</th>
+          <th>MA60</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{{ analysis.rsi }}</td>
+          <td>{{ analysis.macd_hist }}</td>
+          <td>{{ analysis.ma20 }}</td>
+          <td>{{ analysis.ma60 }}</td>
+        </tr>
+
+        <tr>
+          <th>MA120</th>
+          <th>成交量倍数</th>
+          <th>52周高</th>
+          <th>52周低</th>
+        </tr>
+        <tr>
+          <td>{{ analysis.ma120 }}</td>
+          <td>{{ analysis.volume_ratio }}x</td>
+          <td>{{ analysis.high_52w }}</td>
+          <td>{{ analysis.low_52w }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="card">
     <h2 class="section-title">交易计划</h2>
-    <div class="grid3">
-      <div class="mini"><div class="label">参考买入区</div><div class="value">{{ analysis.buy_zone }}</div></div>
-      <div class="mini"><div class="label">止损</div><div class="value">{{ analysis.stop }}</div></div>
-      <div class="mini"><div class="label">目标</div><div class="value">{{ analysis.target1 }} / {{ analysis.target2 }}</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2 class="section-title">价格图：Close + MA20 + MA60 + Bollinger</h2>
-    <canvas id="priceChart" height="110"></canvas>
+    <table>
+      <thead>
+        <tr>
+          <th>买入低</th>
+          <th>买入高</th>
+          <th>止损</th>
+          <th>目标1</th>
+          <th>目标2</th>
+          <th>风险</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{{ analysis.buy_low }}</td>
+          <td>{{ analysis.buy_high }}</td>
+          <td>{{ analysis.stop }}</td>
+          <td>{{ analysis.target1 }}</td>
+          <td>{{ analysis.target2 }}</td>
+          <td>{{ analysis.risk }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="card">
@@ -385,42 +530,25 @@
 
 </div>
 
-{% if chart %}
 <script>
-const chartData = {{ chart | tojson }};
-const ctx = document.getElementById("priceChart");
+function showLoading() {
+  const msg = document.getElementById("loadingMsg");
+  const btn = document.getElementById("analyzeBtn");
 
-new Chart(ctx, {
-  type: "line",
-  data: {
-    labels: chartData.labels,
-    datasets: [
-      { label: "Close", data: chartData.close, borderWidth: 2, pointRadius: 0 },
-      { label: "MA20", data: chartData.ma20, borderWidth: 1, pointRadius: 0 },
-      { label: "MA60", data: chartData.ma60, borderWidth: 1, pointRadius: 0 },
-      { label: "BB Upper", data: chartData.bb_upper, borderWidth: 1, pointRadius: 0 },
-      { label: "BB Lower", data: chartData.bb_lower, borderWidth: 1, pointRadius: 0 }
-    ]
-  },
-  options: {
-    responsive: true,
-    plugins: {
-      legend: { labels: { color: "#e5e7eb" } }
-    },
-    scales: {
-      x: {
-        ticks: { color: "#94a3b8", maxTicksLimit: 8 },
-        grid: { color: "#1f2937" }
-      },
-      y: {
-        ticks: { color: "#94a3b8" },
-        grid: { color: "#1f2937" }
-      }
-    }
-  }
-});
+  if (msg) msg.style.display = "block";
+  if (btn) btn.innerText = "分析中...";
+}
 </script>
-{% endif %}
+
+<script>
+function showMarketLoading() {
+  const msg = document.getElementById("marketLoading");
+  const btn = document.getElementById("marketBtn");
+
+  if (msg) msg.style.display = "block";
+  if (btn) btn.innerText = "加载中...";
+}
+</script>
 
 </body>
 </html>

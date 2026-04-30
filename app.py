@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
+import yfinance as yf
 import requests
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
@@ -36,6 +37,25 @@ MARKET_TICKERS = ["SPY", "QQQ"]
 CACHE = {}
 CACHE_TTL = 60 * 20  # 20分钟缓存，减少API次数
 
+
+def get_real_time_price(ticker):
+    try:
+        t = yf.Ticker(ticker)
+        info = t.fast_info
+
+        price = info.get("last_price") or info.get("regular_market_price")
+        if price:
+            return float(price)
+
+        hist = t.history(period="1d", interval="1m")
+        if not hist.empty:
+            return float(hist["Close"].iloc[-1])
+
+        return None
+    except Exception as e:
+        print("Real price error:", e)
+        return None
+    
 
 def cache_get(key):
     item = CACHE.get(key)
@@ -74,7 +94,7 @@ def get_polygon_daily_bars(ticker: str, days: int = 520):
     }
 
     try:
-        r = requests.get(url, params=params, timeout=20)
+        r = requests.get(url, params=params, timeout=60)
 
         if r.status_code != 200:
             return None, f"Polygon API 错误 {r.status_code}: {r.text[:200]}"
@@ -102,6 +122,9 @@ def get_polygon_daily_bars(ticker: str, days: int = 520):
 
         cache_set(cache_key, df)
         return df, None
+    
+    except requests.exceptions.Timeout:
+        return None, "Polygon 连接超时，请等30秒再试，或检查网络。"
 
     except Exception as e:
         return None, f"读取 Polygon 数据失败：{e}"
@@ -249,8 +272,10 @@ def analyze_ticker(ticker):
     prev = df.iloc[-2]
 
     close = float(last["Close"])
+    real_price = get_real_time_price(ticker)
+    price = real_price if real_price else close
     prev_close = float(prev["Close"])
-    change_pct = (close / prev_close - 1) * 100
+    change_pct = (price / prev_close - 1) * 100
 
     rsi = float(last["RSI"])
     macd_hist = float(last["MACD_HIST"])
@@ -338,8 +363,8 @@ def analyze_ticker(ticker):
 
     analysis = {
         "ticker": ticker.upper(),
-        "price": close,
-        "price_fmt": fmt_money(close),
+        "price": price,
+        "price_fmt": fmt_money(price),
         "change_pct": fmt_pct(change_pct),
         "score": score,
         "decision": decision,
@@ -358,6 +383,8 @@ def analyze_ticker(ticker):
         "bb_lower": fmt_money(last["BB_LOWER"]),
         "high_52w": fmt_money(high_52w),
         "low_52w": fmt_money(low_52w),
+        "buy_low": fmt_money(buy_low),
+        "buy_high": fmt_money(buy_high),
         "buy_zone": f"{fmt_money(buy_low)} - {fmt_money(buy_high)}",
         "stop": fmt_money(stop),
         "target1": fmt_money(target1),
@@ -367,7 +394,7 @@ def analyze_ticker(ticker):
 
     chart = build_chart(df)
 
-    return analysis, chart, None
+    return analysis, chart, price, None
 
 
 def build_chart(df):
@@ -437,7 +464,7 @@ MA60：{analysis['ma60']}
 def get_market_cards():
     cards = []
     for t in MARKET_TICKERS:
-        analysis, _, err = analyze_ticker(t)
+        analysis, _, _, err = analyze_ticker(t)
         if err:
             cards.append({
                 "ticker": t,
@@ -511,16 +538,18 @@ def get_top_picks():
 def index():
     ticker = request.form.get("ticker", "").upper().strip()
 
+    analysis, chart, error = None, None, None
+    price = None
+
     market_filter = {
         "status": "manual",
         "label": "手动分析模式",
         "message": "当前为手动模式，不自动抓大盘数据",
         "allow_long": True
     }
-    analysis, chart, error = None, None, None
 
     if ticker:
-        analysis, chart, error = analyze_ticker(ticker)
+        analysis, chart, price, error = analyze_ticker(ticker)
 
     ai_advice = None
     if analysis:
@@ -534,6 +563,7 @@ def index():
         ticker=ticker,
         analysis=analysis,
         chart=chart,
+        price=price,
         error=error,
         ai_advice=ai_advice,
         market_filter=market_filter,
@@ -545,6 +575,23 @@ def index():
 @app.route("/health")
 def health():
     return {"status": "ok", "has_polygon_key": bool(POLYGON_API_KEY)}
+
+@app.route("/market")
+def market():
+    market_filter = get_market_filter()
+    market_cards = get_market_cards()
+
+    return render_template(
+        "index.html",
+        ticker="",
+        analysis=None,
+        chart=None,
+        error=None,
+        ai_advice=None,
+        market_filter=market_filter,
+        top_picks=[],
+        market_cards=market_cards,
+    )
 
 
 if __name__ == "__main__":

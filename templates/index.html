@@ -209,6 +209,103 @@
       position: relative;
     }
 
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* 左 */
+    .section-header .left {
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    /* 中（居中） */
+    .section-header .center {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-weight: 600;
+    }
+
+    /* 右 */
+    .section-header .right {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .price-meta {
+      text-align: right;
+    }
+
+    .price-meta .price {
+      font-size: 18px;
+      font-weight: 600;
+      color: #4ade80; /* 绿色 */
+    }
+
+    .price-meta .date {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .stock-header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .stock-title {
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .stock-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stock-symbol {
+      margin-right: 28px;   /* 👉 加大间距（现在太挤） */
+      font-size: 20px;      /* 👉 放大 */
+      font-weight: 600;
+      color: #e5e7eb;
+      letter-spacing: 1px;
+    }
+
+    .stock-price {
+      margin-right: 16px;   /* 👉 价格和涨跌再拉开一点 */
+      font-size: 22px;      /* 👉 比 symbol 再大一点（主视觉） */
+      font-weight: 700;
+    }
+
+    .stock-change {
+       min-width: 60px;
+       text-align: right;    
+    }
+
+    .stock-date {
+      text-align: right;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .stock-symbol {
+      min-width: 70px;   /* 👉 固定宽度 */
+    }
+
+    .stock-price {
+      min-width: 100px;  /* 👉 固定价格宽度 */
+    }
+
+    @keyframes priceFlash {
+      0% { transform: scale(1.08); opacity: 0.5; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
     @media (max-width: 600px) {
       .chart-wrap {
         height: 240px;
@@ -371,7 +468,23 @@
 
   {% if analysis %}
   <div class="card">
-    <h2 class="section-title">{{ analysis.ticker }} 个股分析</h2>
+    <div class="stock-header">
+      <div class="stock-title">个股分析</div>
+
+      <div class="stock-center">
+        <span class="stock-symbol">{{ analysis.ticker }}</span>
+        <span class="stock-price" style="color: {{ analysis.change_color }}">
+          {{ analysis.price_fmt }}
+        </span>
+        <span class="stock-change" style="color: {{ analysis.change_color }}">
+          {{ analysis.change_pct }}
+        </span>
+      </div>
+
+      <div class="stock-date">
+        {{ analysis.price_date }}
+      </div>
+    </div>
 
     <table>
       <thead>

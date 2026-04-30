@@ -366,6 +366,8 @@ def analyze_ticker(ticker):
         "price": price,
         "price_fmt": fmt_money(price),
         "change_pct": fmt_pct(change_pct),
+        "change_num": round(change_pct, 2),
+        "change_color": "#4ade80" if change_pct >= 0 else "#f87171",
         "score": score,
         "decision": decision,
         "setup": setup,
@@ -389,7 +391,8 @@ def analyze_ticker(ticker):
         "stop": fmt_money(stop),
         "target1": fmt_money(target1),
         "target2": fmt_money(target2),
-        "notes": notes
+        "notes": notes,
+        "price_date": str(last.name.date())
     }
 
     chart = build_chart(df)

@@ -644,50 +644,100 @@ def get_market_status():
 
         vix_price = float(vix_card["price"])
         vix_rsi = float(vix_card["rsi"]) if vix_card["rsi"] != "--" else 50
+
+        # === VIX 情绪判断 ===
+        if vix_price >= 30:
+            vix_signal = "🩸 极度恐慌：抄底窗口"
+            vix_status = "green"
+
+        elif vix_price >= 25:
+            vix_signal = "😰 恐惧区：开始有机会"
+            vix_status = "yellow"
+
+        elif vix_price >= 18:
+            vix_signal = "😐 中性区：震荡"
+            vix_status = "neutral"
+
+        elif vix_price >= 14:
+            vix_signal = "🙂 偏乐观：趋势正常"
+            vix_status = "green"
+
+        else:
+            vix_signal = "😈 贪婪区：注意见顶风险"
+            vix_status = "red"  
         
         # === BOLL 数值（从 analysis 拿） ===
         spy_boll_pct = spy.get("boll_pct", 50) if spy else 50
+        qqq_boll_pct = qqq.get("boll_pct", 50) if qqq else 50
+
+        market_temp = int((spy_boll_pct + qqq_boll_pct) / 2)
+        if market_temp < 30:
+            temp_label = "❄️ 冰点（低吸区）"
+        elif market_temp < 70:
+            temp_label = "🌤 正常区"
+        else:
+            temp_label = "🔥 过热区"  
 
         # === 判断逻辑（新版本） ===
 
         # 🔥 1. 低吸窗口（优先）
-        if spy_boll_pct < 25 and vix_price < 20:
+        if spy_boll_pct < 25 and vix_price >= 25:
             return {
-                "label": "🔥 低吸窗口",
+                "label": "🔥 抄底窗口",
                 "status": "green",
-                "message": "SPY 接近布林下轨 + VIX 不高，适合低吸"
+                "message": "SPY 低位 + VIX 恐慌，市场恐惧，适合分批低吸",
+                "temp": f"{market_temp} / 100",
+                "temp_label": temp_label,
+                "vix_sentiment": vix_signal,
+                "vix_status": vix_status,
             }
 
         # ⚠️ 2. 高位风险
-        elif spy_boll_pct > 75 and vix_price < 18:
+        elif spy_boll_pct > 75 and vix_price < 14:
             return {
                 "label": "⚠️ 高位区：不追高",
                 "status": "yellow",
-                "message": "SPY 接近上轨 + VIX 低，市场偏热，谨慎追高"
+                "message": "SPY 接近上轨 + 市场贪婪，注意回调风险",
+                "temp": f"{market_temp} / 100",
+                "temp_label": temp_label,
+                "vix_sentiment": vix_signal,
+                "vix_status": vix_status,
             }
 
         # 🟢 3. 正常上涨趋势
-        elif spy_up and qqq_up and vix_price < 18:
+        elif spy_up and qqq_up and 14 <= vix_price <= 18:
             return {
-                "label": "🟢 绿灯：可以偏进攻",
+                "label": "🟢 趋势健康",
                 "status": "green",
-                "message": "SPY & QQQ 在趋势上 + VIX 低，市场稳定，可做多"
+                "message": "趋势向上 + 情绪正常，可持有或顺势",
+                "temp": f"{market_temp} / 100",
+                "temp_label": temp_label,
+                "vix_sentiment": vix_signal,
+                "vix_status": vix_status,
             }
 
         # 🔴 4. 风险高
-        elif vix_price > 22 or vix_rsi > 60:
+        elif vix_price >= 30:
             return {
-                "label": "🔴 红灯：风险高",
+                "label": "🔴 极度恐慌",
                 "status": "red",
-                "message": "VIX 高或恐慌上升，建议减仓或观望"
+                "message": "市场剧烈波动，谨慎操作或等待确认",
+                "temp": f"{market_temp} / 100",
+                "temp_label": temp_label,
+                "vix_sentiment": vix_signal,
+                "vix_status": vix_status,
             }
 
         # 🟡 5. 默认
         else:
             return {
-                "label": "🟡 黄灯：等待回调",
+                "label": "🟡 震荡区",
                 "status": "yellow",
-                "message": "趋势未坏，但不适合追高，等回调更安全"
+                "message": "方向不明，等待机会",
+                "temp": f"{market_temp} / 100",
+                "temp_label": temp_label,
+                "vix_sentiment": vix_signal,
+                "vix_status": vix_status,
             }
 
     except Exception as e:
@@ -695,7 +745,11 @@ def get_market_status():
         return {
             "label": "⚪ 数据不足",
             "status": "gray",
-            "message": "暂时无法判断市场状态"
+            "message": "暂时无法判断市场状态",
+            "temp": f"{market_temp} / 100",
+            "temp_label": temp_label,
+            "vix_sentiment": vix_signal,
+            "vix_status": vix_status,
         }
 
 

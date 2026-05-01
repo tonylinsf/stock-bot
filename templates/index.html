@@ -560,6 +560,14 @@
       {{ market_status.message }}
     </div>
 
+    <div style="margin-top:8px; color:#aaa;">
+      🌡 {{ market_status.temp_label }} ｜ VIX: {{ market_status.vix_sentiment }}
+    </div>
+
+    <div style="margin-top:10px; font-size:14px; color:#aaa;">
+      市场温度：{{ market_status.temp }}（{{ market_status.temp_label }}）
+    </div>
+
   </div>
 
   <div class="card">

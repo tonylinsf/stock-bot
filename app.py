@@ -285,6 +285,58 @@ def analyze_ticker(ticker):
     change = price - prev_close
     change_val = f"{change:+.2f}"
     change_val = price - prev_close
+    ticker_yf = yf.Ticker(ticker)
+    info = ticker_yf.info
+
+    pre_price = None
+    post_price = None
+    pre_change = None
+    pre_pct = None
+    session = None
+    session_price = None
+    diff = None
+    pct = None
+    open_signal = "暂无盘前数据"
+
+    pre_price = info.get("preMarketPrice")
+    post_price = info.get("postMarketPrice")
+
+    if pre_price:
+        session = "盘前"
+        session_price = pre_price
+    elif post_price:
+        session = "盘后"
+        session_price = post_price
+
+    diff = None
+    pct = None
+
+    if session_price and prev_close:
+        diff = session_price - prev_close
+        pct = round((diff / prev_close) * 100, 2)    
+
+    try:
+        vix_card = get_vix_card()
+        vix_price = float(vix_card["price"])
+    except:
+        vix_price = 16    
+
+    # === 开盘预判（用盘前数据）===
+    open_signal = "暂无盘前数据"
+
+    if pre_pct is not None:
+        if pre_pct <= -2 and vix_price >= 20:
+            open_signal = "🔴 低开风险高，可能继续走弱"
+        elif pre_pct <= -2:
+            open_signal = "⚠️ 低开概率高，观察是否反弹"
+        elif pre_pct >= 2 and vix_price < 18:
+            open_signal = "🟢 高开偏强，可能延续上涨"
+        elif pre_pct >= 2:
+            open_signal = "⚠️ 高开但偏热，小心回落"
+        elif -1 <= pre_pct <= 1:
+            open_signal = "😐 平开概率大，等方向选择"
+        else:
+            open_signal = "👀 有波动，开盘再确认"    
 
     rsi = float(last["RSI"])
     macd_hist = float(last["MACD_HIST"])
@@ -449,7 +501,14 @@ def analyze_ticker(ticker):
         "target1": fmt_money(target1),
         "target2": fmt_money(target2),
         "notes": notes,
-        "price_date": datetime.now().strftime("%Y-%m-%d")
+        "price_date": datetime.now().strftime("%Y-%m-%d"),
+        "pre_price": pre_price,
+        "pre_pct": pre_pct,
+        "open_signal": open_signal,
+        "session": session,
+        "session_price": session_price,
+        "session_diff": diff,
+        "session_pct": pct,
     }
 
     chart = build_chart(df)
@@ -642,6 +701,35 @@ def get_market_status():
         spy_up = spy and float(spy["price"]) > float(spy["ma20"].replace("$",""))
         qqq_up = qqq and float(qqq["price"]) > float(qqq["ma20"].replace("$",""))
 
+        # === 盘前数据（用SPY）===
+        spy_pre = None
+        spy_pre_pct = None
+
+        try:
+            spy_info = yf.Ticker("SPY").info
+            spy_pre = spy_info.get("preMarketPrice")
+            spy_prev_close = spy_info.get("previousClose")
+
+            if spy_pre and spy_prev_close:
+                spy_pre_pct = round((spy_pre / spy_prev_close - 1) * 100, 2)
+        except:
+            pass
+
+        # === 大盘开盘预判 ===
+        open_signal = "暂无盘前数据"
+
+        if spy_pre_pct is not None:
+            if spy_pre_pct <= -1.5 and vix_price >= 20:
+                open_signal = "🔴 低开风险高，可能继续走弱"
+            elif spy_pre_pct <= -1.5:
+                open_signal = "⚠️ 低开，观察是否反弹"
+            elif spy_pre_pct >= 1.5 and vix_price <= 18:
+                open_signal = "🟢 高开偏强，可能继续上涨"
+            elif spy_pre_pct >= 1.5:
+                open_signal = "⚠️ 高开偏热，小心回落"
+            else:
+                open_signal = "🟡 平开震荡，等待方向"
+
         # === VIX ===
         vix_card = get_vix_card()
 
@@ -753,6 +841,9 @@ def get_market_status():
             "temp_label": temp_label,
             "vix_sentiment": vix_signal,
             "vix_status": vix_status,
+            "spy_pre": spy_pre,
+            "spy_pre_pct": spy_pre_pct,
+            "open_signal": open_signal,
         }
 
 

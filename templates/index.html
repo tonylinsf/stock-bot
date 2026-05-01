@@ -277,6 +277,64 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .pre-block {
+      margin-top: 8px;
+      text-align: left;
+      width: 100%;
+    }
+
+    .center-block {
+      width: 100%;
+      text-align: center;   /* 🔥 控制整体居中 */
+      margin-top: 8px;
+    }
+
+    .pre-line {
+      text-align: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffd166;   /* 金黄色，像信号 */
+      margin-top: 6px;
+    }
+
+    .open-line {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffd166;
+      margin-top: 6px;
+    }
+
+    .market-extra {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #aaa;
+      line-height: 1.6;
+    }
+
+    .market-extra div {
+      margin-top: 2px;
+    }
+
+    /* 大盘：右边 */
+    .market-open {
+      text-align: right;
+      font-size: 14px;
+      color: #ffd166;
+      margin-top: 6px;
+    }
+
+    /* 个股：中间 */
+    .stock-open {
+      text-align: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffd166;
+      margin: 8px 0;
+      background: rgba(255, 209, 102, 0.08);
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+
     @keyframes priceFlash {
       0% { transform: scale(1.08); opacity: 0.5; }
       100% { transform: scale(1); opacity: 1; }
@@ -565,26 +623,41 @@
   <div class="card market-light {{ market_status.status }}">
 
     <div class="market-header">
-      <div class="market-title">
-        今日大盘灯号
-      </div>
+      今日大盘灯号
+    </div>
 
-      <div class="market-label">
-        {{ market_status.label }}
-      </div>
+    <div class="market-label">
+      {{ market_status.label }}
     </div>
 
     <div class="market-sub">
       {{ market_status.message }}
     </div>
 
-    <div style="margin-top:8px; color:#aaa;">
-      🌡 {{ market_status.temp_label }} ｜ VIX: {{ market_status.vix_sentiment }}
-    </div>
+    <!-- 统一信息块 -->
+    <div class="market-extra">
 
-    <div style="margin-top:10px; font-size:14px; color:#aaa;">
-      市场温度：{{ market_status.temp }}（{{ market_status.temp_label }}）
-    </div>
+      <div>
+        🌡 市场温度：{{ market_status.temp }}
+       （{{ market_status.temp_label }}）
+      </div>
+
+      <div>
+        🧠 VIX：{{ market_status.vix_sentiment }}
+      </div>
+
+      {% if market_status.spy_pre %}
+      <div>
+        ⏰ 盘前：{{ "%.2f"|format(market_status.spy_pre) }}
+        ({{ "%+.2f"|format(market_status.spy_pre_pct) }}%)
+      </div>
+      {% endif %}
+
+      <div class="open-line">
+        🔥 开盘预测：{{ market_status.open_signal }}
+      </div>
+
+    </div> 
 
   </div>
 
@@ -634,18 +707,29 @@
 
       <div class="stock-head-bottom">
         <span class="stock-symbol">{{ analysis.ticker }}</span>
+
         <span class="stock-price" style="color: {{ analysis.change_color }}">
           {{ analysis.price_fmt }}
         </span>
 
-       <div class="stock-change" style="color: {{ analysis.change_color }}">
-         <div class="change-val">
-           {{ analysis.change_val }}
-         </div>
-         <div class="change-pct">
-           {{ analysis.change_pct }}
-         </div>
-       </div>
+        <div class="stock-change" style="color: {{ analysis.change_color }}">
+          <div class="change-val">{{ analysis.change_val }}</div>
+          <div class="change-pct">{{ analysis.change_pct }}</div>
+        </div>
+      </div>
+
+      <div class="pre-block center-block">
+        {% if analysis.session_price %}
+        <div class="pre-line" style="color: {{ 'lightgreen' if analysis.session_diff > 0 else '#ff6b6b' }}">
+            {{ analysis.session }}: 
+            ${{ "%.2f"|format(analysis.session_price) }}
+            ({{ analysis.session_diff|round(2) }} / {{ analysis.session_pct }}%)
+        </div>
+        {% endif %}
+
+        <div class="open-line">
+          🔥 开盘预测：{{ analysis.open_signal }}
+        </div>
       </div>
     </div>
 

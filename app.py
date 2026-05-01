@@ -35,7 +35,11 @@ UNIVERSE = [
 MARKET_TICKERS = ["SPY", "QQQ"]
 
 CACHE = {}
-CACHE_TTL = 60 * 20  # 20分钟缓存，减少API次数
+CACHE_TTL = 60 
+
+market_status_cache = None
+market_status_cache_time = 0
+MARKET_CACHE_TTL = 300
 
 
 def get_real_time_price(ticker):

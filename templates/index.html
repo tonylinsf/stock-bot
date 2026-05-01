@@ -339,6 +339,124 @@
       font-weight: 700;
     }
 
+    .market-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 卡片 */
+    .market-card {
+      background: rgba(20, 30, 50, 0.6);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    }
+
+    /* 顶部 */
+    .market-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .market-name {
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .market-price {
+      font-size: 28px;
+      font-weight: 900;
+    }
+
+    .market-change {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    /* 颜色 */
+    .up {
+      color: #4ade80;
+    }
+
+    .down {
+      color: #f87171;
+    }
+
+    /* 中间 */
+    .market-body {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    /* 右侧指标 */
+    .market-side {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    .market-light {
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    /* 颜色灯号 */
+    .market-light.bull {
+      border-left: 6px solid #4ade80;
+      background: rgba(74, 222, 128, 0.05);
+    }
+
+    .market-light.bear {
+      border-left: 6px solid #f87171;
+      background: rgba(248, 113, 113, 0.05);
+    }
+
+    .market-light.neutral {
+      border-left: 6px solid #facc15;
+      background: rgba(250, 204, 21, 0.05);
+    }
+
+    /* 标题 */
+    .market-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 左边 */
+    .market-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    /* 右边（大灯号） */
+    .market-label {
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    /* 描述 */
+    .market-sub {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .vix-low {
+      color: #4ade80;
+    }
+
+    .vix-high {
+      color: #f87171;
+    }
+
     /* 📱 手机优化 */
     @media (max-width: 600px) {
 
@@ -417,9 +535,22 @@
     <span class="badge">No OpenD Required</span>
   </div>
 
-  <div class="card market-light {{ market_filter.status }}">
-    <h2 class="section-title">今日大盘灯号：{{ market_filter.label }}</h2>
-    <div class="sub">{{ market_filter.message }}</div>
+  <div class="card market-light {{ market_status.status }}">
+
+    <div class="market-header">
+      <div class="market-title">
+        今日大盘灯号
+      </div>
+
+      <div class="market-label">
+        {{ market_status.label }}
+      </div>
+    </div>
+
+    <div class="market-sub">
+      {{ market_status.message }}
+    </div>
+
   </div>
 
   <div class="card">
@@ -614,34 +745,42 @@
     {% endif %}
   </div>
 
-  <div class="card">
-    <h2 class="section-title">大盘状态</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>代码</th>
-          <th>价格</th>
-          <th>决定</th>
-          <th>Setup</th>
-          <th>RSI</th>
-          <th>分数</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for m in market_cards %}
-        <tr>
-          <td><b>{{ m.ticker }}</b></td>
-          <td>{{ m.price }}</td>
-          <td>{{ m.decision }}</td>
-          <td>{{ m.setup }}</td>
-          <td>{{ m.rsi }}</td>
-          <td>{{ m.score }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <div class="market-cards">
 
+    {% for m in market_cards %}
+    <div class="market-card">
+
+      <!-- 顶部 -->
+      <div class="market-header">
+        <div class="market-name">{{ m.ticker }}</div>
+
+        <div class="market-price {{ m.change_class }}">
+          {{ m.price }}
+        </div>
+
+        <div class="market-change {{ m.change_class }}">
+          {{ m.change_pct }}%
+        </div>
+      </div>
+
+      <!-- 中间 -->
+      <div class="market-body">
+        <div>决策: {{ m.decision }}</div>
+        <div>Setup: {{ m.setup }}</div>
+        <div>评分: {{ m.score }}</div>
+      </div>
+
+      <!-- 右侧指标 -->
+      <div class="market-side">
+        <div>RSI {{ m.rsi }}</div>
+        <div>MA20 {{ m.ma20 }}</div>
+        <div>MA60 {{ m.ma60 }}</div>
+      </div>
+
+    </div>
+    {% endfor %}
+
+  </div>
 </div>
 
 <script>

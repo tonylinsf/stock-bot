@@ -256,6 +256,7 @@ def get_market_filter():
 
 
 def analyze_ticker(ticker):
+    display_ticker = "VIX" if ticker == "I:VIX" else ticker
     df, err = get_polygon_daily_bars(ticker)
     if err:
         return None, None, None, err
@@ -272,10 +273,14 @@ def analyze_ticker(ticker):
     prev = df.iloc[-2]
 
     close = float(last["Close"])
-    real_price = get_real_time_price(ticker)
+    if ticker == "I:VIX":
+        real_price = None
+    else:
+        real_price = get_real_time_price(ticker)
+
     price = real_price if real_price else close
     prev_close = float(prev["Close"])
-    change_pct = (price / prev_close - 1) * 100
+    change_pct = (price / prev_close - 1) * 100 if price and prev_close else 0
 
     rsi = float(last["RSI"])
     macd_hist = float(last["MACD_HIST"])
@@ -362,12 +367,13 @@ def analyze_ticker(ticker):
         risk = "较高"
 
     analysis = {
-        "ticker": ticker.upper(),
+        "ticker": display_ticker.upper(),
         "price": price,
         "price_fmt": fmt_money(price),
         "change_pct": fmt_pct(change_pct),
         "change_num": round(change_pct, 2),
         "change_color": "#4ade80" if change_pct >= 0 else "#f87171",
+        "change_class": "up" if change_pct >= 0 else "down",
         "score": score,
         "decision": decision,
         "setup": setup,
@@ -462,31 +468,162 @@ MA60：{analysis['ma60']}
         return res.choices[0].message.content
     except Exception as e:
         return fallback + f"\n\nAI 暂时不可用：{e}"
+    
+
+def get_vix_card():
+    try:
+        df = yf.download("^VIX", period="6mo", interval="1d", progress=False, auto_adjust=False)
+
+        if df is None or df.empty:
+            raise Exception("VIX no data")
+
+        # ✅ 防止 yfinance MultiIndex 问题
+        close_series = df["Close"]
+        if hasattr(close_series, "columns"):
+            close_series = close_series.iloc[:, 0]
+
+        close_series = close_series.dropna()
+
+        # ✅ RSI 计算
+        delta = close_series.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+
+        avg_gain = gain.rolling(14).mean()
+        avg_loss = loss.rolling(14).mean()
+
+        rs = avg_gain / avg_loss
+        rsi_series = 100 - (100 / (1 + rs))
+
+        rsi = float(rsi_series.iloc[-1])
+
+        if len(close_series) < 60:
+            raise Exception("VIX data not enough")
+
+        close = float(close_series.iloc[-1])
+        prev_close = float(close_series.iloc[-2])
+        change_pct = (close / prev_close - 1) * 100
+
+        ma20 = float(close_series.rolling(20).mean().iloc[-1])
+        ma60 = float(close_series.rolling(60).mean().iloc[-1])
+
+        return {
+            "ticker": "VIX",
+            "price": f"{close:.2f}",
+            "change_pct": f"{change_pct:.2f}%",
+            "change_class": "up" if change_pct >= 0 else "down",
+            "decision": "风险观察",
+            "score": 5 if close < 18 else 3 if close < 22 else 1,
+            "rsi": f"{rsi:.2f}",
+            "setup": "低风险区间" if close < 18 else "正常区间" if close < 22 else "高风险区间",
+            "ma20": f"{ma20:.2f}",
+            "ma60": f"{ma60:.2f}",
+        }
+
+    except Exception as e:
+        print("VIX ERROR:", e)  # ✅ 方便你在 Terminal 看到原因
+        return {
+            "ticker": "VIX",
+            "price": "--",
+            "change_pct": "--",
+            "change_class": "",
+            "decision": "读取失败",
+            "score": "--",
+            "rsi": "--",
+            "setup": "--",
+            "ma20": "--",
+            "ma60": "--",
+        }
 
 
 def get_market_cards():
     cards = []
+
     for t in MARKET_TICKERS:
         analysis, _, _, err = analyze_ticker(t)
-        if err:
+
+        if err or not analysis:
             cards.append({
                 "ticker": t,
-                "price": "-",
+                "price": "--",
+                "change_pct": "--",
+                "change_class": "",
                 "decision": "读取失败",
-                "score": "-",
-                "rsi": "-",
-                "setup": "-",
+                "score": "--",
+                "rsi": "--",
+                "setup": "--",
+                "ma20": "--",
+                "ma60": "--",
             })
         else:
             cards.append({
                 "ticker": t,
-                "price": analysis["price_fmt"],
-                "decision": analysis["decision"],
-                "score": analysis["score"],
-                "rsi": analysis["rsi"],
-                "setup": analysis["setup"],
+
+                # 价格（已经带 $）
+                "price": analysis.get("price_fmt"),
+
+                # 涨跌 %
+                "change_pct": analysis.get("change_pct"),
+
+                # 红绿
+                "change_class": "up" if (analysis.get("change_num") or 0) >= 0 else "down",
+
+                "decision": analysis.get("decision"),
+                "score": analysis.get("score"),
+                "rsi": analysis.get("rsi"),
+                "setup": analysis.get("setup"),
+
+                "ma20": analysis.get("ma20"),
+                "ma60": analysis.get("ma60"),
             })
+
+    cards.append(get_vix_card())
     return cards
+
+def get_market_status():
+    try:
+        # === SPY / QQQ ===
+        spy = analyze_ticker("SPY")[0]
+        qqq = analyze_ticker("QQQ")[0]
+
+        spy_up = spy and float(spy["price"]) > float(spy["ma20"].replace("$",""))
+        qqq_up = qqq and float(qqq["price"]) > float(qqq["ma20"].replace("$",""))
+
+        # === VIX ===
+        vix_card = get_vix_card()
+
+        vix_price = float(vix_card["price"])
+        vix_rsi = float(vix_card["rsi"]) if vix_card["rsi"] != "--" else 50
+
+        # === 判断逻辑 ===
+        if spy_up and qqq_up and vix_price < 18:
+            return {
+                "label": "🟢 绿灯：可以偏进攻",
+                "status": "green",
+                "message": "SPY & QQQ 在趋势上 + VIX 低，市场稳定，可做多"
+            }
+
+        elif vix_price > 22 or vix_rsi > 60:
+            return {
+                "label": "🔴 红灯：风险高",
+                "status": "red",
+                "message": "VIX 高或恐慌上升，建议减仓或观望"
+            }
+
+        else:
+            return {
+                "label": "🟡 黄灯：等待回调",
+                "status": "yellow",
+                "message": "趋势未坏，但不适合追高，等回调更安全"
+            }
+
+    except Exception as e:
+        print("Market Status Error:", e)
+        return {
+            "label": "⚪ 数据不足",
+            "status": "gray",
+            "message": "暂时无法判断市场状态"
+        }
 
 
 def get_rebound_signals():
@@ -546,6 +683,7 @@ def index():
     if analysis:
         ai_advice = get_ai_advice(analysis, market_filter)
 
+    market_status = get_market_status()
     top_picks = []
     market_cards = []
 
@@ -560,6 +698,7 @@ def index():
         market_filter=market_filter,
         top_picks=top_picks,
         market_cards=market_cards,
+        market_status=market_status,
     )
 
 
@@ -571,6 +710,7 @@ def health():
 def market():
     market_filter = get_market_filter()
     market_cards = get_market_cards()
+    market_status= get_market_status()
 
     return render_template(
         "index.html",
@@ -582,6 +722,7 @@ def market():
         market_filter=market_filter,
         top_picks=[],
         market_cards=market_cards,
+        market_status=market_status,
     )
 
 @app.route("/scan_rebound")

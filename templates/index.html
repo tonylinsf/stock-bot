@@ -259,6 +259,24 @@
       color: #4ade80;
     }
 
+    .stock-change {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      width: 90px;
+      font-family: 'SF Mono', 'Roboto Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .change-val,
+    .change-pct {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
     @keyframes priceFlash {
       0% { transform: scale(1.08); opacity: 0.5; }
       100% { transform: scale(1); opacity: 1; }
@@ -619,9 +637,15 @@
         <span class="stock-price" style="color: {{ analysis.change_color }}">
           {{ analysis.price_fmt }}
         </span>
-        <span class="stock-change" style="color: {{ analysis.change_color }}">
-          {{ analysis.change_pct }}
-        </span>
+
+       <div class="stock-change" style="color: {{ analysis.change_color }}">
+         <div class="change-val">
+           {{ analysis.change_val }}
+         </div>
+         <div class="change-pct">
+           {{ analysis.change_pct }}
+         </div>
+       </div>
       </div>
     </div>
 
@@ -787,7 +811,7 @@
         </div>
 
         <div class="market-change {{ m.change_class }}">
-          {{ m.change_pct }}%
+          {{ m.change_pct }}
         </div>
       </div>
 

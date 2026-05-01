@@ -282,6 +282,9 @@ def analyze_ticker(ticker):
     price = real_price if real_price else close
     prev_close = float(prev["Close"])
     change_pct = (price / prev_close - 1) * 100 if price and prev_close else 0
+    change = price - prev_close
+    change_val = f"{change:+.2f}"
+    change_val = price - prev_close
 
     rsi = float(last["RSI"])
     macd_hist = float(last["MACD_HIST"])
@@ -412,8 +415,8 @@ def analyze_ticker(ticker):
         "ticker": display_ticker.upper(),
         "price": price,
         "price_fmt": fmt_money(price),
-        "change_pct": fmt_pct(change_pct),
-        "change_num": round(change_pct, 2),
+        "change_val": f"{change_val:+.2f}",
+        "change_pct": f"{change_pct:+.2f}%",
         "change_color": "#4ade80" if change_pct >= 0 else "#f87171",
         "change_class": "up" if change_pct >= 0 else "down",
         "score": score,

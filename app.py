@@ -288,6 +288,9 @@ def analyze_ticker(ticker):
     ma50 = float(last["MA50"])
     ma60 = float(last["MA60"])
     ma120 = float(last["MA120"])
+    bb_upper = float(last["BB_UPPER"])
+    bb_mid = float(last["BB_MID"])
+    bb_lower = float(last["BB_LOWER"])
     vol = float(last["Volume"])
     vol20 = float(last["VOL20"])
 
@@ -365,6 +368,19 @@ def analyze_ticker(ticker):
     else:
         decision = "Skip"
         risk = "较高"
+    if price > ma60 and price <= bb_lower:
+        decision = "🔥 低吸机会（顺势）"
+    elif price > ma60 and price >= bb_upper:
+        decision = "⚠️ 不追高"
+    elif price < ma60:
+        decision = "Skip"
+
+    if price <= bb_lower:
+        boll_pos = "靠近下轨：低吸观察"
+    elif price >= bb_upper:
+        boll_pos = "靠近上轨：不追高"
+    else:
+        boll_pos = "中轨区间：正常观察"
 
     analysis = {
         "ticker": display_ticker.upper(),
@@ -384,6 +400,10 @@ def analyze_ticker(ticker):
         "ma50": fmt_money(ma50),
         "ma60": fmt_money(ma60),
         "ma120": fmt_money(ma120),
+        "bb_upper": fmt_money(bb_upper),
+        "bb_mid": fmt_money(bb_mid),
+        "bb_lower": fmt_money(bb_lower),
+        "boll_pos": boll_pos,
         "volume": fmt_num(vol),
         "vol20": fmt_num(vol20),
         "volume_ratio": round(volume_ratio, 2),
@@ -554,6 +574,7 @@ def get_market_cards():
                 "setup": "--",
                 "ma20": "--",
                 "ma60": "--",
+                "boll_pos": "--",
             })
         else:
             cards.append({
@@ -575,6 +596,7 @@ def get_market_cards():
 
                 "ma20": analysis.get("ma20"),
                 "ma60": analysis.get("ma60"),
+                "boll_pos": analysis.get("boll_pos"),
             })
 
     cards.append(get_vix_card())
@@ -594,15 +616,23 @@ def get_market_status():
 
         vix_price = float(vix_card["price"])
         vix_rsi = float(vix_card["rsi"]) if vix_card["rsi"] != "--" else 50
-
+        
+        spy_boll = spy.get("boll_pos", "") if spy else ""
         # === 判断逻辑 ===
-        if spy_up and qqq_up and vix_price < 18:
+        if spy_up and qqq_up and vix_price < 18 and "下轨" in spy_boll:
             return {
                 "label": "🟢 绿灯：可以偏进攻",
                 "status": "green",
                 "message": "SPY & QQQ 在趋势上 + VIX 低，市场稳定，可做多"
             }
-
+        
+        elif "上轨" in spy_boll:
+            return {
+                "label": "⚠️ 高位风险",
+                "status": "red",
+                "message": "SPY 靠近布林上轨，短线不宜追高"
+           }
+        
         elif vix_price > 22 or vix_rsi > 60:
             return {
                 "label": "🔴 红灯：风险高",

@@ -112,6 +112,10 @@
       font-size: 15px;
     }
 
+    .up { color: #4ade80; }
+    .down { color: #f87171; }
+    .neutral { color: #aaa; }
+
     .grid4 {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -642,6 +646,7 @@
           <th>MACD</th>
           <th>MA20</th>
           <th>MA60</th>
+          <th>BOLL</th>
         </tr>
       </thead>
       <tbody>
@@ -650,6 +655,9 @@
           <td>{{ analysis.macd_hist }}</td>
           <td>{{ analysis.ma20 }}</td>
           <td>{{ analysis.ma60 }}</td>
+          <td class="{% if '低吸' in analysis.boll_pos %}up{% elif '不追' in analysis.boll_pos %}down{% else %}neutral{% endif %}">
+            {{ analysis.boll_pos }}
+          </td>
         </tr>
 
         <tr>
@@ -775,6 +783,12 @@
         <div>RSI {{ m.rsi }}</div>
         <div>MA20 {{ m.ma20 }}</div>
         <div>MA60 {{ m.ma60 }}</div>
+      </div>
+      <div>
+        BOLL:
+        <span class="{% if '低吸' in m.boll_pos %}up{% elif '不追' in m.boll_pos %}down{% else %}neutral{% endif %}">
+          {{ m.boll_pos }}
+        </span>
       </div>
 
     </div>

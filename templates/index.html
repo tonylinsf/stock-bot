@@ -335,6 +335,23 @@
       border-radius: 6px;
     }
 
+    .tech-extra {
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .boll-line {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .risk-line {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
     @keyframes priceFlash {
       0% { transform: scale(1.08); opacity: 0.5; }
       100% { transform: scale(1); opacity: 1; }
@@ -617,7 +634,6 @@
       <h1>Smartai Polygon Pro</h1>
       <div class="sub">Polygon 数据源 + 大盘过滤 + 技术指标 + Top 5 自动选股 + AI 建议</div>
     </div>
-    <span class="badge">No OpenD Required</span>
   </div>
 
   <div class="card market-light {{ market_status.status }}">
@@ -767,7 +783,6 @@
           <th>MACD</th>
           <th>MA20</th>
           <th>MA60</th>
-          <th>BOLL</th>
         </tr>
       </thead>
       <tbody>
@@ -776,9 +791,6 @@
           <td>{{ analysis.macd_hist }}</td>
           <td>{{ analysis.ma20 }}</td>
           <td>{{ analysis.ma60 }}</td>
-          <td class="{% if '低吸' in analysis.boll_pos %}up{% elif '不追' in analysis.boll_pos %}down{% else %}neutral{% endif %}">
-            {{ analysis.boll_pos }}
-          </td>
         </tr>
 
         <tr>
@@ -800,6 +812,15 @@
             {{ analysis.tech_signal }}
           </td>
         </tr>
+
+        <tr>
+          <th>BOLL</th>
+          <td colspan="4" class="boll-line" style="color: {{ analysis.boll_color }};">
+            {{ analysis.boll_text or analysis.boll_pos }}
+          </td>
+        </tr>
+        </div>
+      </div>
       </tbody>
     </table>
   </div>
@@ -814,7 +835,6 @@
           <th>止损</th>
           <th>目标1</th>
           <th>目标2</th>
-          <th>风险</th>
         </tr>
       </thead>
       <tbody>
@@ -824,10 +844,12 @@
           <td>{{ analysis.stop }}</td>
           <td>{{ analysis.target1 }}</td>
           <td>{{ analysis.target2 }}</td>
-          <td>{{ analysis.risk }}</td>
         </tr>
       </tbody>
     </table>
+    <div style="color: {{ analysis.risk_color }}">
+        风险等级：{{ analysis.risk }}
+    </div>
   </div>
 
   <div class="card">

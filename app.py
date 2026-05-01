@@ -419,13 +419,10 @@ def analyze_ticker(ticker):
 
     if score >= 5:
         decision = "Buy Watch"
-        risk = "中等"
     elif score >= 4:
         decision = "Wait Pullback"
-        risk = "中等偏高"
     else:
         decision = "Skip"
-        risk = "较高"
     if price > ma60 and price <= bb_lower:
         decision = "🔥 低吸机会（顺势）"
     elif price > ma60 and price >= bb_upper:
@@ -435,6 +432,35 @@ def analyze_ticker(ticker):
 
     boll_pct = (price - bb_lower) / (bb_upper - bb_lower)
     boll_pct = round(boll_pct * 100, 0)
+
+    # 风险评分（独立）
+    risk_score = 0
+
+    # RSI
+    if rsi > 75:
+        risk_score += 2
+    elif rsi > 65:
+        risk_score += 1
+
+    # BOLL
+    if boll_pct > 90:
+        risk_score += 2
+    elif boll_pct > 75:
+        risk_score += 1
+
+    # 趋势
+    if price < ma60:
+        risk_score += 1
+
+    # 最终风险
+    if risk_score >= 3:
+        risk = "较高"
+    elif risk_score == 2:
+        risk = "中等偏高"
+    elif risk_score == 1:
+        risk = "中等"
+    else:
+        risk = "较低"
 
     if boll_pct > 80:
         boll_pos = f"接近上轨（{boll_pct}%）：⚠️ 不追高"
@@ -463,6 +489,24 @@ def analyze_ticker(ticker):
     else:
         tech_signal = "观察"   
 
+    if boll_pct >= 80:
+        boll_color = "#ff3b30"   # 🔥 强烈过热
+    elif boll_pct >= 70:
+        boll_color = "#ff6b6b"
+    elif boll_pct <= 20:
+        boll_color = "#00c853"   # 🔥 强低位
+    elif boll_pct <= 30:
+        boll_color = "#4cd964"
+    else:
+        boll_color = "#aaaaaa"  
+
+    if "高" in risk:
+        risk_color = "#ff6b6b"
+    elif "低" in risk:
+        risk_color = "#4cd964"
+    else:
+        risk_color = "#aaaaaa"     
+
     analysis = {
         "ticker": display_ticker.upper(),
         "price": price,
@@ -475,6 +519,7 @@ def analyze_ticker(ticker):
         "decision": decision,
         "setup": setup,
         "risk": risk,
+        "risk_color": risk_color,
         "rsi": round(rsi, 2),
         "macd_hist": round(macd_hist, 4),
         "ma20": fmt_money(ma20),
@@ -509,6 +554,9 @@ def analyze_ticker(ticker):
         "session_price": session_price,
         "session_diff": diff,
         "session_pct": pct,
+        "boll_pos": boll_pos,
+        "boll_text": boll_pos,
+        "boll_color": boll_color,
     }
 
     chart = build_chart(df)

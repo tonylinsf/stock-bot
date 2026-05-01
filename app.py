@@ -163,10 +163,11 @@ def add_indicators(df):
     df["RSI"] = calc_rsi(df["Close"])
     df["MACD_DIF"], df["MACD_DEA"], df["MACD_HIST"] = calc_macd(df["Close"])
 
-    df["BB_MID"] = df["Close"].rolling(20).mean()
-    std = df["Close"].rolling(20).std()
-    df["BB_UPPER"] = df["BB_MID"] + 2 * std
-    df["BB_LOWER"] = df["BB_MID"] - 2 * std
+    df["BB_MID"] = df["Close"].rolling(25).mean()
+    std = df["Close"].rolling(25).std()
+
+    df["BB_UPPER"] = df["BB_MID"] + 2.2 * std
+    df["BB_LOWER"] = df["BB_MID"] - 2.2 * std
 
     df["VOL20"] = df["Volume"].rolling(20).mean()
     df["HIGH_20"] = df["High"].rolling(20).max()
@@ -323,16 +324,18 @@ def analyze_ticker(ticker):
     if 40 <= rsi <= 65:
         score += 1
         notes.append("RSI 在健康区间，未明显过热")
-    elif rsi > 70:
-        notes.append("RSI 超过70，短线过热")
-    elif rsi < 35:
-        notes.append("RSI 偏低，可能反弹但要小心趋势未确认")
 
-    if macd_hist > 0:
-        score += 1
-        notes.append("MACD柱体为正，动能偏多")
-    else:
-        notes.append("MACD柱体为负，动能未确认")
+    elif rsi >= 80:
+        notes.append("🔴 RSI 超买（>80），短线风险较高")
+
+    elif rsi <= 20:
+        notes.append("🟢 RSI 超卖（<20），可能出现反弹机会")
+
+    elif rsi > 65:
+        notes.append("RSI 偏高，接近过热区")
+
+    elif rsi < 35:
+        notes.append("RSI 偏低，但未到极端低位")
 
     # 成交量
     volume_ratio = vol / vol20 if vol20 else 0
@@ -346,9 +349,9 @@ def analyze_ticker(ticker):
     setup = "观察"
     if close > ma20 > ma60 and 40 <= rsi <= 65 and macd_hist > 0:
         setup = "趋势突破型"
-    elif close > ma60 and close <= ma20 * 1.03 and 35 <= rsi <= 55:
+    elif close > ma60 and close <= ma20 * 1.03 and 30 <= rsi <= 60:
         setup = "回调低吸型"
-    elif close > ma120 and rsi < 45:
+    elif close > ma120 and rsi < 40:
         setup = "中线回调观察型"
 
     # 买卖计划
@@ -375,12 +378,35 @@ def analyze_ticker(ticker):
     elif price < ma60:
         decision = "Skip"
 
-    if price <= bb_lower:
-        boll_pos = "靠近下轨：低吸观察"
-    elif price >= bb_upper:
-        boll_pos = "靠近上轨：不追高"
+    boll_pct = (price - bb_lower) / (bb_upper - bb_lower)
+    boll_pct = round(boll_pct * 100, 0)
+
+    if boll_pct > 80:
+        boll_pos = f"接近上轨（{boll_pct}%）：⚠️ 不追高"
+    elif boll_pct > 65:
+        boll_pos = f"偏高（{boll_pct}%）：注意回调"
+    elif boll_pct < 20:
+        boll_pos = f"接近下轨（{boll_pct}%）：🔥 低吸观察"
+    elif boll_pct < 35:
+        boll_pos = f"偏低（{boll_pct}%）：可留意"
     else:
-        boll_pos = "中轨区间：正常观察"
+        boll_pos = f"中轨区（{boll_pct}%）：正常"
+    if boll_pct > 80 and rsi > 70:
+        tech_signal = "⚠️ 高位过热：谨慎追高"
+    elif boll_pct < 20 and rsi < 30:
+        tech_signal = "🔥 低位机会：关注反弹"
+    elif 40 < boll_pct < 70 and 40 < rsi < 65:
+        tech_signal = "✅ 健康区间：趋势正常"
+    else:
+        tech_signal = "🤔 中性：等待方向"
+    if rsi >= 70 and boll_pct >= 80:
+        tech_signal = "⚠️ 短线过热：不追高"
+    elif rsi <= 30 and boll_pct <= 20:
+        tech_signal = "🔥 低位反弹区：可留意"
+    elif 45 <= rsi <= 65 and 35 <= boll_pct <= 70:
+        tech_signal = "✅ 健康区间：趋势正常"
+    else:
+        tech_signal = "观察"   
 
     analysis = {
         "ticker": display_ticker.upper(),
@@ -404,6 +430,8 @@ def analyze_ticker(ticker):
         "bb_mid": fmt_money(bb_mid),
         "bb_lower": fmt_money(bb_lower),
         "boll_pos": boll_pos,
+        "tech_signal": tech_signal,
+        "boll_pct": boll_pct,
         "volume": fmt_num(vol),
         "vol20": fmt_num(vol20),
         "volume_ratio": round(volume_ratio, 2),
@@ -617,22 +645,36 @@ def get_market_status():
         vix_price = float(vix_card["price"])
         vix_rsi = float(vix_card["rsi"]) if vix_card["rsi"] != "--" else 50
         
-        spy_boll = spy.get("boll_pos", "") if spy else ""
-        # === 判断逻辑 ===
-        if spy_up and qqq_up and vix_price < 18 and "下轨" in spy_boll:
+        # === BOLL 数值（从 analysis 拿） ===
+        spy_boll_pct = spy.get("boll_pct", 50) if spy else 50
+
+        # === 判断逻辑（新版本） ===
+
+        # 🔥 1. 低吸窗口（优先）
+        if spy_boll_pct < 25 and vix_price < 20:
+            return {
+                "label": "🔥 低吸窗口",
+                "status": "green",
+                "message": "SPY 接近布林下轨 + VIX 不高，适合低吸"
+            }
+
+        # ⚠️ 2. 高位风险
+        elif spy_boll_pct > 75 and vix_price < 18:
+            return {
+                "label": "⚠️ 高位区：不追高",
+                "status": "yellow",
+                "message": "SPY 接近上轨 + VIX 低，市场偏热，谨慎追高"
+            }
+
+        # 🟢 3. 正常上涨趋势
+        elif spy_up and qqq_up and vix_price < 18:
             return {
                 "label": "🟢 绿灯：可以偏进攻",
                 "status": "green",
                 "message": "SPY & QQQ 在趋势上 + VIX 低，市场稳定，可做多"
             }
-        
-        elif "上轨" in spy_boll:
-            return {
-                "label": "⚠️ 高位风险",
-                "status": "red",
-                "message": "SPY 靠近布林上轨，短线不宜追高"
-           }
-        
+
+        # 🔴 4. 风险高
         elif vix_price > 22 or vix_rsi > 60:
             return {
                 "label": "🔴 红灯：风险高",
@@ -640,6 +682,7 @@ def get_market_status():
                 "message": "VIX 高或恐慌上升，建议减仓或观望"
             }
 
+        # 🟡 5. 默认
         else:
             return {
                 "label": "🟡 黄灯：等待回调",

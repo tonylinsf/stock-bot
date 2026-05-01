@@ -254,6 +254,11 @@
       color: #9ca3af;
     }
 
+    .highlight {
+      font-weight: bold;
+      color: #4ade80;
+    }
+
     @keyframes priceFlash {
       0% { transform: scale(1.08); opacity: 0.5; }
       100% { transform: scale(1); opacity: 1; }
@@ -671,6 +676,13 @@
           <td>{{ analysis.volume_ratio }}x</td>
           <td>{{ analysis.high_52w }}</td>
           <td>{{ analysis.low_52w }}</td>
+        </tr>
+
+        <tr>
+          <th>技术信号</th>
+          <td colspan="4" class="highlight">
+            {{ analysis.tech_signal }}
+          </td>
         </tr>
       </tbody>
     </table>

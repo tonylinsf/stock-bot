@@ -28,12 +28,13 @@
       background: radial-gradient(circle at top, #111d35 0, #080d1a 45%);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
     }
 
     .container {
-      max-width: 1220px;
+      max-width: 900px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 10px;
     }
 
     .top {
@@ -68,22 +69,97 @@
     }
 
     .card {
+      width: 100%;
       background: rgba(17, 24, 39, 0.92);
       border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 18px;
-      margin-bottom: 18px;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
       box-shadow: 0 18px 45px rgba(0,0,0,0.25);
     }
 
-    .market-light {
-      border-left: 5px solid var(--blue);
+    .error {
+      background: #3f1d1d;
+      border: 1px solid #7f1d1d;
+      color: #fecaca;
+      padding: 14px;
+      border-radius: 12px;
+      line-height: 1.6;
     }
 
-    .market-light.green { border-left-color: var(--green); }
-    .market-light.yellow { border-left-color: var(--yellow); }
-    .market-light.red { border-left-color: var(--red); }
+    /* 表格 */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
 
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid #1f2937;
+      font-size: 14px;
+      vertical-align: top;
+    }
+
+    th {
+      color: #93c5fd;
+      background: #020617;
+      font-weight: 900;
+    }
+
+    tr:hover {
+      background: #0f172a;
+    }
+
+    .market-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    .market-table th {
+      text-align: left;
+      color: #8fb3ff;
+      font-size: 13px;
+      padding: 6px 8px;
+    }
+
+    .market-table td {
+      padding: 10px 8px;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* 通用 */
+    .up { color: #4ade80; }
+    .down { color: #f87171; }
+    .neutral { color: #aaa; }
+
+    .highlight {
+      font-weight: bold;
+      color: #4ade80;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 900;
+      margin: 0 0 14px;
+    }
+
+    .ai {
+      white-space: pre-wrap;
+      line-height: 1.65;
+      color: #dbeafe;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+      line-height: 1.65;
+      color: #cbd5e1;
+    }
+
+    /* 搜索区 */
     .search {
       display: flex;
       gap: 10px;
@@ -111,198 +187,49 @@
       cursor: pointer;
       font-size: 15px;
     }
-
-    .up { color: #4ade80; }
-    .down { color: #f87171; }
-    .neutral { color: #aaa; }
-
-    .grid4 {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
+ 
+    /* 大盘灯号 */
+    .market-light {
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border-left: 6px solid var(--blue);
     }
 
-    .grid3 {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
+    .market-light.green,
+    .market-light.bull {
+      border-left-color: #4ade80;
+      background: rgba(74, 222, 128, 0.05);
     }
 
-    .mini {
-      background: var(--card2);
-      border: 1px solid #1e293b;
-      border-radius: 15px;
-      padding: 14px;
+    .market-light.yellow,
+    .market-light.neutral {
+      border-left-color: #facc15;
+      background: rgba(250, 204, 21, 0.05);
     }
 
-    .label {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 8px;
+    .market-light.red,
+    .market-light.bear {
+      border-left-color: #f87171;
+      background: rgba(248, 113, 113, 0.05);
     }
 
-    .value {
-      font-weight: 900;
-      font-size: 20px;
-    }
-
-    .section-title {
-      font-size: 20px;
-      font-weight: 900;
-      margin: 0 0 14px;
-    }
-
-    .error {
-      background: #3f1d1d;
-      border: 1px solid #7f1d1d;
-      color: #fecaca;
-      padding: 14px;
-      border-radius: 12px;
-      line-height: 1.6;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    th, td {
-      text-align: left;
-      padding: 12px;
-      border-bottom: 1px solid #1f2937;
-      font-size: 14px;
-      vertical-align: top;
-    }
-
-    th {
-      color: #93c5fd;
-      background: #020617;
-      font-weight: 900;
-    }
-
-    tr:hover {
-      background: #0f172a;
-    }
-
-    .ai {
-      white-space: pre-wrap;
-      line-height: 1.65;
-      color: #dbeafe;
-    }
-
-    ul {
-      margin: 0;
-      padding-left: 20px;
-      line-height: 1.65;
-      color: #cbd5e1;
-    }
-
-    .decision {
-      font-weight: 900;
-      color: #bfdbfe;
-    }
-
-    .small {
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .chart-wrap {
-      height: 220px;
-      max-height: 220px;
-      position: relative;
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    /* 左 */
-    .section-header .left {
-      font-weight: 600;
-      font-size: 18px;
-    }
-
-    /* 中（居中） */
-    .section-header .center {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
+    .market-title {
+      font-size: 16px;
       font-weight: 600;
     }
 
-    /* 右 */
-    .section-header .right {
-      font-size: 12px;
+    .market-label {
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .market-sub {
+      margin-top: 6px;
+      font-size: 13px;
       color: #9ca3af;
     }
 
-    .price-meta {
-      text-align: right;
-    }
-
-    .price-meta .price {
-      font-size: 18px;
-      font-weight: 600;
-      color: #4ade80; /* 绿色 */
-    }
-
-    .price-meta .date {
-      font-size: 12px;
-      color: #9ca3af;
-    }
-
-    .highlight {
-      font-weight: bold;
-      color: #4ade80;
-    }
-
-    .change-val,
-    .change-pct {
-      display: inline;
-    }
-
-    .pre-block {
-      margin-top: 8px;
-      text-align: left;
-      width: 100%;
-    }
-
-    .center-block {
-      width: 100%;
-      text-align: center;   /* 🔥 控制整体居中 */
-      margin-top: 8px;
-    }
-
-    .pre-line {
-      text-align: center;
-      font-size: 15px;
-      font-weight: 600;
-      color: #ffd166;   /* 金黄色，像信号 */
-      margin-top: 6px;
-    }
-
-    .open-line {
-      font-size: 15px;
-      font-weight: 600;
-      color: #ffd166;
-      margin-top: 6px;
-    }
-
-    .market-extra {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #aaa;
-      line-height: 1.6;
-    }
-
-    .market-extra div {
-      margin-top: 2px;
-    }
-
-    /* 大盘：右边 */
     .market-open {
       text-align: right;
       font-size: 14px;
@@ -310,93 +237,118 @@
       margin-top: 6px;
     }
 
-    /* 个股：中间 */
-    .stock-open {
-      text-align: center;
+    .market-light {
+      display: block;
+      text-align: left;
+    }
+
+    .market-light .light-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+ 
+    .market-light .light-label {
+      font-size: 26px;
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+
+    .market-light .light-sub {
+      font-size: 14px;
+      color: #cbd5e1;
+      margin-bottom: 10px;
+    }
+
+    .market-light .light-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
       font-size: 15px;
       font-weight: 600;
-      color: #ffd166;
-      margin: 8px 0;
-      background: rgba(255, 209, 102, 0.08);
-      padding: 6px 10px;
-      border-radius: 6px;
     }
 
-    .tech-extra {
-      margin-top: 8px;
-      text-align: center;
+    /* 大盘卡片 SPY / QQQ / VIX */
+    .market-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    .boll-line {
-      font-size: 14px;
-      font-weight: 600;
+    .market-card {
+      background: rgba(20, 30, 50, 0.6);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.3);
     }
 
-    .risk-line {
-      margin-top: 10px;
-      text-align: center;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    @keyframes priceFlash {
-      0% { transform: scale(1.08); opacity: 0.5; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-
-    @media (max-width: 600px) {
-      .chart-wrap {
-        height: 240px;
-        max-height: 240px;
-      }
-    }
-
-    @media (max-width: 900px) {
-      .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .top { display: block; }
-    }
-
-    @media (max-width: 560px) {
-      .container { padding: 14px; }
-      h1 { font-size: 25px; }
-      .grid4, .grid3 { grid-template-columns: 1fr; }
-      input, button { width: 100%; }
-      table { font-size: 13px; }
-      th, td { padding: 9px; }
-    }
-
-    .container {
-      max-width: 900px;
-      margin: auto;
-      padding: 10px;
-    }
-
-    .card {
-      padding: 12px;
-      margin-bottom: 12px;
-      border-radius: 12px;
-    }
-
-    .market-table {
+    .market-top-row {
+      display: grid;
+      grid-template-columns: 0.8fr 1.4fr 0.8fr;
+      align-items: center;
       width: 100%;
-      border-collapse: collapse;
-     margin-top: 10px;
     }
 
-    .market-table th {
+    .market-name {
+      text-align: right;
+      font-size: 28px;
+      font-weight: 800;
+      padding-right: 10px;
+    }
+
+    .market-price {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .market-change {
       text-align: left;
-      color: #8fb3ff;
+      padding-left: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .market-session {
+      width: 100%;
+      text-align: center;
       font-size: 13px;
-      padding: 6px 8px;
-    }
-
-    .market-table td {
-      padding: 10px 8px;
       font-weight: 600;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+      margin-top: 6px;
     }
 
+    .market-body {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .market-side {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    .market-extra {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      margin-top: 6px;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    .light-line {
+      margin-top: 8px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    /* 个股详情 */
     .stock-head-top {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -408,25 +360,9 @@
       text-align: left;
     }
 
-    .stock-head-bottom {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      align-items: center;
-      width: 100%;
-      margin-top: 8px;
-      text-align: center;
-    }
-
-    .stock-top-row {
-      display: grid;
-      grid-template-columns: 0.8fr 1.2fr 1fr;
-      align-items: center;
-      width: 100%;
-    }
-
     .stock-symbol {
       text-align: center;
-      font-size: 34px;      /* 👉 原来20 → 放大 */
+      font-size: 34px;
       font-weight: 900;
     }
 
@@ -463,216 +399,141 @@
       white-space: nowrap;
     }
 
-    .stock-session,
-    .stock-open {
+    .stock-session {
       text-align: center;
       margin-top: 8px;
       font-size: 18px;
       font-weight: 700;
     }
 
-    .market-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    /* 卡片 */
-    .market-card {
-      background: rgba(20, 30, 50, 0.6);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.3);
-    }
-
-    /* 顶部 */
-    .market-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-
-    .market-top-row {
-      display: grid;
-      grid-template-columns: 0.8fr 1.4fr 0.8fr;
-      align-items: center;
-      width: 100%;
-    }
-
-    .market-name {
-      text-align: right;
-      font-size: 28px;   
-      font-weight: 800;
-      padding-right: 10px;
-    }
-
-    .market-price {
+    .stock-open {
       text-align: center;
-      font-size: 28px;
-      font-weight: 800;
-    }
-
-    .market-change {
-      text-align: left;
-      padding-left: 10px;
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-
-    .market-session {
-      width: 100%;
-      text-align: center;
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 600;
+      color: #ffd166;
+      margin: 8px 0;
+      background: rgba(255, 209, 102, 0.08);
+      padding: 6px 10px;
+      border-radius: 6px;  
+    }
+
+    .stock-meta {
+      text-align: center;
       margin-top: 6px;
-    }
-
-    /* 颜色 */
-    .up {
-      color: #4ade80;
-    }
-
-    .down {
-      color: #f87171;
-    }
-
-    /* 中间 */
-    .market-body {
-      display: flex;
-      justify-content: space-between;
       font-size: 14px;
-      margin-bottom: 10px;
+      opacity: 0.85;
     }
 
-    /* 右侧指标 */
-    .market-side {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      opacity: 0.8;
-    }
-
-    .market-light {
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 12px;
-    }
-
-    /* 颜色灯号 */
-    .market-light.bull {
-      border-left: 6px solid #4ade80;
-      background: rgba(74, 222, 128, 0.05);
-    }
-
-    .market-light.bear {
-      border-left: 6px solid #f87171;
-      background: rgba(248, 113, 113, 0.05);
-    }
-
-    .market-light.neutral {
-      border-left: 6px solid #facc15;
-      background: rgba(250, 204, 21, 0.05);
-    }
-
-    /* 标题 */
-    .market-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* 左边 */
-    .market-title {
+    .stock-trend {
+      text-align: center;
+      margin-top: 6px;
       font-size: 16px;
+      font-weight: 700;
+      color: #ffd166;
+    }
+
+    /* 技术指标 / 交易计划 */
+    .boll-line {
+      font-size: 14px;
       font-weight: 600;
     }
 
-    /* 右边（大灯号） */
-    .market-label {
-      font-size: 20px;
-      font-weight: 800;
+    .risk-line {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
     }
 
-    /* 描述 */
-    .market-sub {
-      margin-top: 6px;
-      font-size: 13px;
-      color: #9ca3af;
+    /* 图表 */
+    .chart-wrap {
+      height: 220px;
+      max-height: 220px;
+      position: relative;
     }
 
-    .vix-low {
-      color: #4ade80;
+    /* Mobile */
+    @media (max-width: 900px) {
+      .top { display: block; }
     }
 
-    .vix-high {
-      color: #f87171;
-    }
-
-    /* 📱 手机优化 */
     @media (max-width: 600px) {
+      body {
+        font-size: 14px;
+      }
 
-       .stock-symbol {
-         font-size: 22px;
-       }
+      .container {
+        padding: 14px;
+      }
 
-       .stock-price {
-         font-size: 26px;
-       }
+      h1 {
+        font-size: 20px;
+      }
 
-       .stock-change {
-         font-size: 16px;
-       }
+      h2,
+      .section-title {
+        font-size: 16px;
+      }
 
-       body {
-           font-size: 14px;
-       }
+      .card {
+        padding: 10px;
+      }
 
-       h1 {
-           font-size: 20px;
-       }
+      input,
+      button {
+        width: 100%;
+        font-size: 16px;
+      }
 
-       h2 {
-           font-size: 16px;
-       }
+      th, td {
+        padding: 9px;
+        font-size: 13px;
+      }
 
-       .card {
-           padding: 10px;
-       }
+      .stock-symbol {
+        font-size: 24px;
+      }
 
-       /* ✅ 关键：这里才会生效 */
-       .grid4 {
-           grid-template-columns: repeat(3, 1fr);
-           gap: 8px;
-       }
+      .stock-price {
+        font-size: 30px;
+        padding-right: 12px;
+      }
 
-       .grid3 {
-           grid-template-columns: repeat(3, 1fr);
-           gap: 8px;
-       }
+      .stock-change {
+        font-size: 16px;
+        padding-left: 12px;
+      }
 
-       .mini {
-           padding: 8px;
-       }
+      .stock-session {
+        font-size: 15px;
+      }
 
-       .label {
-           font-size: 11px;
-       }
+      .stock-open {
+        font-size: 14px;
+      }
 
-       .value {
-           font-size: 15px;
-       }
+      .market-name {
+        font-size: 24px;
+      }
 
-       input {
-           width: 100%;
-           font-size: 16px;
-       }
+      .market-price {
+        font-size: 26px;
+      }
 
-       button {
-           width: 100%;
-           font-size: 16px;
-       }
+      .market-change {
+        font-size: 14px;
+      }
+
+      .market-body,
+      .market-side,
+      .market-extra {
+        font-size: 13px;
+      }
+
+      .chart-wrap {
+        height: 240px;
+        max-height: 240px;
+      }
     }
  </style>
 </head>
@@ -687,45 +548,14 @@
     </div>
   </div>
 
-  <div class="card market-light {{ market_status.status }}">
+  <div class="card market-light green">
+    <div class="light-title">今日大盘灯号</div>
+    <div class="light-label">🟢 趋势健康</div>
+    <div class="light-sub">趋势向上 + 情绪正常，可持有或顺势</div>
 
-    <div class="market-header">
-      今日大盘灯号
-    </div>
-
-    <div class="market-label">
-      {{ market_status.label }}
-    </div>
-
-    <div class="market-sub">
-      {{ market_status.message }}
-    </div>
-
-    <!-- 统一信息块 -->
-    <div class="market-extra">
-
-      <div>
-        🌡 市场温度：{{ market_status.temp }}
-       （{{ market_status.temp_label }}）
-      </div>
-
-      <div>
-        🧠 VIX：{{ market_status.vix_sentiment }}
-      </div>
-
-      {% if market_status.spy_pre %}
-      <div>
-        ⏰ 盘前：{{ "%.2f"|format(market_status.spy_pre) }}
-        ({{ "%+.2f"|format(market_status.spy_pre_pct) }}%)
-      </div>
-      {% endif %}
-
-      <div class="open-line">
-        🔥 开盘预测：{{ market_status.open_signal }}
-      </div>
-
-    </div> 
-
+    <div class="light-line">🌡️ 市场温度：{{ market_status.temp }} / 100 （🔥 过热区）</div>
+    <div class="light-line">🧠 VIX：🙂 偏乐观：趋势正常</div>
+    <div class="light-line">🔥 开盘预测：{{ market_status.open_signal }}</div>
   </div>
 
   <div class="card">
@@ -782,6 +612,10 @@
         </span>
       </div>
 
+      <div class="stock-trend">
+        {{ analysis.trend_arrow }} {{ analysis.trend_label }}
+      </div>
+
       {% if analysis.session_price %}
       <div class="stock-session" style="color: {{ '#4cd964' if analysis.session_diff > 0 else '#ff6b6b' }}">
         {{ analysis.session }}:
@@ -792,6 +626,10 @@
 
       <div class="stock-open">
         🔥 开盘预测：{{ analysis.open_signal }}
+      </div>
+      <div class="stock-meta">
+        Volume: {{ analysis.volume }}　
+        Avg Vol: {{ analysis.vol20 }}
       </div>
     </div>
 
@@ -979,6 +817,12 @@
       <div>RSI {{ m.rsi }}</div>
       <div>MA20 {{ m.ma20 }}</div>
       <div>MA60 {{ m.ma60 }}</div>
+    </div>
+
+    <div class="market-extra">
+      <div>52H {{ m.high_52w }}</div>
+      <div>52L {{ m.low_52w }}</div>
+      <div>Vol {{ m.volume_ratio }}x</div>
     </div>
 
     <div>

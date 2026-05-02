@@ -564,6 +564,8 @@ def analyze_ticker(ticker):
         "boll_pos": boll_pos,
         "boll_text": boll_pos,
         "boll_color": boll_color,
+        "trend_arrow": "↑" if close > ma20 else "↓",
+        "trend_label": "短线向上" if close > ma20 else "短线偏弱",
     }
 
     chart = build_chart(df)
@@ -742,6 +744,9 @@ def get_market_cards():
                 "ma20": analysis.get("ma20"),
                 "ma60": analysis.get("ma60"),
                 "boll_pos": analysis.get("boll_pos"),
+                "high_52w": analysis.get("high_52w"),
+                "low_52w": analysis.get("low_52w"),
+                "volume_ratio": analysis.get("volume_ratio"),
                 "session": analysis.get("session"),
                 "session_price": analysis.get("session_price"),
                 "session_diff": analysis.get("session_diff"),

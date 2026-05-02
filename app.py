@@ -37,9 +37,12 @@ MARKET_TICKERS = ["SPY", "QQQ"]
 CACHE = {}
 CACHE_TTL = 60 
 
-market_status_cache = None
-market_status_cache_time = 0
-MARKET_CACHE_TTL = 300
+MARKET_STATUS_CACHE = {
+    "data": None,
+    "time": 0
+}
+
+MARKET_CACHE_TTL = 600  # 10分鐘
 
 
 def get_real_time_price(ticker):
@@ -758,6 +761,18 @@ def get_market_cards():
     return cards
 
 def get_market_status():
+    now = time.time()
+    if MARKET_STATUS_CACHE["data"] and now - MARKET_STATUS_CACHE["time"] < MARKET_CACHE_TTL:
+        return MARKET_STATUS_CACHE["data"]
+    
+    market_temp = 50
+    temp_zone = "中性"
+    vix_text = "暂无"
+    open_signal = "暂无数据"
+    label = "⚪ 数据不足"
+    desc = "暂时无法判断市场状态"
+    color = "gray"
+
     try:
         # === SPY / QQQ ===
         spy = analyze_ticker("SPY")[0]
@@ -834,82 +849,61 @@ def get_market_status():
         else:
             temp_label = "🔥 过热区"  
 
-        # === 判断逻辑（新版本） ===
+        # === 判断逻辑（最终版） ===
 
-        # 🔥 1. 低吸窗口（优先）
+        # 🔥 1. 抄底窗口
         if spy_boll_pct < 25 and vix_price >= 25:
-            return {
-                "label": "🔥 抄底窗口",
-                "status": "green",
-                "message": "SPY 低位 + VIX 恐慌，市场恐惧，适合分批低吸",
-                "temp": f"{market_temp} / 100",
-                "temp_label": temp_label,
-                "vix_sentiment": vix_signal,
-                "vix_status": vix_status,
-            }
+            label = "🔥 抄底窗口"
+            desc = "SPY 低位 + VIX 恐慌，市场恐惧，适合分批低吸"
+            color = "green"
 
         # ⚠️ 2. 高位风险
         elif spy_boll_pct > 75 and vix_price < 14:
-            return {
-                "label": "⚠️ 高位区：不追高",
-                "status": "yellow",
-                "message": "SPY 接近上轨 + 市场贪婪，注意回调风险",
-                "temp": f"{market_temp} / 100",
-                "temp_label": temp_label,
-                "vix_sentiment": vix_signal,
-                "vix_status": vix_status,
-            }
+            label = "⚠️ 高位区：不追高"
+            desc = "SPY 接近上轨 + 市场贪婪，注意回调风险"
+            color = "yellow"
 
-        # 🟢 3. 正常上涨趋势
+        # 🟢 3. 趋势健康
         elif spy_up and qqq_up and 14 <= vix_price <= 18:
-            return {
-                "label": "🟢 趋势健康",
-                "status": "green",
-                "message": "趋势向上 + 情绪正常，可持有或顺势",
-                "temp": f"{market_temp} / 100",
-                "temp_label": temp_label,
-                "vix_sentiment": vix_signal,
-                "vix_status": vix_status,
-            }
+            label = "🟢 趋势健康"
+            desc = "趋势向上 + 情绪正常，可持有或顺势"
+            color = "green"
 
-        # 🔴 4. 风险高
+        # 🔴 4. 极度恐慌
         elif vix_price >= 30:
-            return {
-                "label": "🔴 极度恐慌",
-                "status": "red",
-                "message": "市场剧烈波动，谨慎操作或等待确认",
-                "temp": f"{market_temp} / 100",
-                "temp_label": temp_label,
-                "vix_sentiment": vix_signal,
-                "vix_status": vix_status,
-            }
-
+            label = "🔴 极度恐慌"
+            desc = "市场剧烈波动，谨慎操作或等待确认"
+            color = "red"
+             
         # 🟡 5. 默认
         else:
-            return {
-                "label": "🟡 震荡区",
-                "status": "yellow",
-                "message": "方向不明，等待机会",
-                "temp": f"{market_temp} / 100",
-                "temp_label": temp_label,
-                "vix_sentiment": vix_signal,
-                "vix_status": vix_status,
-            }
+            label = "🟡 震荡区"
+            desc = "方向不明，等待机会"
+            color = "yellow"
 
     except Exception as e:
         print("Market Status Error:", e)
-        return {
-            "label": "⚪ 数据不足",
-            "status": "gray",
-            "message": "暂时无法判断市场状态",
-            "temp": f"{market_temp} / 100",
-            "temp_label": temp_label,
-            "vix_sentiment": vix_signal,
-            "vix_status": vix_status,
-            "spy_pre": spy_pre,
-            "spy_pre_pct": spy_pre_pct,
-            "open_signal": open_signal,
-        }
+        label = "⚪ 数据不足"
+        desc = "暂时无法判断市场状态"
+        temp_zone = "中性"
+        vix_text = "暂无"
+        open_signal = "暂无数据"
+        color = "gray"
+    
+    result = {
+        "label": label,
+        "desc": desc,
+        "temp": market_temp,
+        "temp_zone": temp_zone,
+        "vix_text": vix_text,
+        "open_signal": open_signal,
+        "color": color,
+    }
+
+    MARKET_STATUS_CACHE["data"] = result
+    MARKET_STATUS_CACHE["time"] = time.time()
+
+    return result
 
 
 def get_rebound_signals():

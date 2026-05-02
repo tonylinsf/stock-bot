@@ -728,9 +728,20 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2 class="section-title">AI 建议</h2>
-    <div class="ai">{{ ai_advice }}</div>
+  <div class="card mt-4">
+    <div class="card-body">
+      <h4>AI 建议</h4>
+
+      <button id="aiBtn" class="btn btn-warning" onclick="loadAIAnalysis('{{ ticker }}')">
+        🤖 生成 AI 分析
+      </button>
+
+      <div id="aiLoading" style="display:none; margin-top:10px;">
+        🔄 AI 分析中...
+      </div>
+
+      <div id="aiResult" style="margin-top:15px; white-space:pre-line;"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -872,6 +883,42 @@ function showMarketLoading() {
 function showScanLoading() {
   const msg = document.getElementById("scanLoading");
   if (msg) msg.style.display = "block";
+}
+</script>
+
+<script>
+function loadAIAnalysis(ticker) {
+  const btn = document.getElementById("aiBtn");
+  const loading = document.getElementById("aiLoading");
+  const result = document.getElementById("aiResult");
+
+  // 防重复点击
+  if (btn.disabled) return;
+
+  btn.disabled = true;
+  btn.innerText = "分析中...";
+  loading.style.display = "block";
+  result.innerText = "";
+
+  fetch(`/api/ai_analysis/${ticker}`)
+    .then(response => response.json())
+    .then(data => {
+      loading.style.display = "none";
+
+      // ✅ 加入 cache 判断（重点🔥）
+      if (data.cached) {
+        result.innerText = "✅ 使用4小时内缓存的 AI 分析：\n\n" + data.ai_analysis;
+      } else {
+        result.innerText = data.ai_analysis || "暂时无法生成 AI 分析";
+      }
+      btn.innerText = "✅ 已生成 AI 分析";
+    })
+    .catch(error => {
+      loading.style.display = "none";
+      result.innerText = "AI 分析失败，请稍后再试。";
+      btn.disabled = false;
+      btn.innerText = "🤖 重新生成 AI 分析";
+    });
 }
 </script>
 

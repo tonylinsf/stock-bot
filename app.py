@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 import requests
+from flask import jsonify
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
 
@@ -18,6 +19,9 @@ except Exception:
 load_dotenv()
 
 app = Flask(__name__)
+
+AI_ANALYSIS_CACHE = {}
+AI_ANALYSIS_TTL = 4 * 60 * 60  # 4小时
 
 POLYGON_API_KEY = os.getenv("POLYGON_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -960,10 +964,8 @@ def index():
         analysis, chart, price, error = analyze_ticker(ticker)
 
     ai_advice = None
-    if analysis:
-        ai_advice = get_ai_advice(analysis, market_filter)
 
-    market_status = get_market_status()
+    market_status = None
     top_picks = []
     market_cards = []
 
@@ -981,6 +983,48 @@ def index():
         market_status=market_status,
     )
 
+
+@app.route("/api/ai_analysis/<ticker>")
+def api_ai_analysis(ticker):
+    ticker = ticker.upper()
+    now = time.time()
+
+    cached = AI_ANALYSIS_CACHE.get(ticker)
+    if cached and now - cached["time"] < AI_ANALYSIS_TTL:
+        return jsonify({
+            "ticker": ticker,
+            "ai_analysis": cached["text"],
+            "cached": True
+        })
+
+    analysis, chart, price, error = analyze_ticker(ticker)
+
+    if not analysis:
+        return jsonify({
+            "ticker": ticker,
+            "ai_analysis": error or "暂时无法取得股票分析数据。",
+            "cached": False
+        })
+
+    market_filter = {
+        "status": "manual",
+        "label": "手动分析模式",
+        "message": "当前为手动模式，不自动抓大盘数据",
+        "allow_long": True
+    }
+
+    ai_text = get_ai_advice(analysis, market_filter)
+
+    AI_ANALYSIS_CACHE[ticker] = {
+        "time": now,
+        "text": ai_text
+    }
+
+    return jsonify({
+        "ticker": ticker,
+        "ai_analysis": ai_text,
+        "cached": False
+    })
 
 @app.route("/health")
 def health():

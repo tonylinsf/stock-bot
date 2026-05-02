@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 import requests
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
 from flask import jsonify
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
@@ -25,6 +28,8 @@ AI_ANALYSIS_TTL = 4 * 60 * 60  # 4小时
 
 POLYGON_API_KEY = os.getenv("POLYGON_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
+ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
@@ -51,18 +56,13 @@ MARKET_CACHE_TTL = 600  # 10分鐘
 
 def get_real_time_price(ticker):
     try:
-        t = yf.Ticker(ticker)
-        info = t.fast_info
+        data = get_alpaca_history(ticker, days=2)
 
-        price = info.get("last_price") or info.get("regular_market_price")
-        if price:
-            return float(price)
+        if data is None or data.empty:
+            return None
 
-        hist = t.history(period="1d", interval="1m")
-        if not hist.empty:
-            return float(hist["Close"].iloc[-1])
+        return float(data["Close"].iloc[-1])
 
-        return None
     except Exception as e:
         print("Real price error:", e)
         return None
@@ -265,6 +265,49 @@ def get_market_filter():
         "message": "SPY / QQQ 趋势偏弱，自动选股信号降级，建议少做或不做。",
         "allow_long": False
     }
+
+
+alpaca_client = StockHistoricalDataClient(
+    ALPACA_API_KEY,
+    ALPACA_SECRET_KEY
+)
+
+def get_alpaca_history(ticker, days=365):
+    try:
+        end = datetime.now()
+        start = end - timedelta(days=days)
+
+        request = StockBarsRequest(
+            symbol_or_symbols=ticker,
+            timeframe=TimeFrame.Day,
+            start=start,
+            end=end
+        )
+
+        bars = alpaca_client.get_stock_bars(request).df
+
+        if bars.empty:
+            return None
+
+        # 处理 multi-index
+        if "symbol" in bars.index.names:
+            df = bars.xs(ticker, level="symbol")
+        else:
+            df = bars
+
+        df = df.rename(columns={
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
+            "volume": "Volume"
+        })
+
+        return df[["Open", "High", "Low", "Close", "Volume"]]
+
+    except Exception as e:
+        print("Alpaca error:", e)
+        return None
 
 
 def analyze_ticker(ticker):

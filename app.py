@@ -315,9 +315,12 @@ def analyze_ticker(ticker):
     diff = None
     pct = None
 
-    if session_price and prev_close:
-        diff = session_price - prev_close
-        pct = round((diff / prev_close) * 100, 2)    
+    if session_price and price:
+        diff = session_price - price
+        pct = round((diff / price) * 100, 2)
+    else:
+        diff = None
+        pct = None    
 
     try:
         vix_card = get_vix_card()
@@ -739,6 +742,11 @@ def get_market_cards():
                 "ma20": analysis.get("ma20"),
                 "ma60": analysis.get("ma60"),
                 "boll_pos": analysis.get("boll_pos"),
+                "session": analysis.get("session"),
+                "session_price": analysis.get("session_price"),
+                "session_diff": analysis.get("session_diff"),
+                "session_pct": analysis.get("session_pct"),
+                "change_val": analysis.get("change_val"),
             })
 
     cards.append(get_vix_card())

@@ -424,21 +424,35 @@
       text-align: center;
     }
 
+    .stock-top-row {
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr 1fr;
+      align-items: center;
+      width: 100%;
+    }
+
     .stock-symbol {
-      font-size: 26px;      /* 👉 原来20 → 放大 */
+      text-align: right;
+      padding-right: 18px;
+      font-size: 30px;      /* 👉 原来20 → 放大 */
       font-weight: 800;
       letter-spacing: 1px;
     }
 
     .stock-price {
+      text-align: center;
       font-size: 30px;      /* 👉 主视觉最大 */
       font-weight: 900;
+      white-space: nowrap;
       text-shadow: 0 0 8px rgba(255,255,255,0.05);  /* 微光 */
     }
 
     .stock-change {
-      font-size: 18px;      /* 👉 比价格小一点 */
+      text-align: left;
+      padding-left: 18px;
+      font-size: 18px;
       font-weight: 700;
+      white-space: nowrap;
     }
 
     .market-cards {
@@ -463,19 +477,40 @@
       margin-bottom: 12px;
     }
 
+    .market-top-row {
+      display: grid;
+      grid-template-columns: 0.8fr 1.4fr 0.8fr;
+      align-items: center;
+      width: 100%;
+    }
+
     .market-name {
-      font-size: 26px;
+      text-align: right;
+      font-size: 28px;   
       font-weight: 800;
+      padding-right: 10px;
     }
 
     .market-price {
+      text-align: center;
       font-size: 28px;
-      font-weight: 900;
+      font-weight: 800;
     }
 
     .market-change {
-      font-size: 16px;
+      text-align: left;
+      padding-left: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .market-session {
+      width: 100%;
+      text-align: center;
+      font-size: 13px;
       font-weight: 600;
+      margin-top: 6px;
     }
 
     /* 颜色 */
@@ -721,25 +756,24 @@
         <span class="stock-date">{{ analysis.price_date }}</span>
       </div>
 
-      <div class="stock-head-bottom">
+      <div class="stock-head-bottom stock-top-row">
         <span class="stock-symbol">{{ analysis.ticker }}</span>
 
         <span class="stock-price" style="color: {{ analysis.change_color }}">
           {{ analysis.price_fmt }}
         </span>
 
-        <div class="stock-change" style="color: {{ analysis.change_color }}">
-          <div class="change-val">{{ analysis.change_val }}</div>
-          <div class="change-pct">{{ analysis.change_pct }}</div>
-        </div>
+        <span class="stock-change" style="color: {{ analysis.change_color }}">
+          {{ analysis.change_val }} / {{ analysis.change_pct }}
+        </span>
       </div>
 
       <div class="pre-block center-block">
         {% if analysis.session_price %}
-        <div class="pre-line" style="color: {{ 'lightgreen' if analysis.session_diff > 0 else '#ff6b6b' }}">
-            {{ analysis.session }}: 
-            ${{ "%.2f"|format(analysis.session_price) }}
-            ({{ analysis.session_diff|round(2) }} / {{ analysis.session_pct }}%)
+        <div class="pre-line" style="color: {{ '#4cd964' if analysis.session_diff > 0 else '#ff6b6b' }}">
+          {{ analysis.session }}:
+          ${{ "%.2f"|format(analysis.session_price) }}
+          ({{ "%+.2f"|format(analysis.session_diff) }} / {{ "%+.2f"|format(analysis.session_pct) }}%)
         </div>
         {% endif %}
 
@@ -904,47 +938,56 @@
   </div>
 
   <div class="market-cards">
+  {% for m in market_cards %}
+  <div class="market-card">
 
-    {% for m in market_cards %}
-    <div class="market-card">
+    <!-- 第一行：左名 + 中价 + 右涨跌 -->
+    <div class="market-top-row">
+      <div class="market-name">{{ m.ticker }}</div>
 
-      <!-- 顶部 -->
-      <div class="market-header">
-        <div class="market-name">{{ m.ticker }}</div>
-
-        <div class="market-price {{ m.change_class }}">
-          {{ m.price }}
-        </div>
-
-        <div class="market-change {{ m.change_class }}">
-          {{ m.change_pct }}
-        </div>
+      <div class="market-price {{ m.change_class }}">
+        {{ m.price }}
       </div>
 
-      <!-- 中间 -->
-      <div class="market-body">
-        <div>决策: {{ m.decision }}</div>
-        <div>Setup: {{ m.setup }}</div>
-        <div>评分: {{ m.score }}</div>
+      <div class="market-change {{ m.change_class }}">
+        {{ m.change_val }}<br>
+        {{ m.change_pct }}
       </div>
-
-      <!-- 右侧指标 -->
-      <div class="market-side">
-        <div>RSI {{ m.rsi }}</div>
-        <div>MA20 {{ m.ma20 }}</div>
-        <div>MA60 {{ m.ma60 }}</div>
-      </div>
-      <div>
-        BOLL:
-        <span class="{% if '低吸' in m.boll_pos %}up{% elif '不追' in m.boll_pos %}down{% else %}neutral{% endif %}">
-          {{ m.boll_pos }}
-        </span>
-      </div>
-
     </div>
-    {% endfor %}
+
+    <!-- 第二行：盘前 / 盘后 放中间 -->
+    {% if m.session_price %}
+    <div class="market-session" style="color: {{ '#4cd964' if m.session_diff > 0 else '#ff6b6b' }}">
+      {{ m.session }}:
+      ${{ "%.2f"|format(m.session_price) }}
+      ({{ "%+.2f"|format(m.session_diff) }} / {{ "%+.2f"|format(m.session_pct) }}%)
+    </div>
+    {% endif %}
+
+    <!-- 下面资料 -->
+    <div class="market-body">
+      <div>决策: {{ m.decision }}</div>
+      <div>Setup: {{ m.setup }}</div>
+      <div>评分: {{ m.score }}</div>
+    </div>
+
+    <div class="market-side">
+      <div>RSI {{ m.rsi }}</div>
+      <div>MA20 {{ m.ma20 }}</div>
+      <div>MA60 {{ m.ma60 }}</div>
+    </div>
+
+    <div>
+      BOLL:
+      <span class="{% if '低吸' in m.boll_pos %}up{% elif '不追' in m.boll_pos %}down{% endif %}">
+        {{ m.boll_pos }}
+      </span>
+    </div>
 
   </div>
+  {% endfor %}
+  </div>
+
 </div>
 
 <script>

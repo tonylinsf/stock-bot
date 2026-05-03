@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 import requests
+from alpaca.data.enums import DataFeed
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
@@ -273,15 +274,24 @@ alpaca_client = StockHistoricalDataClient(
 )
 
 def get_alpaca_history(ticker, days=365):
+    cache_key = f"alpaca:{ticker}:{days}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        print(f"♻️ Using CACHE for {ticker}")
+        return cached
+
+    print(f"✅ Using ALPACA for {ticker}")
+
     try:
-        end = datetime.now()
+        end = datetime.now() - timedelta(minutes=16)
         start = end - timedelta(days=days)
 
         request = StockBarsRequest(
             symbol_or_symbols=ticker,
             timeframe=TimeFrame.Day,
             start=start,
-            end=end
+            end=end,
+            feed=DataFeed.IEX,
         )
 
         bars = alpaca_client.get_stock_bars(request).df
@@ -303,7 +313,9 @@ def get_alpaca_history(ticker, days=365):
             "volume": "Volume"
         })
 
-        return df[["Open", "High", "Low", "Close", "Volume"]]
+        df[["Open", "High", "Low", "Close", "Volume"]]
+        cache_set(cache_key, df)
+        return df
 
     except Exception as e:
         print("Alpaca error:", e)

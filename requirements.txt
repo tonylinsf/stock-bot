@@ -5,5 +5,4 @@ requests
 python-dotenv
 openai
 gunicorn
-yfinance
 alpaca-py

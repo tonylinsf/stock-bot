@@ -24,6 +24,9 @@ load_dotenv()
 
 app = Flask(__name__)
 
+USE_ALPACA = True
+USE_POLYGON_FALLBACK = True
+
 AI_ANALYSIS_CACHE = {}
 AI_ANALYSIS_TTL = 4 * 60 * 60  # 4小时
 
@@ -57,7 +60,7 @@ MARKET_CACHE_TTL = 600  # 10分鐘
 
 def get_real_time_price(ticker):
     try:
-        data = get_alpaca_history(ticker, days=2)
+        data = get_history(ticker, days=2)
 
         if data is None or data.empty:
             return None
@@ -273,16 +276,9 @@ alpaca_client = StockHistoricalDataClient(
     ALPACA_SECRET_KEY
 )
 
-def get_alpaca_history(ticker, days=365):
-    cache_key = f"alpaca:{ticker}:{days}"
-    cached = cache_get(cache_key)
-    if cached is not None:
-        print(f"♻️ Using CACHE for {ticker}")
-        return cached
-
-    print(f"✅ Using ALPACA for {ticker}")
-
+def get_history(ticker, days=180):
     try:
+        # ===== Alpaca =====
         end = datetime.now() - timedelta(minutes=16)
         start = end - timedelta(days=days)
 
@@ -297,9 +293,8 @@ def get_alpaca_history(ticker, days=365):
         bars = alpaca_client.get_stock_bars(request).df
 
         if bars.empty:
-            return None
+            raise Exception("Alpaca empty")
 
-        # 处理 multi-index
         if "symbol" in bars.index.names:
             df = bars.xs(ticker, level="symbol")
         else:
@@ -313,12 +308,21 @@ def get_alpaca_history(ticker, days=365):
             "volume": "Volume"
         })
 
-        df[["Open", "High", "Low", "Close", "Volume"]]
-        cache_set(cache_key, df)
+        print(f"✅ Using ALPACA for {ticker}")
         return df
 
     except Exception as e:
-        print("Alpaca error:", e)
+        print(f"⚠️ Alpaca failed: {ticker}", e)
+
+        # ===== Polygon fallback =====
+        if USE_POLYGON_FALLBACK:
+            try:
+                df = get_polygon_history(ticker, days)
+                print(f"🟡 Using POLYGON for {ticker}")
+                return df
+            except Exception as e2:
+                print(f"❌ Polygon failed: {ticker}", e2)
+
         return None
 
 
@@ -699,69 +703,83 @@ MA60：{analysis['ma60']}
         return fallback + f"\n\nAI 暂时不可用：{e}"
     
 
+VIX_CACHE = {"data": None, "time": 0}
+VIX_TTL = 1800  # 30分钟
+
 def get_vix_card():
+    now = time.time()
+
+    if VIX_CACHE["data"] and now - VIX_CACHE["time"] < VIX_TTL:
+        return VIX_CACHE["data"]
+
     try:
-        df = yf.download("^VIX", period="6mo", interval="1d", progress=False, auto_adjust=False)
+        df = yf.download("^VIX", period="6mo", interval="1d", progress=False)
 
         if df is None or df.empty:
             raise Exception("VIX no data")
 
-        # ✅ 防止 yfinance MultiIndex 问题
-        close_series = df["Close"]
-        if hasattr(close_series, "columns"):
-            close_series = close_series.iloc[:, 0]
+        close = df["Close"].dropna()
+        if isinstance(close, pd.DataFrame):
+            close = close.iloc[:, 0]
+            close = close.dropna()
 
-        close_series = close_series.dropna()
+        price = float(close.iloc[-1])
+        prev = float(close.iloc[-2])
+        change_pct = round((price / prev - 1) * 100, 2)
 
-        # ✅ RSI 计算
-        delta = close_series.diff()
+        ma20 = close.rolling(20).mean().iloc[-1]
+        ma60 = close.rolling(60).mean().iloc[-1]
+
+        # RSI
+        delta = close.diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
 
-        avg_gain = gain.rolling(14).mean()
-        avg_loss = loss.rolling(14).mean()
+        rs = gain.rolling(14).mean() / loss.rolling(14).mean()
+        rsi = 100 - (100 / (1 + rs))
+        rsi = float(rsi.iloc[-1])
 
-        rs = avg_gain / avg_loss
-        rsi_series = 100 - (100 / (1 + rs))
-
-        rsi = float(rsi_series.iloc[-1])
-
-        if len(close_series) < 60:
-            raise Exception("VIX data not enough")
-
-        close = float(close_series.iloc[-1])
-        prev_close = float(close_series.iloc[-2])
-        change_pct = (close / prev_close - 1) * 100
-
-        ma20 = float(close_series.rolling(20).mean().iloc[-1])
-        ma60 = float(close_series.rolling(60).mean().iloc[-1])
-
-        return {
+        data = {
             "ticker": "VIX",
-            "price": f"{close:.2f}",
-            "change_pct": f"{change_pct:.2f}%",
+            "price": f"{price:.2f}",
+            "change_pct": f"{change_pct:+.2f}%",
             "change_class": "up" if change_pct >= 0 else "down",
+            "rsi": round(rsi, 2),
+            "ma20": f"{ma20:.2f}" if ma20 else "--",
+            "ma60": f"{ma60:.2f}" if ma60 else "--",
             "decision": "风险观察",
-            "score": 5 if close < 18 else 3 if close < 22 else 1,
-            "rsi": f"{rsi:.2f}",
-            "setup": "低风险区间" if close < 18 else "正常区间" if close < 22 else "高风险区间",
-            "ma20": f"{ma20:.2f}",
-            "ma60": f"{ma60:.2f}",
+            "setup": "波动指标",
+            "score": "—",
+            "boll_pos": "--",
+            "high_52w": "--",
+            "low_52w": "--",
+            "volume_ratio": "--",
+            "session": None,
+            "session_price": None,
+            "session_diff": None,
+            "session_pct": None,
         }
 
+        VIX_CACHE["data"] = data
+        VIX_CACHE["time"] = now
+
+        print("🧠 Using YFINANCE for VIX")
+        return data
+
     except Exception as e:
-        print("VIX ERROR:", e)  # ✅ 方便你在 Terminal 看到原因
+        print("❌ VIX error:", e)
         return {
             "ticker": "VIX",
             "price": "--",
             "change_pct": "--",
             "change_class": "",
-            "decision": "读取失败",
-            "score": "--",
             "rsi": "--",
-            "setup": "--",
             "ma20": "--",
             "ma60": "--",
+            "decision": "暂无",
+            "setup": "暂无",
+            "score": "--",
+            "boll_pos": "--",
         }
 
 
@@ -839,6 +857,10 @@ def get_market_status():
 
         spy_up = spy and float(spy["price"]) > float(spy["ma20"].replace("$",""))
         qqq_up = qqq and float(qqq["price"]) > float(qqq["ma20"].replace("$",""))
+
+        vix = get_vix_card()
+        vix_price = float(vix["price"]) if vix["price"] != "--" else 20
+        vix_text = f"{vix['price']} ({vix['change_pct']})"
 
         # === 盘前数据（用SPY）===
         spy_pre = None

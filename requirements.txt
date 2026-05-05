@@ -2,6 +2,7 @@ flask
 pandas
 numpy
 requests
+yfinance
 python-dotenv
 openai
 gunicorn

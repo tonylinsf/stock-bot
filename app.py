@@ -317,7 +317,9 @@ def get_history(ticker, days=180):
         # ===== Polygon fallback =====
         if USE_POLYGON_FALLBACK:
             try:
-                df = get_polygon_history(ticker, days)
+                df, err = get_polygon_daily_bars(ticker, days)
+                if err:
+                    raise Exception(err)
                 print(f"🟡 Using POLYGON for {ticker}")
                 return df
             except Exception as e2:

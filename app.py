@@ -358,7 +358,7 @@ def analyze_ticker(ticker):
     change_val = f"{change:+.2f}"
     change_val = price - prev_close
     ticker_yf = yf.Ticker(ticker)
-    info = ticker_yf.info
+    info = {}
 
     pre_price = None
     post_price = None
@@ -370,7 +370,7 @@ def analyze_ticker(ticker):
     pct = None
     open_signal = "暂无盘前数据"
 
-    pre_price = info.get("preMarketPrice")
+    pre_price = info.get("preMarketPrice", None)
     post_price = info.get("postMarketPrice")
 
     if pre_price:

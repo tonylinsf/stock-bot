@@ -728,6 +728,16 @@
     </div>
   </div>
 
+  {% if analysis %}
+  <div class="card">
+    <h2>公司新闻</h2>
+
+    <a href="/news/{{ analysis.ticker }}" target="_blank">
+      <button type="button">📰 查看 {{ analysis.ticker }} 新闻</button>
+    </a>
+  </div>
+  {% endif %}
+
   <div class="card mt-4">
     <div class="card-body">
       <h4>AI 建议</h4>

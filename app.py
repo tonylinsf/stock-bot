@@ -57,6 +57,99 @@ MARKET_STATUS_CACHE = {
 
 MARKET_CACHE_TTL = 600  # 10分鐘
 
+NEWS_CACHE = {}
+NEWS_CACHE_TTL = 1800
+
+
+def summarize_news_with_ai(title, summary):
+
+    try:
+
+        prompt = f"""
+请用繁体中文总结以下股票新闻。
+
+要求：
+1. 用投资者风格
+2. 简短
+3. 开头加 emoji
+4. 用 3 个重点
+5. 不要超过 80 字
+
+标题：
+{title}
+
+内容：
+{summary}
+"""
+
+        response = client.chat.completions.create(
+            model="gpt-5.1",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5,
+            max_completion_tokens=120
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as e:
+        print("AI 新闻总结失败:", e)
+        return summary
+
+
+def get_company_news(ticker, limit=5):
+    cache_key = f"{ticker}_news_{limit}"
+    cached = NEWS_CACHE.get(cache_key)
+
+    if cached and time.time() - cached["time"] < NEWS_CACHE_TTL:
+        print(f"📰 Using cached news for {ticker}")
+        return cached["data"]
+    try:
+        if not POLYGON_API_KEY:
+            return []
+
+        url = "https://api.polygon.io/v2/reference/news"
+        params = {
+            "ticker": ticker.upper(),
+            "limit": limit,
+            "order": "desc",
+            "sort": "published_utc",
+            "apiKey": POLYGON_API_KEY
+        }
+
+        r = requests.get(url, params=params, timeout=10)
+        js = r.json()
+
+        news = []
+        for item in js.get("results", []):
+        
+            raw_summary = item.get("description", "")
+
+            ai_summary = summarize_news_with_ai(
+                item.get("title", ""),
+                raw_summary
+            )
+
+            news.append({
+                "title": item.get("title", ""),
+                "publisher": item.get("publisher", {}).get("name", ""),
+                "url": item.get("article_url", ""),
+                "time": item.get("published_utc", "")[:10],
+                "summary": ai_summary
+           })
+            
+            NEWS_CACHE[cache_key] = {
+                "time": time.time(),
+                "data": news
+            }
+
+        return news
+
+    except Exception as e:
+        print("News error:", e)
+        return []
+
 
 def get_real_time_price(ticker):
     try:
@@ -357,8 +450,10 @@ def analyze_ticker(ticker):
     change = price - prev_close
     change_val = f"{change:+.2f}"
     change_val = price - prev_close
-    ticker_yf = yf.Ticker(ticker)
-    info = {}
+    try:
+        info = yf.Ticker(ticker).info
+    except:
+        info = {}
 
     pre_price = None
     post_price = None
@@ -1031,6 +1126,7 @@ def index():
 
     analysis, chart, error = None, None, None
     price = None
+    news = []
 
     market_filter = {
         "status": "manual",
@@ -1041,6 +1137,7 @@ def index():
 
     if ticker:
         analysis, chart, price, error = analyze_ticker(ticker)
+        news = get_company_news(ticker)
 
     ai_advice = None
 
@@ -1055,6 +1152,7 @@ def index():
         chart=chart,
         price=price,
         error=error,
+        news=news,
         ai_advice=ai_advice,
         market_filter=market_filter,
         top_picks=top_picks,
@@ -1132,6 +1230,16 @@ def market():
 def scan_rebound():
     picks = get_rebound_signals()
     return render_template("rebound.html", picks=picks)
+
+@app.route("/news/<ticker>")
+def stock_news(ticker):
+    news = get_company_news(ticker)
+
+    return render_template(
+        "news.html",
+        ticker=ticker.upper(),
+        news=news
+    )
 
 
 if __name__ == "__main__":

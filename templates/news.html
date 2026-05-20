@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ ticker }} 新闻</title>
+
+    <style>
+        body{
+            background:#071225;
+            color:white;
+            font-family:Arial;
+            padding:20px;
+        }
+
+        .card{
+            background:#0f1d35;
+            padding:18px;
+            border-radius:16px;
+            margin-bottom:18px;
+            border:1px solid rgba(255,255,255,0.08);
+        }
+
+        .title{
+            font-size:20px;
+            font-weight:bold;
+            margin-bottom:10px;
+        }
+
+        .meta{
+            color:#9fb3d9;
+            font-size:14px;
+            margin-bottom:10px;
+        }
+
+        .summary{
+            line-height:1.6;
+            color:#d7e3ff;
+        }
+
+        a{
+            color:#58a6ff;
+            text-decoration:none;
+        }
+
+        h1{
+            margin-bottom:25px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+<h1>📰 {{ ticker }} 最新新闻</h1>
+
+{% if news %}
+
+    {% for n in news[:5] %}
+
+    <div class="card">
+
+        <div class="title">
+            <a href="{{ n.url }}" target="_blank">
+                {{ n.title }}
+            </a>
+        </div>
+
+        <div class="meta">
+            {{ n.publisher }} ｜ {{ n.time }}
+        </div>
+
+        {% if n.summary %}
+        <div class="summary">
+            {{ n.summary }}
+        </div>
+        {% endif %}
+
+    </div>
+
+    {% endfor %}
+
+{% else %}
+
+<p>暂无新闻</p>
+
+{% endif %}
+
+</body>
+</html>

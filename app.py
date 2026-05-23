@@ -34,6 +34,7 @@ POLYGON_API_KEY = os.getenv("POLYGON_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
@@ -99,55 +100,61 @@ def summarize_news_with_ai(title, summary):
 
 
 def get_company_news(ticker, limit=5):
+
     cache_key = f"{ticker}_news_{limit}"
+
     cached = NEWS_CACHE.get(cache_key)
 
     if cached and time.time() - cached["time"] < NEWS_CACHE_TTL:
         print(f"📰 Using cached news for {ticker}")
         return cached["data"]
-    try:
-        if not POLYGON_API_KEY:
-            return []
 
-        url = "https://api.polygon.io/v2/reference/news"
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        url = "https://finnhub.io/api/v1/company-news"
+
         params = {
-            "ticker": ticker.upper(),
-            "limit": limit,
-            "order": "desc",
-            "sort": "published_utc",
-            "apiKey": POLYGON_API_KEY
+            "symbol": ticker.upper(),
+            "from": today,
+            "to": today,
+            "token": FINNHUB_API_KEY
         }
 
         r = requests.get(url, params=params, timeout=10)
+
         js = r.json()
 
         news = []
-        for item in js.get("results", []):
-        
-            raw_summary = item.get("description", "")
+
+        for item in js[:limit]:
+
+            raw_summary = item.get("summary", "")
 
             ai_summary = summarize_news_with_ai(
-                item.get("title", ""),
+                item.get("headline", ""),
                 raw_summary
             )
 
             news.append({
-                "title": item.get("title", ""),
-                "publisher": item.get("publisher", {}).get("name", ""),
-                "url": item.get("article_url", ""),
-                "time": item.get("published_utc", "")[:10],
+                "title": item.get("headline", ""),
+                "publisher": item.get("source", ""),
+                "url": item.get("url", ""),
+                "time": datetime.fromtimestamp(
+                    item.get("datetime", 0)
+                ).strftime("%Y-%m-%d"),
                 "summary": ai_summary
-           })
-            
-            NEWS_CACHE[cache_key] = {
-                "time": time.time(),
-                "data": news
-            }
+            })
+
+        NEWS_CACHE[cache_key] = {
+            "time": time.time(),
+            "data": news
+        }
 
         return news
 
     except Exception as e:
-        print("News error:", e)
+        print("Finnhub news error:", e)
         return []
 
 

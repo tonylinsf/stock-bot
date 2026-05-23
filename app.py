@@ -40,10 +40,27 @@ client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
 # 先用一批高流动性股票，避免太多垃圾信号
 UNIVERSE = [
-    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA",
-    "AVGO", "AMD", "NFLX", "PLTR", "ORCL", "CRM", "NOW",
-    "LLY", "ABBV", "ISRG", "COST", "JPM", "V", "MA",
-    "QQQ", "SPY", "DIA", "SMH", "IGV", "GLD", "IBIT"
+    # ===== Mega Cap AI =====
+    "NVDA","MSFT","META","AMZN","GOOGL","GOOG","AAPL",
+
+    # ===== AI / Software =====
+    "PLTR","SNOW","NOW","CRM","ORCL","ADBE","INTU",
+
+    # ===== Semiconductor =====
+    "AVGO","AMD","MU","QCOM","LRCX","AMAT","KLAC",
+    "ASML","TSM","ARM","INTC",
+
+    # ===== Momentum / SPMO =====
+    "JPM","GE","CAT","XOM","NFLX","CSCO",
+
+    # ===== AI Infra / Cloud =====
+    "ANET","PANW","CRWD","DDOG","MDB","NET",
+
+    # ===== Robotics / Future AI =====
+    "ISRG","TSLA","RXRX",
+
+    # ===== ETF / Market =====
+    "QQQ","SPY","SMH","IGV","SPMO"
 ]
 
 MARKET_TICKERS = ["SPY", "QQQ"]

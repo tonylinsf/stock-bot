@@ -55,9 +55,18 @@ UNIVERSE = [
 
     # ===== AI Infra / Cloud =====
     "ANET","PANW","CRWD","DDOG","MDB","NET",
+    "GLW","OKLO","POET","IREN","NBIS","LITE",
 
     # ===== Robotics / Future AI =====
     "ISRG","TSLA","RXRX",
+
+    # 医药 / 医疗
+    "LLY","NVO","VRTX","REGN",
+    "UNH","ABBV","MRK","TMO","DHR",
+
+    # 太空 / 国防
+    "RKLB","LUNR","ASTS","PL","SPIR",
+    "KTOS","AVAV","RTX","LMT","NOC"
 
     # ===== ETF / Market =====
     "QQQ","SPY","SMH","IGV","SPMO"
@@ -1122,9 +1131,9 @@ def get_rebound_signals():
             macd_hist = float(analysis["macd_hist"])
             ma20 = float(str(analysis["ma20"]).replace("$", "").replace(",", ""))
 
-            near_ma20 = abs(price - ma20) / ma20 <= 0.04  # 距离MA20 4%内
+            near_ma20 = abs(price - ma20) / ma20 <= 0.08 # 距离MA20 8%内
 
-            if 20 <= rsi <= 30 and macd_hist > 0 and near_ma20:
+            if 20 <= rsi <= 55 and macd_hist > -1.5 and near_ma20:
                 picks.append({
                     "ticker": analysis["ticker"],
                     "price": analysis["price_fmt"],

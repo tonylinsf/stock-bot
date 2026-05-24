@@ -125,6 +125,117 @@ def summarize_news_with_ai(title, summary):
         return summary
 
 
+def get_insider_data(ticker):
+
+    try:
+
+        url = "https://finnhub.io/api/v1/stock/insider-transactions"
+
+        params = {
+            "symbol": ticker.upper(),
+            "token": FINNHUB_API_KEY
+        }
+
+        r = requests.get(url, params=params, timeout=10)
+        js = r.json()
+
+        raw_data = js.get("data", [])
+
+        grouped = {}
+
+        from datetime import datetime, timedelta
+
+        # 只保留最近180天
+        cutoff = datetime.now() - timedelta(days=180)
+
+        for d in raw_data:
+
+            # =====================
+            # 日期过滤
+            # =====================
+
+            date_str = d.get("transactionDate", "")
+
+            try:
+                tx_date = datetime.strptime(
+                    date_str,
+                    "%Y-%m-%d"
+                )
+
+                if tx_date < cutoff:
+                    continue
+
+            except:
+                continue
+
+            # =====================
+            # 基本数据
+            # =====================
+
+            name = d.get("name", "")
+            date = d.get("transactionDate", "")
+
+            change = d.get("change", 0) or 0
+            share = d.get("share", 0) or 0
+            price = d.get("transactionPrice", 0) or d.get("price", 0) or 0
+
+            key = f"{name}_{date}"
+
+            # =====================
+            # 初始化
+            # =====================
+
+            if key not in grouped:
+
+                grouped[key] = {
+                    "name": name,
+                    "transactionDate": date,
+                    "buy": 0,
+                    "sell": 0,
+                    "net": 0,
+                    "price": round(float(price), 2) if price else None,
+                    "share": share
+                }
+
+            # =====================
+            # 买入卖出统计
+            # =====================
+
+            if change > 0:
+
+                grouped[key]["buy"] += int(change)
+
+            elif change < 0:
+
+                grouped[key]["sell"] += int(abs(change))
+
+            # =====================
+            # 净买卖
+            # =====================
+
+            grouped[key]["net"] = (
+                grouped[key]["buy"]
+                - grouped[key]["sell"]
+            )
+
+            grouped[key]["share"] = int(share)
+
+        result = list(grouped.values())
+
+        result.sort(
+            key=lambda x: x["transactionDate"],
+            reverse=True 
+        )
+
+        return result[:20]
+
+    except Exception as e:
+
+        print("Insider error:", e)
+
+        return []
+
+
 def get_company_news(ticker, limit=5):
 
     cache_key = f"{ticker}_news_{limit}"
@@ -1272,6 +1383,16 @@ def stock_news(ticker):
         "news.html",
         ticker=ticker.upper(),
         news=news
+    )
+
+@app.route("/insider/<ticker>")
+def insider_page(ticker):
+    data = get_insider_data(ticker)
+
+    return render_template(
+        "insider.html",
+        ticker=ticker.upper(),
+        data=data
     )
 
 

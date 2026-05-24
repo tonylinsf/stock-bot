@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+<meta charset="UTF-8">
+<title>{{ ticker }} 机构动向</title>
+
+<style>
+
+body{
+    background:#071225;
+    color:white;
+    font-family:Arial;
+    padding:20px;
+}
+
+.card{
+    background:#10203a;
+    padding:18px;
+    border-radius:16px;
+    margin-bottom:18px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>🏦 {{ ticker }} 机构动向</h1>
+
+{% if data %}
+
+    {% for d in data %}
+
+    <div class="card">
+
+        <div style="
+            display:flex;
+            gap:16px;
+            align-items:center;
+            margin-bottom:12px;
+        ">
+
+            <div style="
+                font-size:20px;
+                font-weight:700;
+            ">
+                👤 {{ d.name }}
+            </div>
+
+            <div style="
+                color:#9ca3af;
+                font-size:12px;
+                opacity:0.7;
+            ">
+                📅 {{ d.transactionDate }}
+            </div>
+
+            <div style="
+                color:#9ca3af;
+                font-size:14px;
+                margin-top:-6px;
+                margin-bottom:10px;
+            ">
+                {{ d.title }}
+            </div>
+
+        </div>
+
+
+        {% if d.net > 0 %}
+        <div style="
+            color:#4ade80;
+            font-size:28px;
+            font-weight:800;
+            margin-bottom:10px;
+        ">
+            🟢 净买入 {{ d.net }} 股
+        </div>
+
+        {% elif d.net < 0 %} 
+        <div style="
+            color:#f87171;
+            font-size:28px;
+            font-weight:800;
+            margin-bottom:10px;
+        ">
+           🔴 净卖出 {{ -d.net }} 股
+        </div>
+
+        {% else %}
+
+        <div style="
+            color:#9ca3af;
+            font-size:22px;
+            margin-bottom:10px;
+        ">
+           ⚪ 无变化
+        </div>
+
+        {% endif %}
+
+        <div style="
+            color:#facc15;
+            font-size:18px;
+        ">
+            📦 持仓：{{ d.share }} 股
+        </div>
+
+        {% if d.price %}
+        <p style="color:#93c5fd;font-size:16px;">
+        💵 成交价：${{ d.price }}
+        </p>
+        {% endif %}
+
+    </div>
+
+    {% endfor %}
+
+{% else %}
+
+<p>暂无资料</p>
+
+{% endif %}
+
+</body>
+</html>

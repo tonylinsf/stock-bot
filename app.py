@@ -267,6 +267,40 @@ def get_insider_data(ticker):
         return []
 
 
+def get_institution_data(ticker):
+
+    try:
+        import pandas as pd
+
+        path = "data/13f_latest.csv"
+        df = pd.read_csv(path)
+
+        print(df.columns)
+
+        ticker_col = "Ticker" if "Ticker" in df.columns else "ticker"
+        name_col = "NameOfIssuer" if "NameOfIssuer" in df.columns else "nameofissuer"
+        shares_col = "sshPrnamt" if "sshPrnamt" in df.columns else "shares"
+
+        rows = df[df[ticker_col].astype(str).str.upper() == ticker.upper()]
+
+        result = []
+
+        for _, r in rows.head(10).iterrows():
+
+            result.append({
+                "name": str(r.get(name_col, "Institution")),
+                "shares": int(float(r.get(shares_col, 0))),
+                "change": 0,
+                "date": "13F 最新季度"
+            })
+
+        return result
+
+    except Exception as e:
+        print("SEC 13F error:", e)
+        return []
+
+
 def get_company_news(ticker, limit=5):
 
     cache_key = f"{ticker}_news_{limit}"
@@ -544,7 +578,7 @@ alpaca_client = StockHistoricalDataClient(
     ALPACA_SECRET_KEY
 )
 
-def get_history(ticker, days=180):
+def get_history(ticker, days=180, interval="1d"):
     try:
         # ===== Alpaca =====
         end = datetime.now() - timedelta(minutes=16)
@@ -552,7 +586,7 @@ def get_history(ticker, days=180):
 
         request = StockBarsRequest(
             symbol_or_symbols=ticker,
-            timeframe=TimeFrame.Day,
+            timeframe=TimeFrame.Minute if interval == "5m" else TimeFrame.Day,
             start=start,
             end=end,
             feed=DataFeed.IEX,
@@ -594,6 +628,78 @@ def get_history(ticker, days=180):
                 print(f"❌ Polygon failed: {ticker}", e2)
 
         return None
+
+
+def get_money_flow(ticker):
+
+    try:
+
+        bars = get_history(ticker, days=1, interval="5m")
+
+        if bars is None or bars.empty:
+            return {
+                "buy_flow": "$0",
+                "sell_flow": "$0",
+                "signal": "暂无数据"
+            }
+
+        buy_flow = 0
+        sell_flow = 0
+
+        for idx, row in bars.iterrows():
+
+            open_price = float(row["Open"])
+            close_price = float(row["Close"])
+            volume = float(row["Volume"])
+
+            avg_price = (open_price + close_price) / 2
+
+            money = avg_price * volume
+
+            # 上涨K线 → 买盘
+            if close_price > open_price:
+                buy_flow += money
+
+            # 下跌K线 → 卖盘
+            elif close_price < open_price:
+                sell_flow += money
+
+        # format
+        def fmt(v):
+
+            if v >= 1_000_000_000:
+                return f"${v/1_000_000_000:.2f}B"
+
+            elif v >= 1_000_000:
+                return f"${v/1_000_000:.2f}M"
+
+            return f"${v:,.0f}"
+
+        # signal
+        if buy_flow > sell_flow * 1.2:
+            signal = "🔥 资金偏多"
+
+        elif sell_flow > buy_flow * 1.2:
+            signal = "⚠️ 资金流出"
+
+        else:
+            signal = "🤝 多空平衡"
+
+        return {
+            "buy_flow": fmt(buy_flow),
+            "sell_flow": fmt(sell_flow),
+            "signal": signal
+        }
+
+    except Exception as e:
+
+        print("资金流错误:", e)
+
+        return {
+            "buy_flow": "$0",
+            "sell_flow": "$0",
+            "signal": "暂无数据"
+        }
 
 
 def analyze_ticker(ticker):
@@ -694,6 +800,7 @@ def analyze_ticker(ticker):
     bb_lower = float(last["BB_LOWER"])
     vol = float(last["Volume"])
     vol20 = float(last["VOL20"])
+    money_flow = get_money_flow(ticker)
 
     high_52w = float(df["High"].tail(252).max())
     low_52w = float(df["Low"].tail(252).min())
@@ -867,6 +974,9 @@ def analyze_ticker(ticker):
         "risk_color": risk_color,
         "rsi": round(rsi, 2),
         "macd_hist": round(macd_hist, 4),
+        "buy_flow": money_flow["buy_flow"],
+        "sell_flow": money_flow["sell_flow"],
+        "flow_signal": money_flow["signal"],
         "ma20": fmt_money(ma20),
         "ma50": fmt_money(ma50),
         "ma60": fmt_money(ma60),
@@ -1419,6 +1529,7 @@ def stock_news(ticker):
 @app.route("/insider/<ticker>")
 def insider_page(ticker):
     insider = get_insider_data(ticker)
+    institution = []
 
     data = insider["data"]
     summary = insider["summary"]
@@ -1427,7 +1538,8 @@ def insider_page(ticker):
         "insider.html",
         ticker=ticker.upper(),
         data=data,
-        summary=summary
+        summary=summary,
+        institution=institution
     )
 
 

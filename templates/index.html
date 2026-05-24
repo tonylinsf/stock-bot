@@ -697,6 +697,20 @@
             {{ analysis.boll_text or analysis.boll_pos }}
           </td>
         </tr>
+        <tr>
+            <td>资金流向</td>
+            <td>
+                <div style="color:#4ade80;">
+                    🟢 买入估算：{{ analysis.buy_flow }}
+                </div>
+                <div style="color:#f87171;">
+                    🔴 卖出估算：{{ analysis.sell_flow }}
+                </div>
+                <div style="margin-top:6px;color:#facc15;font-weight:bold;">
+                    {{ analysis.flow_signal }}
+                </div>
+            </td>
+        </tr>
       </tbody>
     </table>
   </div>

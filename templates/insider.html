@@ -57,6 +57,76 @@ line-height:2;
 
 {% if data %}
 
+<div class="card" style="margin-top:20px;">
+    <h2 style="color:#facc15;">
+        🏦 机构持仓变化
+    </h2>
+
+    {% if institution %}
+        {% for i in institution %}
+
+        <div style="margin-top:14px;">
+
+            <div style="
+                color:white;
+                font-size:20px;
+                font-weight:bold;
+            ">
+                {{ i.name }}
+            </div>
+
+            {% if i.change > 0 %}
+            <div style="
+                color:#4ade80;
+                font-size:28px;
+                font-weight:800;
+            ">
+                增持 {{ "{:,}".format(i.change) }} 股
+            </div>
+
+            {% elif i.change < 0 %}
+            <div style="
+                color:#f87171;
+                font-size:28px;
+                font-weight:800;
+            ">
+                减持 {{ "{:,}".format(-i.change) }} 股
+            </div>
+            {% endif %}
+
+            <div style="
+                color:#facc15;
+                font-size:16px;
+            ">
+                📦 持仓：
+                {{ "{:,}".format(i.shares) }} 股
+            </div>
+
+            <div style="
+                color:#9ca3af;
+                font-size:13px;
+            ">
+                {{ i.date }}
+            </div>
+
+            <hr style="
+                border-color:#1e3a8a;
+                margin-top:12px;
+            ">
+
+        </div>
+
+        {% endfor %}
+
+    {% else %}
+
+    <div style="color:#9ca3af;">
+        暂无机构数据
+    </div>
+
+    {% endif %}
+</div>
+
     {% for d in data %}
 
     <div class="card">

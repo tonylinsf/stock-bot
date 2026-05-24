@@ -125,7 +125,7 @@ def summarize_news_with_ai(title, summary):
         return summary
 
 
-def get_insider_data(ticker):
+def get_insider_data(ticker):   
 
     try:
 
@@ -148,86 +148,117 @@ def get_insider_data(ticker):
         # 只保留最近180天
         cutoff = datetime.now() - timedelta(days=180)
 
-        for d in raw_data:
+        hist = get_history(ticker, days=220)
 
-            # =====================
-            # 日期过滤
-            # =====================
+        close_map = {}
+
+        if hist is not None and not hist.empty:
+            hist = hist.copy()
+
+            hist.index = hist.index.strftime("%Y-%m-%d")
+
+            for idx, row in hist.iterrows():
+                close_map[idx] = float(row["Close"])
+
+        buy_count = 0
+        sell_count = 0
+        buy_value = 0
+        sell_value = 0
+
+        for d in raw_data:
 
             date_str = d.get("transactionDate", "")
 
             try:
-                tx_date = datetime.strptime(
-                    date_str,
-                    "%Y-%m-%d"
-                )
-
+                tx_date = datetime.strptime(date_str, "%Y-%m-%d")
                 if tx_date < cutoff:
                     continue
-
             except:
                 continue
 
-            # =====================
-            # 基本数据
-            # =====================
-
             name = d.get("name", "")
-            date = d.get("transactionDate", "")
+            title = (d.get("title") or "").upper()
 
             change = d.get("change", 0) or 0
             share = d.get("share", 0) or 0
-            price = d.get("transactionPrice", 0) or d.get("price", 0) or 0
+            price = (
+                d.get("transactionPrice")
+                or d.get("price")
+                or d.get("transactionPricePerShare")
+                or None
+            )
 
-            key = f"{name}_{date}"
+            is_estimated = False
 
-            # =====================
-            # 初始化
-            # =====================
+            if price:
+                price = round(float(price), 2)
+            else:
+                price = close_map.get(date_str)
+
+                if price:
+                    price = round(float(price), 2)
+                    is_estimated = True
+                else:
+                    price = None
+
+            key = f"{name}_{date_str}"
 
             if key not in grouped:
-
                 grouped[key] = {
                     "name": name,
-                    "transactionDate": date,
+                    "title": title,
+                    "transactionDate": date_str,
                     "buy": 0,
                     "sell": 0,
                     "net": 0,
-                    "price": round(float(price), 2) if price else None,
-                    "share": share
+                    "share": share,
+                    "price": price,
+                    "estimated": is_estimated
                 }
 
-            # =====================
-            # 买入卖出统计
-            # =====================
+           # ===== summary =====
 
             if change > 0:
-
                 grouped[key]["buy"] += int(change)
 
-            elif change < 0:
+                buy_count += 1
 
+                try:
+                    price_value = float(price)
+                except:
+                    price_value = 0
+
+                if price_value > 0:
+                    buy_value += abs(change) * price_value
+
+            elif change < 0:
                 grouped[key]["sell"] += int(abs(change))
 
-            # =====================
-            # 净买卖
-            # =====================
+                sell_count += 1
 
-            grouped[key]["net"] = (
-                grouped[key]["buy"]
-                - grouped[key]["sell"]
-            )
+                try:
+                    price_value = float(price)
+                except:
+                    price_value = 0
 
-            grouped[key]["share"] = int(share)
+                if price_value > 0:
+                    sell_value += abs(change) * price_value
 
-        result = list(grouped.values())
+            grouped[key]["share"] = share
+            grouped[key]["net"] = grouped[key]["buy"] - grouped[key]["sell"]
 
-        result.sort(
-            key=lambda x: x["transactionDate"],
-            reverse=True 
-        )
+        summary = {
+            "buy_count": buy_count,
+            "sell_count": sell_count,
+            "buy_value": buy_value,
+            "sell_value": sell_value,
+            "total_value": buy_value + sell_value
+        }
 
-        return result[:20]
+        return {
+            "data": list(grouped.values())[:20],
+            "summary": summary
+        }
 
     except Exception as e:
 
@@ -1387,12 +1418,16 @@ def stock_news(ticker):
 
 @app.route("/insider/<ticker>")
 def insider_page(ticker):
-    data = get_insider_data(ticker)
+    insider = get_insider_data(ticker)
+
+    data = insider["data"]
+    summary = insider["summary"]
 
     return render_template(
         "insider.html",
         ticker=ticker.upper(),
-        data=data
+        data=data,
+        summary=summary
     )
 
 

@@ -867,6 +867,59 @@ def analyze_ticker(ticker):
     future_low = round(price - atr * 5 / trend_factor, 2)
     future_high = round(price + atr * 5 * trend_factor, 2)
 
+    # ===== 趋势强度评分 =====
+    trend_score = 50
+
+    if close > ma20:
+        trend_score += 10
+    else:
+        trend_score -= 10
+
+    if close > ma60:
+        trend_score += 10
+    else:
+        trend_score -= 10
+
+    if rsi >= 60:
+        trend_score += 10
+    elif rsi < 40:
+        trend_score -= 10
+
+    if macd_hist > 0:
+        trend_score += 10
+    else:
+        trend_score -= 5
+
+    if vol20 and vol > vol20:
+        trend_score += 5
+
+    trend_score = max(0, min(100, trend_score))
+
+    if trend_score >= 75:
+        trend_label = "强势"
+    elif trend_score >= 55:
+        trend_label = "偏强"
+    elif trend_score >= 40:
+        trend_label = "中性"
+    else:
+        trend_label = "偏弱"
+
+    # ===== 主力状态 =====
+    if trend_score >= 70 and close > ma20 and vol > vol20:
+        main_force = "🟢 主力吸筹"
+
+    elif trend_score >= 55 and close > ma20:
+        main_force = "🟡 温和流入"
+
+    elif trend_score < 40 and close < ma20:
+       main_force = "🔴 主力流出"
+
+    elif atr_pct >= 5:
+        main_force = "⚠️ 高波动洗盘"
+
+    else:
+        main_force = "⚪ 观望"    
+
     score = 0
     notes = []
 
@@ -1044,6 +1097,9 @@ def analyze_ticker(ticker):
         "volatility_level": volatility_level,
         "atr_pct": atr_pct,
         "atr": atr,
+        "trend_score": trend_score,
+        "trend_label": trend_label,
+        "main_force": main_force,
         "macd_hist": round(macd_hist, 4),
         "buy_flow": money_flow["buy_flow"],
         "sell_flow": money_flow["sell_flow"],

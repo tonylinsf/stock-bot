@@ -737,13 +737,46 @@
 
                     <div style="
                         color:#4ade80;
-                        font-size:20px;
+                        font-size:15px;
+                        margin-top:6px;
+                    ">
+                        保守：
+                        ${{ analysis.safe_low }}
+                        →
+                        ${{ analysis.safe_high }}
+                    </div>
+
+                    <div style="
+                        color:#93c5fd;
+                        font-size:18px;
                         font-weight:700;
                         margin-top:6px;
                     ">
+                        正常：
                         ${{ analysis.future_low }}
                         →
                         ${{ analysis.future_high }}
+                    </div>
+
+                    <div style="
+                        color:#f87171;
+                        font-size:15px;
+                        margin-top:6px;
+                    ">
+                        极端：
+                        ${{ analysis.extreme_low }}
+                        →
+                        ${{ analysis.extreme_high }}
+                    </div>
+
+                    <div style="
+                        color:#facc15;
+                        margin-top:8px;
+                        font-size:13px;
+                    ">
+                        波动等级：
+                        {{ analysis.volatility_level }}
+                        (ATR {{ analysis.atr_pct }}%)
                     </div>
 
                     <div style="

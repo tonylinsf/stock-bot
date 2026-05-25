@@ -820,6 +820,23 @@ def analyze_ticker(ticker):
     future_low = round(price - atr * 5, 2)
     future_high = round(price + atr * 5, 2)
 
+    safe_low = round(price - atr * 2, 2)
+    safe_high = round(price + atr * 2, 2)
+
+    extreme_low = round(price - atr * 10, 2)
+    extreme_high = round(price + atr * 10, 2)
+
+    atr_pct = round((atr / price) * 100, 2)
+
+    if atr_pct < 2:
+        volatility_level = "低波动"
+
+    elif atr_pct < 5:
+        volatility_level = "中等波动"
+
+    else:
+        volatility_level = "高波动"
+
     score = 0
     notes = []
 
@@ -990,6 +1007,12 @@ def analyze_ticker(ticker):
         "rsi": round(rsi, 2),
         "future_low": future_low,
         "future_high": future_high,
+        "safe_low": safe_low,
+        "safe_high": safe_high,
+        "extreme_low": extreme_low,
+        "extreme_high": extreme_high,
+        "volatility_level": volatility_level,
+        "atr_pct": atr_pct,
         "atr": atr,
         "macd_hist": round(macd_hist, 4),
         "buy_flow": money_flow["buy_flow"],

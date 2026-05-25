@@ -892,6 +892,35 @@ def analyze_ticker(ticker):
     price = real_price if real_price else close
     prev_close = float(prev["Close"])
     change_pct = (price / prev_close - 1) * 100 if price and prev_close else 0
+
+    # Relative Strength（相对大盘强弱）
+    spy_df = get_history("SPY", days=10, interval="1d")
+
+    if spy_df is not None and not spy_df.empty and len(spy_df) >= 2:
+        spy_last = float(spy_df["Close"].iloc[-1])
+        spy_prev = float(spy_df["Close"].iloc[-2])
+
+        spy_change_pct = ((spy_last - spy_prev) / spy_prev) * 100
+    else:
+        spy_change_pct = 0
+
+    relative_strength = change_pct - spy_change_pct
+
+    if relative_strength >= 2:
+        relative_signal = "🔥 明显强于大盘"
+
+    elif relative_strength >= 0.8:
+        relative_signal = "🟢 强于大盘"
+
+    elif relative_strength <= -2:
+        relative_signal = "⚠️ 明显弱于大盘"
+
+    elif relative_strength <= -0.8:
+        relative_signal = "🔴 弱于大盘"
+
+    else:
+        relative_signal = "⚪ 跟随大盘"
+
     change = price - prev_close
     change_val = f"{change:+.2f}"
     change_val = price - prev_close
@@ -962,6 +991,7 @@ def analyze_ticker(ticker):
     bb_upper = float(last["BB_UPPER"])
     bb_mid = float(last["BB_MID"])
     bb_lower = float(last["BB_LOWER"])
+    boll_pct = ((price - bb_lower) / (bb_upper - bb_lower)) * 100
     vol = float(last["Volume"])
     vol20 = float(last["VOL20"])
     money_flow = get_money_flow(ticker)
@@ -978,6 +1008,22 @@ def analyze_ticker(ticker):
 
     momentum = ((price - ma20) / ma20) * 100
     volume_ratio = vol / vol20 if vol20 > 0 else 1
+    # 放量行为判断
+    if volume_ratio >= 1.8 and price > ma20 and momentum > 2:
+        volume_signal = "🔥 放量突破"
+
+    elif volume_ratio >= 1.5 and change_pct < 0:
+        volume_signal = "⚠️ 放量出货"
+
+    elif volume_ratio < 0.8 and momentum > 0:
+        volume_signal = "🟡 缩量洗盘"
+
+    elif volume_ratio < 0.8:
+        volume_signal = "⚪ 缩量观望"
+
+    else:
+        volume_signal = "正常"
+
     momentum = ((price - ma20) / ma20) * 100
     smart_money = estimate_smart_money(
         price=price,
@@ -985,6 +1031,55 @@ def analyze_ticker(ticker):
         volume_ratio=volume_ratio,
         momentum=momentum
     )
+
+    # ===== 综合评分 =====
+    final_score = 0
+
+    # 趋势
+    if price > ma20:
+        final_score += 15
+
+    if price > ma60:
+        final_score += 15
+
+    # RSI
+    if 40 <= rsi <= 65:
+        final_score += 15
+
+    elif rsi > 75:
+        final_score -= 10
+
+    # BOLL
+    if 30 <= boll_pct <= 70:
+        final_score += 15
+
+    elif boll_pct > 85:
+        final_score -= 10
+
+    # 相对强弱
+    if relative_strength > 0.8:
+        final_score += 15
+
+    elif relative_strength < -0.8:
+        final_score -= 10
+
+    # 主力
+    if smart_money["strength"] >= 60:
+        final_score += 20
+
+    elif smart_money["strength"] <= 30:
+        final_score -= 10
+
+    final_score = max(0, min(100, final_score))
+
+    if final_score >= 75:
+        final_decision = "🟢 可关注买入"
+
+    elif final_score >= 55:
+        final_decision = "🟡 观察等回调"
+
+    else:
+        final_decision = "🔴 暂时观望"
 
     atr = calc_atr(df)
 
@@ -1285,6 +1380,12 @@ def analyze_ticker(ticker):
         "smart_money_alert": smart_money["alert"],
         "smart_money_risk": smart_money["risk_warning"],
         "smart_money_rotation": smart_money["rotation"],
+        "relative_strength": round(relative_strength, 2),
+        "relative_signal": relative_signal,
+        "volume_signal": volume_signal,
+        "final_score": final_score,
+        "final_decision": final_decision,
+        "tech_signal": tech_signal,
         "flow_signal": "",
         "ma20": fmt_money(ma20),
         "ma50": fmt_money(ma50),

@@ -687,9 +687,53 @@ def get_money_flow(ticker):
         print("资金流错误:", e)
 
         return {
-            "buy_flow": "$0",
-            "sell_flow": "$0"
+            "buy_flow": "暂无数据",
+            "sell_flow": "暂无数据"
         }
+    
+
+def get_intraday_signal(ticker):
+    bars = get_history(ticker, days=1, interval="5m")
+
+    if bars is None or bars.empty or len(bars) < 3:
+        print("No intraday:", ticker)
+        return None
+    
+    print("Intraday loaded:", ticker)
+    
+    total_volume = bars["Volume"].sum()
+
+    if total_volume <= 0:
+        return None
+
+    vwap = (bars["Close"] * bars["Volume"]).sum() / total_volume
+
+    first_price = float(bars["Close"].iloc[0])
+    last_price = float(bars["Close"].iloc[-1])
+
+    momentum = ((last_price - first_price) / first_price) * 100
+
+    buy_flow = 0
+    sell_flow = 0
+
+    for _, row in bars.iterrows():
+        avg_price = (float(row["Open"]) + float(row["Close"])) / 2
+        money = avg_price * float(row["Volume"])
+
+        if row["Close"] > row["Open"]:
+            buy_flow += money
+        elif row["Close"] < row["Open"]:
+            sell_flow += money
+
+    flow_ratio = buy_flow / sell_flow if sell_flow > 0 else 999
+
+    return {
+        "vwap": vwap,
+        "momentum": momentum,
+        "buy_flow_raw": buy_flow,
+        "sell_flow_raw": sell_flow,
+        "flow_ratio": flow_ratio
+    }    
     
 
 def estimate_smart_money(price, vwap, volume_ratio, momentum):
@@ -922,11 +966,17 @@ def analyze_ticker(ticker):
     vol20 = float(last["VOL20"])
     money_flow = get_money_flow(ticker)
 
-    # 主力状态推测
-    vwap = (
-        (df["Close"].tail(20) * df["Volume"].tail(20)).sum()
-        / df["Volume"].tail(20).sum()
-    )
+    intraday = get_intraday_signal(ticker)
+    if intraday:
+        vwap = intraday["vwap"]
+        momentum = intraday["momentum"]
+    else:
+        vwap = (
+            (df["Close"].tail(20) * df["Volume"].tail(20)).sum()
+            / df["Volume"].tail(20).sum()
+        )
+
+    momentum = ((price - ma20) / ma20) * 100
     volume_ratio = vol / vol20 if vol20 > 0 else 1
     momentum = ((price - ma20) / ma20) * 100
     smart_money = estimate_smart_money(

@@ -632,29 +632,6 @@
         Avg Vol: {{ analysis.vol20 }}
       </div>
     </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>代码</th>
-          <th>价格</th>
-          <th>涨跌</th>
-          <th>决定</th>
-          <th>Setup</th>
-          <th>分数</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>{{ analysis.ticker }}</td>
-          <td>{{ analysis.price_fmt }}</td>
-          <td>{{ analysis.change_pct }}</td>
-          <td><b>{{ analysis.decision }}</b></td>
-          <td>{{ analysis.setup }}</td>
-          <td>{{ analysis.score }}/6</td>
-        </tr>
-      </tbody>
-    </table>
   </div>
 
   <div class="card">
@@ -688,7 +665,7 @@
           <td>{{ analysis.low_52w }}</td>
         </tr>
         <tr>
-            <td style="width:90px;">技术信号</td>
+            <td style="width:120px;">技术信号</td>
             <td colspan="3" style="font-size:13px;">
                 <span style="color:#4ade80;font-weight:700;">
                     {{ analysis.tech_signal }}
@@ -704,13 +681,13 @@
             </td>
         </tr>
         <tr>
-            <td style="width:90px;">BOLL</td>
+            <td style="width:120px;">BOLL</td>
             <td colspan="3" class="boll-line" style="color: {{ analysis.boll_color }};">
                 {{ analysis.boll_text or analysis.boll_pos }}
             </td>
         </tr>
         <tr>
-            <td style="width:90px;">相对强弱</td>
+            <td style="width:120px;">相对强弱</td>
             <td colspan="3">
                 <span style="color:#4ade80;font-weight:700;">
                     🟢 强于大盘
@@ -728,7 +705,7 @@
           </td>
         </tr>
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:90px;">波动等级</td>
+            <td style="color:#93c5fd;font-weight:700;width:120px;">波动等级</td>
             <td colspan="3">
                 <span style="color:#facc15;font-weight:700;">
                     {{ analysis.volatility_level }}
@@ -740,7 +717,7 @@
         </tr>
 
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:90px;">波动区间</td>
+            <td style="color:#93c5fd;font-weight:700;width:120px;">波动区间</td>
             <td colspan="3">
                 <span style="color:#4ade80;">70%：${{ analysis.safe_low }} → ${{ analysis.safe_high }}</span>
                 <br>
@@ -751,7 +728,7 @@
         </tr>
 
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:90px;">资金流向</td>
+            <td style="color:#93c5fd;font-weight:700;width:120px;">资金流向</td>
             <td colspan="3">
                 <span style="color:#4ade80;">买入：{{ analysis.buy_flow }}</span>
                 &nbsp;&nbsp;
@@ -760,7 +737,7 @@
         </tr>
 
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:90px;">主力状态</td>
+            <td style="color:#93c5fd;font-weight:700;width:120px;">主力状态</td>
             <td colspan="3">
                 <span style="color:#4ade80;font-weight:700;">
                     {{ analysis.smart_money_status }}
@@ -775,7 +752,7 @@
         </tr>
 
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:90px;">主力行为</td>
+            <td style="color:#93c5fd;font-weight:700;width:120px;">主力行为</td>
             <td colspan="3">
                 <span style="color:#facc15;">
                     {{ analysis.smart_money_behavior }}
@@ -796,32 +773,34 @@
                 {% endif %}
             </td>
         </tr>
-  </div>
-
-  <div class="card">
-    <h2 class="section-title">交易计划</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>买入低</th>
-          <th>买入高</th>
-          <th>止损</th>
-          <th>目标1</th>
-          <th>目标2</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>{{ analysis.buy_low }}</td>
-          <td>{{ analysis.buy_high }}</td>
-          <td>{{ analysis.stop }}</td>
-          <td>{{ analysis.target1 }}</td>
-          <td>{{ analysis.target2 }}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div style="color: {{ analysis.risk_color }}">
-      风险等级：{{ analysis.risk }}
+        </tbody>
+        </table>
+        <div style="overflow-x:auto; width:100%;">
+            <table class="market-table" style="min-width:480px;">
+                <thead>
+                    <tr>
+                        <th>买入低</th>
+                        <th>买入高</th>
+                        <th>止损</th>
+                        <th>目标1</th>
+                        <th>目标2</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ analysis.buy_low }}</td>
+                        <td>{{ analysis.buy_high }}</td>
+                        <td>{{ analysis.stop }}</td>
+                        <td>{{ analysis.target1 }}</td>
+                        <td>{{ analysis.target2 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+       
+        <div style="color: {{ analysis.risk_color }}">
+            风险等级：{{ analysis.risk }}
+        </div>
     </div>
   </div>
 
@@ -870,7 +849,7 @@
   </div>
   {% endif %}
 
-  <div class="card">
+  <div class="card" style="display:none;">
     <h2 class="section-title">🔥 AI低位反弹扫描结果</h2>
     {% if top_picks %}
     <table>

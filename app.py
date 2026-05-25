@@ -647,8 +647,8 @@ def get_money_flow(ticker):
 
         if bars is None or bars.empty:
             return {
-                "buy_flow": "$0",
-                "sell_flow": "$0"
+                "buy_flow": "暂无数据",
+                "sell_flow": "暂无数据"
             }
 
         buy_flow = 0
@@ -723,9 +723,102 @@ def estimate_smart_money(price, vwap, volume_ratio, momentum):
     else:
         status = "🟡 主力观望"
 
+    # 主力强度评分
+    strength = 50
+    strength += score * 20
+
+    # 成交量确认
+    if volume_ratio > 1.5:
+        strength += 15
+
+    elif volume_ratio < 0.8:
+        strength -= 10
+
+    # Momentum加强
+    if momentum > 2:
+        strength += 10
+
+    elif momentum < -2:
+        strength -= 10
+
+    # 限制范围
+    strength = max(10, min(100, strength))  
+
+    if volume_ratio > 1.5:
+        confidence = "高"
+
+    elif volume_ratio > 1:
+        confidence = "中"
+
+    else:
+        confidence = "低" 
+
+    # 主力行为判断
+    if volume_ratio > 1.2 and momentum > 1 and price > vwap:
+        behavior = "🔥 放量吸筹"
+    elif momentum > 1 and price > vwap:
+        behavior = "🟢 趋势吸筹"
+    elif volume_ratio > 1.2 and momentum < -1 and price < vwap:
+        behavior = "🔴 放量派发"
+    elif volume_ratio < 0.8 and momentum < 0 and price < vwap:
+        behavior = "🟡 缩量洗盘"
+    else:
+        behavior = "⚪ 资金观望"    
+
+    # 主力异动
+    alert = ""
+
+    if volume_ratio > 2 and momentum > 2:
+        alert = "🚨 主力异动：放量拉升"
+
+    elif volume_ratio > 2 and momentum < -2:
+        alert = "⚠️ 主力异常撤退：放量下跌"
+
+    elif volume_ratio > 1.5 and price > vwap:
+        alert = "🔥 主力资金活跃"
+
+    elif volume_ratio < 0.7:
+        alert = "⚪ 市场交投清淡"    
+
+    # 风险提示
+    risk_warning = ""
+
+    if momentum > 3 and volume_ratio < 1:
+        risk_warning = "⚠️ 短线过热，谨慎追高"
+
+    elif momentum < -3 and volume_ratio > 1.5:
+        risk_warning = "⚠️ 放量下跌，注意风险"
+
+    elif price < vwap and momentum < -2:
+        risk_warning = "⚠️ 跌破VWAP，短线偏弱"
+
+    elif volume_ratio < 0.6:
+        risk_warning = "⚪ 成交量极低，观望为主" 
+
+    # 主力转向
+    rotation = ""
+
+    if score >= 1 and momentum > 1:
+        rotation = "🔄 主力转强：资金开始回流"
+
+    elif score <= -1 and momentum < -1:
+        rotation = "⚠️ 主力转弱：资金持续流出"
+
+    elif score > 0 and momentum < 0:
+        rotation = "🟡 主力分歧：趋势转弱"
+
+    elif score < 0 and momentum > 0:
+        rotation = "🟢 主力试盘：可能止跌"       
+
     return {
         "status": status,
-        "reasons": reasons
+        "reasons": reasons,
+        "strength": strength,
+        "confidence": confidence,
+        "behavior": behavior,
+        "alert": alert,
+        "risk_warning": risk_warning,
+        "rotation": rotation
     }
 
 
@@ -1136,6 +1229,12 @@ def analyze_ticker(ticker):
         "sell_flow": money_flow["sell_flow"],
         "smart_money_status": smart_money["status"],
         "smart_money_reasons": smart_money["reasons"],
+        "smart_money_strength": smart_money["strength"],
+        "smart_money_confidence": smart_money["confidence"],
+        "smart_money_behavior": smart_money["behavior"],
+        "smart_money_alert": smart_money["alert"],
+        "smart_money_risk": smart_money["risk_warning"],
+        "smart_money_rotation": smart_money["rotation"],
         "flow_signal": "",
         "ma20": fmt_money(ma20),
         "ma50": fmt_money(ma50),

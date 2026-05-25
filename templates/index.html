@@ -770,18 +770,9 @@
                 </div>
 
                 <!-- 右边：资金流向 -->
-                <div style="
-                    flex:1;
-                    min-width:220px;
-                    padding-left:14px;
-                ">
+                <div style="flex:1;min-width:220px;padding-left:14px;">
 
-                    <div style="
-                        color:#facc15;
-                        font-size:20px;
-                        font-weight:700; 
-                        margin-bottom:10px;
-                    ">
+                    <div style="color:#facc15;font-size:20px;font-weight:700; margin-bottom:10px;">
                         💰 资金流向
                     </div>
 
@@ -793,33 +784,49 @@
                         🔴 卖出估算：{{ analysis.sell_flow }}
                     </div>
 
-                    <div style="
-                        margin-top:15px;
-                        color:#facc15;
-                        font-size:20px;
-                        font-weight:700;
-                    ">
+                    <div style="margin-top:15px;color:#facc15;font-size:20px;font-weight:700;">
                         🧠 主力状态推测
                     </div>
 
-                    <div style="
-                        margin-top:8px;
-                        color:#4ade80;
-                        font-size:18px;
-                        font-weight:700;
-                    ">
+                    <div style="margin-top:8px;color:#4ade80;font-size:18px;font-weight:700;">
                         {{ analysis.smart_money_status }}
                     </div>
 
-                    <div style="
-                        color:#cbd5e1;
-                        font-size:15px;
-                        line-height:1.6;
-                    ">
+                    <div style="color:#cbd5e1;font-size:15px;line-height:1.6;">
                         {% for reason in analysis.smart_money_reasons %}
                             <div>• {{ reason }}</div>
                         {% endfor %}
                     </div>
+
+                    <div style="color:#facc15;font-size:15px;margin-top:5px;">
+                        主力强度：{{ analysis.smart_money_strength }}/100
+                    </div>
+
+                    <div style="color:#cbd5e1;font-size:14px;">
+                        确认度：{{ analysis.smart_money_confidence }}
+                    </div>
+
+                    <div style="color:#facc15;font-size:14px;">
+                        主力行为：{{ analysis.smart_money_behavior }}
+                    </div>
+
+                    {% if analysis.smart_money_alert %} 
+                    <div style="margin-top:6px;color:#facc15;font-size:14px;font-weight:700;">
+                       {{ analysis.smart_money_alert }}
+                    </div>
+                    {% endif %}
+
+                    {% if analysis.smart_money_risk %}
+                    <div style="margin-top:6px;color:#fb7185;font-size:14px;font-weight:700;">
+                       {{ analysis.smart_money_risk }}
+                    </div>
+                    {% endif %}
+
+                    {% if analysis.smart_money_rotation %}
+                    <div style="margin-top:6px;color:#38bdf8;font-size:14px;font-weight:700;">
+                       {{ analysis.smart_money_rotation }}
+                    </div>
+                    {% endif %}
                 </div>   
             </div>  
       </tbody>

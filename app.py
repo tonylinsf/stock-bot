@@ -817,9 +817,6 @@ def analyze_ticker(ticker):
     high_52w = float(df["High"].tail(252).max())
     low_52w = float(df["Low"].tail(252).min())
 
-    future_low = round(price - atr * 5, 2)
-    future_high = round(price + atr * 5, 2)
-
     safe_low = round(price - atr * 2, 2)
     safe_high = round(price + atr * 2, 2)
 
@@ -836,6 +833,39 @@ def analyze_ticker(ticker):
 
     else:
         volatility_level = "高波动"
+
+    # ===== 趋势因子 =====
+    trend_factor = 1.0
+
+    # 站上 MA20
+    if close > ma20:
+        trend_factor += 0.2
+
+    # 站上 MA60
+    if close > ma60:
+        trend_factor += 0.2
+
+    # RSI 偏强
+    if rsi >= 60:
+        trend_factor += 0.2
+
+    # MACD 转强
+    if macd_hist > 0:
+        trend_factor += 0.2
+
+    # RSI 偏弱
+    if rsi < 40:
+        trend_factor -= 0.2
+
+    # 跌破 MA20
+    if close < ma20:
+        trend_factor -= 0.2
+
+    # 最低保护
+    trend_factor = max(trend_factor, 0.5)
+
+    future_low = round(price - atr * 5 / trend_factor, 2)
+    future_high = round(price + atr * 5 * trend_factor, 2)
 
     score = 0
     notes = []

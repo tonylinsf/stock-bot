@@ -794,12 +794,31 @@
                     </div>
 
                     <div style="
-                        margin-top:10px;
+                        margin-top:15px;
                         color:#facc15;
-                        font-size:18px;
-                        font-weight:700; 
+                        font-size:20px;
+                        font-weight:700;
                     ">
-                        {{ analysis.main_force }}
+                        🧠 主力状态推测
+                    </div>
+
+                    <div style="
+                        margin-top:8px;
+                        color:#4ade80;
+                        font-size:18px;
+                        font-weight:700;
+                    ">
+                        {{ analysis.smart_money_status }}
+                    </div>
+
+                    <div style="
+                        color:#cbd5e1;
+                        font-size:15px;
+                        line-height:1.6;
+                    ">
+                        {% for reason in analysis.smart_money_reasons %}
+                            <div>• {{ reason }}</div>
+                        {% endfor %}
                     </div>
                 </div>   
             </div>  

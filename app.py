@@ -642,75 +642,91 @@ def get_history(ticker, days=180, interval="1d"):
 
 
 def get_money_flow(ticker):
-
     try:
-
         bars = get_history(ticker, days=1, interval="5m")
 
         if bars is None or bars.empty:
             return {
                 "buy_flow": "$0",
-                "sell_flow": "$0",
-                "signal": "暂无数据"
+                "sell_flow": "$0"
             }
 
         buy_flow = 0
         sell_flow = 0
 
         for idx, row in bars.iterrows():
-
             open_price = float(row["Open"])
             close_price = float(row["Close"])
             volume = float(row["Volume"])
 
             avg_price = (open_price + close_price) / 2
-
             money = avg_price * volume
 
-            # 上涨K线 → 买盘
+            # 上涨K线 → 买盘估算
             if close_price > open_price:
                 buy_flow += money
 
-            # 下跌K线 → 卖盘
+            # 下跌K线 → 卖盘估算
             elif close_price < open_price:
                 sell_flow += money
 
-        # format
         def fmt(v):
-
             if v >= 1_000_000_000:
-                return f"${v/1_000_000_000:.2f}B"
-
+                return f"${v / 1_000_000_000:.2f}B"
             elif v >= 1_000_000:
-                return f"${v/1_000_000:.2f}M"
-
-            return f"${v:,.0f}"
-
-        # signal
-        if buy_flow > sell_flow * 1.2:
-            signal = "🔥 资金偏多"
-
-        elif sell_flow > buy_flow * 1.2:
-            signal = "⚠️ 资金流出"
-
-        else:
-            signal = "🤝 多空平衡"
+                return f"${v / 1_000_000:.2f}M"
+            else:
+                return f"${v:,.0f}"
 
         return {
             "buy_flow": fmt(buy_flow),
-            "sell_flow": fmt(sell_flow),
-            "signal": signal
+            "sell_flow": fmt(sell_flow)
         }
 
     except Exception as e:
-
         print("资金流错误:", e)
 
         return {
             "buy_flow": "$0",
-            "sell_flow": "$0",
-            "signal": "暂无数据"
+            "sell_flow": "$0"
         }
+    
+
+def estimate_smart_money(price, vwap, volume_ratio, momentum):
+    score = 0
+    reasons = []
+
+    if price > vwap:
+        score += 1
+        reasons.append("📈 价格高于VWAP")
+    else:
+        score -= 1
+        reasons.append("📉 价格低于VWAP")
+
+    if volume_ratio > 1.5:
+        score += 1
+        reasons.append("🔥 成交量明显放大")
+    elif volume_ratio < 0.8:
+        reasons.append("⚪ 成交量偏低")
+
+    if momentum > 1:
+        score += 1
+        reasons.append("⚡ Momentum偏强")
+    elif momentum < -1:
+        score -= 1
+        reasons.append("Momentum偏弱")
+
+    if score >= 1:
+        status = "🟢 主力偏吸筹"
+    elif score <= -1:
+        status = "🔴 主力偏流出"
+    else:
+        status = "🟡 主力观望"
+
+    return {
+        "status": status,
+        "reasons": reasons
+    }
 
 
 def analyze_ticker(ticker):
@@ -812,6 +828,21 @@ def analyze_ticker(ticker):
     vol = float(last["Volume"])
     vol20 = float(last["VOL20"])
     money_flow = get_money_flow(ticker)
+
+    # 主力状态推测
+    vwap = (
+        (df["Close"].tail(20) * df["Volume"].tail(20)).sum()
+        / df["Volume"].tail(20).sum()
+    )
+    volume_ratio = vol / vol20 if vol20 > 0 else 1
+    momentum = ((price - ma20) / ma20) * 100
+    smart_money = estimate_smart_money(
+        price=price,
+        vwap=vwap,
+        volume_ratio=volume_ratio,
+        momentum=momentum
+    )
+
     atr = calc_atr(df)
 
     high_52w = float(df["High"].tail(252).max())
@@ -1103,7 +1134,9 @@ def analyze_ticker(ticker):
         "macd_hist": round(macd_hist, 4),
         "buy_flow": money_flow["buy_flow"],
         "sell_flow": money_flow["sell_flow"],
-        "flow_signal": money_flow["signal"],
+        "smart_money_status": smart_money["status"],
+        "smart_money_reasons": smart_money["reasons"],
+        "flow_signal": "",
         "ma20": fmt_money(ma20),
         "ma50": fmt_money(ma50),
         "ma60": fmt_money(ma60),

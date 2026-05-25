@@ -688,44 +688,43 @@
           <td>{{ analysis.low_52w }}</td>
         </tr>
         <tr>
-            <td style="width:70px;">技术信号</td>
+            <td style="width:90px;">技术信号</td>
             <td colspan="3" style="font-size:13px;">
                 <span style="color:#4ade80;font-weight:700;">
                     {{ analysis.tech_signal }}
                 </span>
-
-                <span style="margin:0 3px; color:#666;">|</span>
-
-                <span style="color:white;font-size:13px;">
-                    综合评分：
-                </span>
+            </td>
+        </tr>
+        <tr>
+            <td style="color:white;font-size:13px;">综合评分：</td>
+            <td colspan="3" style="font-size:13px;">
                 <span style="color:#facc15;font-weight:700;">
                     {{ analysis.final_score }}/100
                 </span>
             </td>
         </tr>
         <tr>
-          <td style="width:90px;">BOLL</td>
-          <td colspan="3" class="boll-line" style="color: {{ analysis.boll_color }};">
-            {{ analysis.boll_text or analysis.boll_pos }}
-          </td>
+            <td style="width:90px;">BOLL</td>
+            <td colspan="3" class="boll-line" style="color: {{ analysis.boll_color }};">
+                {{ analysis.boll_text or analysis.boll_pos }}
+            </td>
         </tr>
         <tr>
-          <td style="width:90px;">相对强弱</td>
-          <td colspan="3">
-              <span style="color:#4ade80;font-weight:700;">
-                  🟢 强于大盘
-              <span style="color:#ffffff;font-weight:700;">
-                  {{ analysis.relative_strength }}%
-              </span>
-
-              <span style="color:#6b7280;padding:0 8px;">｜</span>
-
-              <span style="color:white;">
-                  量价行为：
-              <span style="color:#facc15;font-weight:700;">
-                  {{ analysis.volume_signal }}
-              </span>
+            <td style="width:90px;">相对强弱</td>
+            <td colspan="3">
+                <span style="color:#4ade80;font-weight:700;">
+                    🟢 强于大盘
+                <span style="color:#ffffff;font-weight:700;">
+                    {{ analysis.relative_strength }}%
+                </span>
+            </td>
+        </tr>      
+        <tr>
+              <td style="color:white;">量价行为：</td>
+              <td colspan="3" style="font-size:13px;">
+                <span style="color:#facc15;font-weight:700;">
+                    {{ analysis.volume_signal }}
+                </span>
           </td>
         </tr>
         <tr>

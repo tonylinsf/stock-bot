@@ -698,19 +698,97 @@
           </td>
         </tr>
         <tr>
-            <td>资金流向</td>
-            <td>
-                <div style="color:#4ade80;">
-                    🟢 买入估算：{{ analysis.buy_flow }}
+        <td>资金流向</td>
+
+        <td colspan="3">
+
+            <div style="
+                display:flex;
+                gap:18px;
+                align-items:flex-start;
+                justify-content:space-between;
+                flex-wrap:wrap;
+            ">
+
+                <!-- 左边：波动预测 -->
+                <div style="
+                    flex:1;
+                    min-width:220px;
+                    padding-right:14px;
+                    border-right:1px solid rgba(255,255,255,0.08);
+                ">
+
+                    <div style="
+                        color:#f472b6;
+                        font-size:16px;
+                        font-weight:700;
+                        margin-bottom:6px;
+                    ">
+                        🔮 波动预测
+                    </div>
+
+                    <div style="
+                        color:#93c5fd;
+                        font-size:14px;
+                    ">
+                        ATR 波动值：
+                        {{ analysis.atr }}
+                    </div>
+
+                    <div style="
+                        color:#4ade80;
+                        font-size:20px;
+                        font-weight:700;
+                        margin-top:6px;
+                    ">
+                        ${{ analysis.future_low }}
+                        →
+                        ${{ analysis.future_high }}
+                    </div>
+
+                    <div style="
+                        color:#9ca3af;
+                        margin-top:4px;
+                        font-size:12px;
+                    ">
+                        未来几周正常波动范围估算
+                    </div>
+
                 </div>
-                <div style="color:#f87171;">
-                    🔴 卖出估算：{{ analysis.sell_flow }}
-                </div>
-                <div style="margin-top:6px;color:#facc15;font-weight:bold;">
-                    {{ analysis.flow_signal }}
-                </div>
-            </td>
-        </tr>
+
+                <!-- 右边：资金流向 -->
+                <div style="
+                    flex:1;
+                    min-width:220px;
+                    padding-left:14px;
+                ">
+
+                    <div style="
+                        color:#facc15;
+                        font-size:16px;
+                        font-weight:700; 
+                        margin-bottom:6px;
+                    ">
+                        💰 资金流向
+                    </div>
+
+                    <div style="color:#4ade80;">
+                        🟢 买入估算：{{ analysis.buy_flow }}
+                    </div>
+
+                    <div style="color:#f87171;">
+                        🔴 卖出估算：{{ analysis.sell_flow }}
+                    </div>
+
+                    <div style="
+                        margin-top:6px;
+                        color:#facc15;
+                        font-weight:bold;
+                    ">
+                        {{ analysis.flow_signal }}
+                    </div>
+                </div>   
+            </div>  
       </tbody>
     </table>
   </div>
@@ -741,6 +819,7 @@
       风险等级：{{ analysis.risk }}
     </div>
   </div>
+
 
   {% if analysis %}
   <div class="card">

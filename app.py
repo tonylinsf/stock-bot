@@ -446,6 +446,17 @@ def get_polygon_daily_bars(ticker: str, days: int = 520):
     except Exception as e:
         return None, f"读取 Polygon 数据失败：{e}"
 
+def calc_atr(df, period=14):
+    high_low = df["High"] - df["Low"]
+    high_close = (df["High"] - df["Close"].shift()).abs()
+    low_close = (df["Low"] - df["Close"].shift()).abs()
+
+    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+
+    atr = tr.rolling(period).mean()
+
+    return round(float(atr.iloc[-1]), 2)
+
 
 def calc_rsi(close, period=14):
     delta = close.diff()
@@ -801,9 +812,13 @@ def analyze_ticker(ticker):
     vol = float(last["Volume"])
     vol20 = float(last["VOL20"])
     money_flow = get_money_flow(ticker)
+    atr = calc_atr(df)
 
     high_52w = float(df["High"].tail(252).max())
     low_52w = float(df["Low"].tail(252).min())
+
+    future_low = round(price - atr * 5, 2)
+    future_high = round(price + atr * 5, 2)
 
     score = 0
     notes = []
@@ -973,6 +988,9 @@ def analyze_ticker(ticker):
         "risk": risk,
         "risk_color": risk_color,
         "rsi": round(rsi, 2),
+        "future_low": future_low,
+        "future_high": future_high,
+        "atr": atr,
         "macd_hist": round(macd_hist, 4),
         "buy_flow": money_flow["buy_flow"],
         "sell_flow": money_flow["sell_flow"],

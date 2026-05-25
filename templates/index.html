@@ -698,139 +698,74 @@
           </td>
         </tr>
         <tr>
-        <td colspan="3">
+            <td style="color:#93c5fd;font-weight:700;">波动等级</td>
+            <td colspan="3">
+                <span style="color:#facc15;font-weight:700;">
+                    {{ analysis.volatility_level }}
+                </span>
+                <span style="color:#9ca3af;font-size:13px;">
+                   （ATR {{ analysis.atr_pct }}%）
+                </span>
+            </td>
+        </tr>
 
-            <div style="
-                display:flex;
-                gap:18px;
-                align-items:flex-start;
-                justify-content:space-between;
-                flex-wrap:wrap;
-            ">
+        <tr>
+            <td style="color:#93c5fd;font-weight:700;">波动区间</td>
+            <td colspan="3">
+                <span style="color:#4ade80;">70%：${{ analysis.safe_low }} → ${{ analysis.safe_high }}</span>
+                <br>
+                <span style="color:#93c5fd;">25%：${{ analysis.future_low }} → ${{ analysis.future_high }}</span>
+                <br>
+                <span style="color:#f87171;">5%：${{ analysis.extreme_low }} → ${{ analysis.extreme_high }}</span>
+            </td>
+        </tr>
 
-                <!-- 左边：波动预测 -->
-                <div style="
-                    flex:1;
-                    min-width:220px;
-                    padding-right:14px;
-                    border-right:1px solid rgba(255,255,255,0.08);
-                ">
+        <tr>
+            <td style="color:#93c5fd;font-weight:700;">资金流向</td>
+            <td colspan="3">
+                <span style="color:#4ade80;">买入：{{ analysis.buy_flow }}</span>
+                &nbsp;&nbsp;
+                <span style="color:#f87171;">卖出：{{ analysis.sell_flow }}</span>
+            </td>
+        </tr>
 
-                    <div style="
-                        color:#f472b6;
-                        font-size:16px;
-                        font-weight:700;
-                        margin-bottom:6px;
-                    ">
-                        🔮 波动预测
-                    </div>
+        <tr>
+            <td style="color:#93c5fd;font-weight:700;">主力状态</td>
+            <td colspan="3">
+                <span style="color:#4ade80;font-weight:700;">
+                    {{ analysis.smart_money_status }}
+                </span>
+                <span style="color:#facc15;margin-left:10px;">
+                    强度：{{ analysis.smart_money_strength }}/100
+                </span>
+                <span style="color:#cbd5e1;margin-left:10px;">
+                    确认度：{{ analysis.smart_money_confidence }}
+                </span>
+            </td>
+        </tr>
 
-                    <div style="
-                        color:#93c5fd;
-                        font-size:14px;
-                    ">
-                        ATR 波动值：
-                        {{ analysis.atr }}
-                    </div>
+        <tr>
+            <td style="color:#93c5fd;font-weight:700;">主力行为</td>
+            <td colspan="3">
+                <span style="color:#facc15;">
+                    {{ analysis.smart_money_behavior }}
+                </span>
 
-                    <div style="color:#4ade80;font-size:18px;font-weight:700;margin-top:6px;">
-                        保守 70%：${{ analysis.safe_low }} → ${{ analysis.safe_high }}
-                    </div>
+                {% if analysis.smart_money_risk %}
+                    <br>
+                    <span style="color:#fb7185;font-weight:700;">
+                        {{ analysis.smart_money_risk }}
+                    </span>
+                {% endif %}
 
-                    <div style="color:#93c5fd;font-size:18px;font-weight:700;margin-top:6px;">
-                        正常 25%：${{ analysis.future_low }} → ${{ analysis.future_high }}
-                    </div>
-
-                    <div style="color:#f87171;font-size:18px;font-weight:700;margin-top:6px;">
-                        极端 5%：${{ analysis.extreme_low }} → ${{ analysis.extreme_high }}
-                    </div>
-
-                    <div style="
-                        color:#facc15;
-                        margin-top:8px;
-                        font-size:13px;
-                    ">
-                        波动等级：
-                        {{ analysis.volatility_level }}
-                        (ATR {{ analysis.atr_pct }}%)
-                    </div>
-
-                    <div style="color:#facc15;margin-top:8px;font-size:14px;font-weight:700;">
-                        趋势强度：{{ analysis.trend_score }}/100（{{ analysis.trend_label }}）
-                    </div>
-
-                    <div style="
-                        color:#9ca3af;
-                        margin-top:4px;
-                        font-size:12px;
-                    ">
-                        未来几周正常波动范围估算
-                    </div>
-
-                </div>
-
-                <!-- 右边：资金流向 -->
-                <div style="flex:1;min-width:220px;padding-left:14px;">
-
-                    <div style="color:#facc15;font-size:20px;font-weight:700; margin-bottom:10px;">
-                        💰 资金流向
-                    </div>
-
-                    <div style="color:#4ade80;font-size:18px;">
-                        🟢 买入估算：{{ analysis.buy_flow }}
-                    </div>
-
-                    <div style="color:#f87171;font-size:18px;">
-                        🔴 卖出估算：{{ analysis.sell_flow }}
-                    </div>
-
-                    <div style="margin-top:15px;color:#facc15;font-size:20px;font-weight:700;">
-                        🧠 主力状态推测
-                    </div>
-
-                    <div style="margin-top:8px;color:#4ade80;font-size:18px;font-weight:700;">
-                        {{ analysis.smart_money_status }}
-                    </div>
-
-                    <div style="color:#cbd5e1;font-size:15px;line-height:1.6;">
-                        {% for reason in analysis.smart_money_reasons %}
-                            <div>• {{ reason }}</div>
-                        {% endfor %}
-                    </div>
-
-                    <div style="color:#facc15;font-size:15px;margin-top:5px;">
-                        主力强度：{{ analysis.smart_money_strength }}/100
-                    </div>
-
-                    <div style="color:#cbd5e1;font-size:14px;">
-                        确认度：{{ analysis.smart_money_confidence }}
-                    </div>
-
-                    <div style="color:#facc15;font-size:14px;">
-                        主力行为：{{ analysis.smart_money_behavior }}
-                    </div>
-
-                    {% if analysis.smart_money_alert %} 
-                    <div style="margin-top:6px;color:#facc15;font-size:14px;font-weight:700;">
-                       {{ analysis.smart_money_alert }}
-                    </div>
-                    {% endif %}
-
-                    {% if analysis.smart_money_risk %}
-                    <div style="margin-top:6px;color:#fb7185;font-size:14px;font-weight:700;">
-                       {{ analysis.smart_money_risk }}
-                    </div>
-                    {% endif %}
-
-                    {% if analysis.smart_money_rotation %}
-                    <div style="margin-top:6px;color:#38bdf8;font-size:14px;font-weight:700;">
-                       {{ analysis.smart_money_rotation }}
-                    </div>
-                    {% endif %}
-                </div>   
-            </div>  
-      </tbody>
-    </table>
+                {% if analysis.smart_money_rotation %}
+                    <br>
+                    <span style="color:#38bdf8;font-weight:700;">
+                        {{ analysis.smart_money_rotation }}
+                    </span>
+                {% endif %}
+            </td>
+        </tr>
   </div>
 
   <div class="card">

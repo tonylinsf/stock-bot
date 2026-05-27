@@ -1274,13 +1274,19 @@ def analyze_ticker(ticker):
         notes.append("成交量未明显放大")
 
     # Setup 判定
-    setup = "观察"
+    setup = f"⚪ 中性｜观察（{trend_label}）"
+
     if close > ma20 > ma60 and 40 <= rsi <= 65 and macd_hist > 0:
-        setup = "趋势突破型"
+        setup = f"🟢 多头｜趋势突破（{trend_label}）"
+
     elif close > ma60 and close <= ma20 * 1.03 and 30 <= rsi <= 60:
-        setup = "回调低吸型"
+        setup = f"🟢 多头｜上升回调（{trend_label}）"
+
     elif close > ma120 and rsi < 40:
-        setup = "中线回调观察型"
+        setup = f"🟡 中线｜回调观察（{trend_label}）"
+
+    elif close < ma20 < ma60:
+        setup = f"🔴 空头｜下降趋势（{trend_label}）"
 
     # 买卖计划
     support = max(float(last["BB_LOWER"]), float(last["LOW_20"]), ma60 * 0.98)
@@ -1289,6 +1295,43 @@ def analyze_ticker(ticker):
     stop = min(support * 0.98, close * 0.93)
     target1 = close * 1.08
     target2 = close * 1.15
+
+    # ===== 支撑 / 压力 =====
+    support = round(
+        min(ma20, ma60, bb_lower),
+        2
+    )
+
+    resistance = round(
+        max(bb_upper, float(last["HIGH_20"])),
+        2
+    )
+
+    # ===== 风险回报 =====
+    risk = buy_low - stop
+    reward = target1 - buy_low
+    rr_ratio = round(
+        reward / risk,
+        2
+    ) if risk > 0 else 0
+
+
+    # ===== 支撑距离 =====
+    support_pct = round(((price - support) / support) * 100, 1)
+
+    if support_pct >= 0:
+        support_text = f"支撑 +{support_pct}%"
+
+    else:
+        support_text = f"跌破支撑 {support_pct}%"
+
+    # ===== 压力距离 =====
+    resistance_pct = round(((resistance - price) / price) * 100, 1)
+
+    if resistance_pct >= 0:
+        resistance_text = f"压力 {resistance_pct}%"
+    else:
+        resistance_text = f"突破压力 +{-resistance_pct}%"
 
     if score >= 5:
         decision = "Buy Watch"
@@ -1436,6 +1479,11 @@ def analyze_ticker(ticker):
         "final_score": final_score,
         "trend_stage": trend_stage,
         "trend_stage_color": trend_stage_color,
+        "support": support,
+        "resistance": resistance,
+        "rr_ratio": rr_ratio,
+        "support_text": support_text,
+        "resistance_text": resistance_text,
         "flow_signal": "",
         "ma20": fmt_money(ma20),
         "ma50": fmt_money(ma50),
@@ -1445,7 +1493,6 @@ def analyze_ticker(ticker):
         "bb_mid": fmt_money(bb_mid),
         "bb_lower": fmt_money(bb_lower),
         "boll_pos": boll_pos,
-        "tech_signal": tech_signal,
         "boll_pct": boll_pct,
         "volume": fmt_num(vol),
         "vol20": fmt_num(vol20),

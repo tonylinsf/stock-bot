@@ -676,7 +676,43 @@
             <td style="color:#93c5fd;font-weight:700;">趋势阶段</td>
             <td colspan="3">
                 <span style="color:{{ analysis.trend_stage_color }};font-weight:700;">
-                    {{ analysis.trend_stage }}
+                    {{ analysis.setup }}
+                </span>
+            </td>
+        </tr>
+        <tr>
+            <td>支撑 / 压力</td>
+            <td colspan="3">
+                <span style="color:#4ade80;font-weight:700;">
+                    ${{ analysis.support }}
+                </span>
+                <span style="color:#94a3b8;">
+                    /
+                </span>
+                <span style="color:#f87171;font-weight:700;">
+                    ${{ analysis.resistance }}
+                </span>
+            </td>
+        </tr>
+        <tr>
+            <td>距离空间</td>
+            <td colspan="3">
+                <span style="color:#4ade80;font-weight:700;">
+                    {{ analysis.support_text }}%
+                </span>
+                <span style="color:#94a3b8;padding:0 10px;">
+                    /
+                </span>
+                <span style="color:#f87171;font-weight:700;">
+                    {{ analysis.resistance_text }}%
+                </span>
+            </td>
+        </tr>
+        <tr>
+            <td>风险回报</td>
+            <td colspan="3">
+                <span style="color:#facc15;font-weight:700;">
+                    1 : {{ analysis.rr_ratio }}
                 </span>
             </td>
         </tr>

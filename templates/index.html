@@ -665,7 +665,7 @@
           <td>{{ analysis.low_52w }}</td>
         </tr>
         <tr>
-            <td style="width:140px;">技术信号</td>
+            <td style="color:white;">技术信号</td>
             <td colspan="3" style="font-size:13px;">
                 <span style="color:#4ade80;font-weight:700;">
                     {{ analysis.tech_signal }}
@@ -673,15 +673,21 @@
             </td>
         </tr>
         <tr>
-            <td style="color:white;font-size:13px;width:140px;">综合评分：</td>
-            <td colspan="3" style="font-size:13px;">
-                <span style="color:#facc15;font-weight:700;">
-                    {{ analysis.final_score }}/100
+            <td style="color:#93c5fd;font-weight:700;">趋势阶段</td>
+            <td colspan="3">
+                <span style="color:{{ analysis.trend_stage_color }};font-weight:700;">
+                    {{ analysis.trend_stage }}
                 </span>
             </td>
         </tr>
         <tr>
-            <td style="width:140px;">BOLL</td>
+            <td style="color:#93c5fd;font-weight:700;">综合评分</td>
+            <td colspan="3" style="color:#facc15;font-weight:700;">
+                {{ analysis.final_score }}/100
+            </td>
+        </tr>
+        <tr>
+            <td style="color:white;">BOLL</td>
             <td colspan="3" class="boll-line" style="color: {{ analysis.boll_color }};">
                 {{ analysis.boll_text or analysis.boll_pos }}
             </td>
@@ -697,7 +703,7 @@
             </td>
         </tr>      
         <tr>
-              <td style="color:white;width:140px;">量价行为：</td>
+              <td style="color:white;">量价行为：</td>
               <td colspan="3" style="font-size:13px;">
                 <span style="color:#facc15;font-weight:700;">
                     {{ analysis.volume_signal }}
@@ -705,7 +711,7 @@
           </td>
         </tr>
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:140px;">波动等级</td>
+            <td style="color:#93c5fd;font-weight:700;">波动等级</td>
             <td colspan="3">
                 <span style="color:#facc15;font-weight:700;">
                     {{ analysis.volatility_level }}
@@ -717,7 +723,7 @@
         </tr>
 
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:140px;">波动区间</td>
+            <td style="color:#93c5fd;font-weight:700;">波动区间</td>
             <td colspan="3">
                 <span style="color:#4ade80;">70%：${{ analysis.safe_low }} → ${{ analysis.safe_high }}</span>
                 <br>
@@ -728,7 +734,7 @@
         </tr>
 
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:140px">资金流向</td>
+            <td style="color:#93c5fd;font-weight:700;">资金流向</td>
             <td colspan="3">
                 <span style="color:#4ade80;">买入：{{ analysis.buy_flow }}</span>
                 &nbsp;&nbsp;
@@ -737,7 +743,7 @@
         </tr>
 
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:140px;">主力状态</td>
+            <td style="color:#93c5fd;font-weight:700;">主力状态</td>
             <td colspan="3">
                 <span style="color:#4ade80;font-weight:700;">
                     {{ analysis.smart_money_status }}
@@ -752,7 +758,7 @@
         </tr>
 
         <tr>
-            <td style="color:#93c5fd;font-weight:700;width:140px;">主力行为</td>
+            <td style="color:#93c5fd;font-weight:700;">主力行为</td>
             <td colspan="3">
                 <span style="color:#facc15;">
                     {{ analysis.smart_money_behavior }}

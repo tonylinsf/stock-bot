@@ -445,6 +445,43 @@ def get_polygon_daily_bars(ticker: str, days: int = 520):
 
     except Exception as e:
         return None, f"读取 Polygon 数据失败：{e}"
+    
+
+def calc_trend_stage(price, ma20, ma60, ma120, rsi, boll_pct, volume_ratio):
+    if not price or not ma20 or not ma60:
+        return "数据不足", "#94a3b8"
+
+    # 多头排列
+    if ma120 and price > ma20 > ma60 > ma120:
+        if rsi and rsi > 72:
+            return "高位过热", "#fb7185"
+        elif volume_ratio and volume_ratio >= 1.3:
+            return "主升阶段", "#22c55e"
+        else:
+            return "健康上升", "#4ade80"
+
+    # 突破/启动
+    if price > ma20 and ma20 > ma60:
+        return "启动阶段", "#38bdf8"
+
+    # 高位震荡
+    if price > ma60 and rsi and 55 <= rsi <= 72 and boll_pct and boll_pct > 70:
+        return "高位震荡", "#facc15"
+
+    # 回调但未破坏
+    if price < ma20 and price > ma60:
+        return "上升回调", "#facc15"
+
+    # 趋势转弱
+    if price < ma60:
+        return "趋势转弱", "#fb923c"
+
+    # 空头
+    if ma120 and price < ma20 < ma60 < ma120:
+        return "下跌阶段", "#ef4444"
+
+    return "震荡阶段", "#94a3b8"    
+
 
 def calc_atr(df, period=14):
     high_low = df["High"] - df["Low"]
@@ -1341,7 +1378,17 @@ def analyze_ticker(ticker):
     elif "低" in risk:
         risk_color = "#4cd964"
     else:
-        risk_color = "#aaaaaa"     
+        risk_color = "#aaaaaa"    
+
+    trend_stage, trend_stage_color = calc_trend_stage(
+        price=price,
+        ma20=ma20,
+        ma60=ma60,
+        ma120=ma120,
+        rsi=rsi,
+        boll_pct=boll_pct,
+        volume_ratio=volume_ratio
+    )     
 
     analysis = {
         "ticker": display_ticker.upper(),
@@ -1386,6 +1433,9 @@ def analyze_ticker(ticker):
         "final_score": final_score,
         "final_decision": final_decision,
         "tech_signal": tech_signal,
+        "final_score": final_score,
+        "trend_stage": trend_stage,
+        "trend_stage_color": trend_stage_color,
         "flow_signal": "",
         "ma20": fmt_money(ma20),
         "ma50": fmt_money(ma50),

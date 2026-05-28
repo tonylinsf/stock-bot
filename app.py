@@ -1318,20 +1318,17 @@ def analyze_ticker(ticker):
 
     # ===== 支撑距离 =====
     support_pct = round(((price - support) / support) * 100, 1)
-
     if support_pct >= 0:
-        support_text = f"支撑 +{support_pct}%"
-
+        support_text = f"+{support_pct}%"
     else:
-        support_text = f"跌破支撑 {support_pct}%"
+        support_text = f"{support_pct}%"
 
     # ===== 压力距离 =====
     resistance_pct = round(((resistance - price) / price) * 100, 1)
-
     if resistance_pct >= 0:
-        resistance_text = f"压力 {resistance_pct}%"
+        resistance_text = f"+{resistance_pct}%"
     else:
-        resistance_text = f"突破压力 +{-resistance_pct}%"
+        resistance_text = f"{resistance_pct}%"
 
     if score >= 5:
         decision = "Buy Watch"

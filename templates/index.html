@@ -665,14 +665,6 @@
           <td>{{ analysis.low_52w }}</td>
         </tr>
         <tr>
-            <td style="color:white;">技术信号</td>
-            <td colspan="3" style="font-size:13px;">
-                <span style="color:#4ade80;font-weight:700;">
-                    {{ analysis.tech_signal }}
-                </span>
-            </td>
-        </tr>
-        <tr>
             <td style="color:#93c5fd;font-weight:700;">趋势阶段</td>
             <td colspan="3">
                 <span style="color:{{ analysis.trend_stage_color }};font-weight:700;">
@@ -681,30 +673,18 @@
             </td>
         </tr>
         <tr>
-            <td>支撑 / 压力</td>
+            <td>支撑/压力/空间</td>
             <td colspan="3">
                 <span style="color:#4ade80;font-weight:700;">
                     ${{ analysis.support }}
-                </span>
-                <span style="color:#94a3b8;">
-                    /
-                </span>
-                <span style="color:#f87171;font-weight:700;">
-                    ${{ analysis.resistance }}
-                </span>
-            </td>
-        </tr>
-        <tr>
-            <td>距离空间</td>
-            <td colspan="3">
-                <span style="color:#4ade80;font-weight:700;">
-                    {{ analysis.support_text }}%
+                   （{{ analysis.support_text }}）
                 </span>
                 <span style="color:#94a3b8;padding:0 10px;">
                     /
                 </span>
                 <span style="color:#f87171;font-weight:700;">
-                    {{ analysis.resistance_text }}%
+                    ${{ analysis.resistance }}
+                   （{{ analysis.resistance_text }}）
                 </span>
             </td>
         </tr>
@@ -717,35 +697,11 @@
             </td>
         </tr>
         <tr>
-            <td style="color:#93c5fd;font-weight:700;">综合评分</td>
-            <td colspan="3" style="color:#facc15;font-weight:700;">
-                {{ analysis.final_score }}/100
-            </td>
-        </tr>
-        <tr>
             <td style="color:white;">BOLL</td>
             <td colspan="3" class="boll-line" style="color: {{ analysis.boll_color }};">
                 {{ analysis.boll_text or analysis.boll_pos }}
             </td>
-        </tr>
-        <tr>
-            <td style="width:140px">相对强弱</td>
-            <td colspan="3">
-                <span style="color:#4ade80;font-weight:700;">
-                    🟢 强于大盘
-                <span style="color:#ffffff;font-weight:700;">
-                    {{ analysis.relative_strength }}%
-                </span>
-            </td>
-        </tr>      
-        <tr>
-              <td style="color:white;">量价行为：</td>
-              <td colspan="3" style="font-size:13px;">
-                <span style="color:#facc15;font-weight:700;">
-                    {{ analysis.volume_signal }}
-                </span>
-          </td>
-        </tr>
+        </tr>   
         <tr>
             <td style="color:#93c5fd;font-weight:700;">波动等级</td>
             <td colspan="3">

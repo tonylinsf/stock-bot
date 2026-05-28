@@ -313,23 +313,18 @@ def get_company_news(ticker, limit=5):
 
     try:
         today = datetime.now().strftime("%Y-%m-%d")
+        from_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
         url = "https://finnhub.io/api/v1/company-news"
 
         params = {
             "symbol": ticker.upper(),
-            "from": today,
+            "from": from_date,
             "to": today,
             "token": FINNHUB_API_KEY
         }
 
         r = requests.get(url, params=params, timeout=10)
-
-        print("NEWS TICKER:", ticker)
-        print("FINNHUB KEY EXISTS:", bool(FINNHUB_API_KEY))
-        print("FINNHUB URL:", url)
-        print("NEWS STATUS:", r.status_code)
-        print("NEWS TEXT:", r.text[:300])
 
         js = r.json()
 

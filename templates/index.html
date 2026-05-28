@@ -576,6 +576,16 @@
   </div>
 
     <div style="margin-top:10px;">
+        <a href="/market" onclick="showSectorLoading()">
+            <button type="button">🧭 板块轮动</button>
+        </a>
+        <div id="sectorLoading"
+             style="display:none; margin-top:10px; color:#93c5fd;">
+            ⏳ 正在分析板块资金流向...
+        </div>
+    </div>
+
+    <div style="margin-top:10px;">
       <a href="/scan_rebound" onclick="showScanLoading()">
         <button type="button">🔥 扫描低位反弹机会</button>
       </a>
@@ -940,7 +950,35 @@
   {% endfor %}
   </div>
 
+  <div class="card">
+      <h3>🔥 板块轮动</h3>
+
+      {% for s in market_status.sector_rotation or [] %}
+      <div style="
+            display:grid;
+            grid-template-columns: 1.3fr 0.8fr 0.8fr;
+            gap:8px;
+            padding:8px 0;
+            border-bottom:1px solid rgba(255,255,255,0.08);
+            align-items:center;       
+          ">
+          <div>
+              <b>{{ s.ticker }}</b>
+              {{ s.name }}
+          </div>
+
+          <div style="color:{% if s.change > 0 %}#4ade80{% else %}#f87171{% endif %}; font-weight:700;">
+              {{ s.change }}%
+          </div>
+
+          <div>
+              {{ s.status }}
+          </div>
+      </div>
+      {% endfor %}
+  </div>
 </div>
+
 
 <script>
 function showLoading() {
@@ -949,6 +987,12 @@ function showLoading() {
 
   if (msg) msg.style.display = "block";
   if (btn) btn.innerText = "分析中...";
+}
+</script>
+
+<script>
+function showSectorLoading() {
+    document.getElementById("sectorLoading").style.display = "block";
 }
 </script>
 

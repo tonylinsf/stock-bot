@@ -570,6 +570,51 @@ def fmt_num(x):
         return f"{x:.0f}"
     except Exception:
         return "-"
+    
+
+def get_sector_rotation():
+    sector_data = []
+
+    SECTOR_ETFS = {
+        "SMH": "半导体",
+        "IGV": "软件",
+        "XLF": "金融",
+        "XLV": "医疗",
+        "XLE": "能源",
+        "XLY": "消费",
+    }
+
+    for ticker, name in SECTOR_ETFS.items():
+        try:
+            analysis, _, _, err = analyze_ticker(ticker)
+
+            if err or not analysis:
+                continue
+
+            change_pct = float(str(analysis.get("change_pct", "0")).replace("%", ""))
+
+            if change_pct >= 2:
+                status = "🔥 强势"
+            elif change_pct >= 0.5:
+                status = "🟢 偏强"
+            elif change_pct <= -2:
+                status = "🔴 弱势"
+            elif change_pct <= -0.5:
+                status = "⚠️ 偏弱"
+            else:
+                status = "⚪ 中性"
+
+            sector_data.append({
+                "ticker": ticker,
+                "name": name,
+                "change": round(change_pct, 2),
+                "status": status
+            })
+
+        except Exception as e:
+            print("Sector error:", ticker, e)
+
+    return sorted(sector_data, key=lambda x: x["change"], reverse=True)
 
 
 def get_market_filter():
@@ -1748,6 +1793,7 @@ def get_market_status():
         vix = get_vix_card()
         vix_price = float(vix["price"]) if vix["price"] != "--" else 20
         vix_text = f"{vix['price']} ({vix['change_pct']})"
+        sector_rotation = get_sector_rotation()
 
         # === 盘前数据（用SPY）===
         spy_pre = None
@@ -1866,6 +1912,7 @@ def get_market_status():
         "vix_text": vix_text,
         "open_signal": open_signal,
         "color": color,
+        "sector_rotation": sector_rotation
     }
 
     MARKET_STATUS_CACHE["data"] = result

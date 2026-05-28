@@ -72,6 +72,14 @@ UNIVERSE = [
     "QQQ","SPY","SMH","IGV","SPMO"
 ]
 
+QQQ_TICKERS = [
+    "NVDA","MSFT","AAPL","AVGO","AMZN","META","GOOGL","GOOG","TSLA","NFLX",
+    "COST","AMD","PLTR","ADBE","CSCO","PEP","TMUS","INTU","QCOM","AMAT",
+    "TXN","ISRG","BKNG","AMGN","HON","VRTX","MU","PANW","LRCX","ADP",
+    "ADI","MELI","KLAC","CRWD","SBUX","GILD","MDLZ","REGN","SNPS","CDNS",
+    "MAR","PYPL","ORLY","ABNB","CTAS","MNST","CSX","NXPI","MRVL","ROP"
+]
+
 MARKET_TICKERS = ["SPY", "QQQ"]
 
 CACHE = {}
@@ -123,6 +131,106 @@ def summarize_news_with_ai(title, summary):
     except Exception as e:
         print("AI 新闻总结失败:", e)
         return summary
+    
+
+BREAKOUT_CACHE = {"time": 0, "data": []}
+BREAKOUT_CACHE_TTL = 60 * 30   # 30分钟缓存
+
+
+def scan_qqq_breakouts():
+    now = time.time()
+
+    if BREAKOUT_CACHE["data"] and now - BREAKOUT_CACHE["time"] < BREAKOUT_CACHE_TTL:
+        return BREAKOUT_CACHE["data"]
+
+    results = []
+
+    for ticker in QQQ_TICKERS:
+        try:
+            df = get_history(ticker, days=120, interval="1d")
+
+            if df is None or df.empty or len(df) < 60:
+                continue
+
+            close = float(df["Close"].iloc[-1])
+            prev_close = float(df["Close"].iloc[-2])
+
+            ma20 = float(df["Close"].rolling(20).mean().iloc[-1])
+            ma60 = float(df["Close"].rolling(60).mean().iloc[-1])
+
+            high20 = float(df["High"].rolling(20).max().iloc[-2])
+            high52 = float(df["High"].rolling(120).max().iloc[-1])
+
+            vol = float(df["Volume"].iloc[-1])
+            vol20 = float(df["Volume"].rolling(20).mean().iloc[-1])
+            volume_ratio = round(vol / vol20, 2) if vol20 else 0
+
+            # RSI
+            delta = df["Close"].diff()
+            gain = delta.where(delta > 0, 0).rolling(14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+            rs = gain / loss
+            rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 2)
+
+            # BOLL位置
+            mid = df["Close"].rolling(20).mean()
+            std = df["Close"].rolling(20).std()
+            upper = float((mid + 2 * std).iloc[-1])
+            lower = float((mid - 2 * std).iloc[-1])
+            boll_pct = round(((close - lower) / (upper - lower)) * 100, 1) if upper != lower else 50
+
+            change_pct = round(((close - prev_close) / prev_close) * 100, 2)
+
+            score = 0
+            reasons = []
+
+            if close > ma20:
+                score += 2
+                reasons.append("站上MA20")
+
+            if ma20 > ma60:
+                score += 2
+                reasons.append("MA20>MA60")
+
+            if close >= high20 * 0.98:
+                score += 2
+                reasons.append("接近20日突破")
+
+            if 55 <= rsi <= 75:
+                score += 2
+                reasons.append(f"RSI健康 {rsi}")
+
+            if volume_ratio >= 1.2:
+                score += 2
+                reasons.append(f"放量 {volume_ratio}x")
+
+            if boll_pct > 85:
+                score -= 2
+                reasons.append("接近上轨，不追高")
+
+            if score >= 6:
+                results.append({
+                    "ticker": ticker,
+                    "price": round(close, 2),
+                    "change_pct": change_pct,
+                    "score": score,
+                    "rsi": rsi,
+                    "volume_ratio": volume_ratio,
+                    "boll_pct": boll_pct,
+                    "high20": round(high20, 2),
+                    "high52": round(high52, 2),
+                    "reason": "、".join(reasons)
+                })
+
+        except Exception as e:
+            print("Breakout scan error:", ticker, e)
+
+    results = sorted(results, key=lambda x: x["score"], reverse=True)[:10]
+
+    BREAKOUT_CACHE["time"] = now
+    BREAKOUT_CACHE["data"] = results
+
+    return results   
 
 
 def get_insider_data(ticker):   
@@ -576,6 +684,7 @@ def get_sector_rotation():
     sector_data = []
 
     SECTOR_ETFS = {
+        "QQQ": "科技",
         "SMH": "半导体",
         "IGV": "软件",
         "XLF": "金融",
@@ -586,12 +695,23 @@ def get_sector_rotation():
 
     for ticker, name in SECTOR_ETFS.items():
         try:
-            analysis, _, _, err = analyze_ticker(ticker)
+            df = get_history(ticker, days=5, interval="5m")
 
-            if err or not analysis:
+            if df is None or df.empty or len(df) < 2:
+                print("Sector no intraday data:", ticker)
                 continue
 
-            change_pct = float(str(analysis.get("change_pct", "0")).replace("%", ""))
+            close = float(df["Close"].iloc[-1])
+
+            # 找昨日/前一交易日参考价
+            daily = get_history(ticker, days=5, interval="1d")
+            if daily is None or daily.empty or len(daily) < 2:
+                print("Sector no daily data:", ticker)
+                continue
+
+            prev_close = float(daily["Close"].iloc[-2])
+
+            change_pct = round(((close - prev_close) / prev_close) * 100, 2)
 
             if change_pct >= 2:
                 status = "🔥 强势"
@@ -607,7 +727,7 @@ def get_sector_rotation():
             sector_data.append({
                 "ticker": ticker,
                 "name": name,
-                "change": round(change_pct, 2),
+                "change": change_pct,
                 "status": status
             })
 
@@ -2067,6 +2187,11 @@ def market():
 def scan_rebound():
     picks = get_rebound_signals()
     return render_template("rebound.html", picks=picks)
+
+@app.route("/scan_breakout")
+def scan_breakout():
+    results = scan_qqq_breakouts()
+    return render_template("breakout.html", results=results)
 
 @app.route("/news/<ticker>")
 def stock_news(ticker):

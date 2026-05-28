@@ -325,6 +325,12 @@ def get_company_news(ticker, limit=5):
 
         r = requests.get(url, params=params, timeout=10)
 
+        print("NEWS TICKER:", ticker)
+        print("FINNHUB KEY EXISTS:", bool(FINNHUB_API_KEY))
+        print("FINNHUB URL:", url)
+        print("NEWS STATUS:", r.status_code)
+        print("NEWS TEXT:", r.text[:300])
+
         js = r.json()
 
         news = []

@@ -2161,41 +2161,89 @@ def get_market_status():
 
     return result
 
-
+SPY_TICKERS = load_tickers("spy.txt")
 def get_rebound_signals():
     picks = []
+    tickers = load_tickers("spy.txt")
 
-    for ticker in UNIVERSE:
+    for ticker in tickers:
         analysis, _, _, err = analyze_ticker(ticker)
         if err or not analysis:
             continue
-
         try:
-            price = float(analysis["price"])
-            rsi = float(analysis["rsi"])
-            macd_hist = float(analysis["macd_hist"])
-            ma20 = float(str(analysis["ma20"]).replace("$", "").replace(",", ""))
+            price = clean_num(analysis["price"])
+            rsi = clean_num(analysis["rsi"])
+            macd_hist = clean_num(analysis["macd_hist"])
+            ma20 = clean_num(analysis["ma20"])
+            ma60 = clean_num(analysis.get("ma60", 0))
+            boll_pct = clean_num(analysis.get("boll_pct", 50))
+            volume_ratio = clean_num(analysis.get("volume_ratio", 1))
+            if price <= 0 or ma20 <= 0:
+                continue
 
-            near_ma20 = abs(price - ma20) / ma20 <= 0.08 # 距离MA20 8%内
+            # 距离 MA20
+            near_ma20 = abs(price - ma20) / ma20 <= 0.06
+            score = 0
+            reasons = []
 
-            if 20 <= rsi <= 55 and macd_hist > -1.5 and near_ma20:
-                picks.append({
-                    "ticker": analysis["ticker"],
-                    "price": analysis["price_fmt"],
-                    "rsi": analysis["rsi"],
-                    "macd": analysis["macd_hist"],
-                    "ma20": analysis["ma20"],
-                    "decision": analysis["decision"],
-                    "setup": "低位反弹信号",
-                    "buy_low": analysis["buy_low"],
-                    "buy_high": analysis["buy_high"],
-                    "stop": analysis["stop"],
-                })
+            # 低位反弹核心
+            if 35 <= rsi <= 55:
+                score += 2
+                reasons.append("RSI低位回升")
+            if macd_hist > -1.5:
+                score += 1
+                reasons.append("MACD未继续恶化")
+            if near_ma20:
+                score += 2
+                reasons.append("靠近MA20")
+            if ma60 > 0 and price > ma60:
+                score += 2
+                reasons.append("中期趋势未破")
+            if 20 <= boll_pct <= 65:
+                score += 2
+                reasons.append("BOLL低位/中低位")
+            if volume_ratio >= 0.8:
+                score += 1
+                reasons.append("量能正常")
 
-        except Exception:
+            # 太高不要
+            if rsi > 60 or boll_pct > 75:
+                continue
+            if score < 5:
+                continue
+            support = max(ma20 * 0.97, price * 0.94)
+            stop = round(support * 0.98, 2)
+            stop_pct = round((price - stop) / price * 100, 1)
+            if stop_pct > 8:
+                continue
+
+            buy_low = round(price * 0.985, 2)
+            buy_high = round(price * 1.005, 2)
+            target1 = round(price * 1.06, 2)
+            target2 = round(price * 1.12, 2)
+            picks.append({
+                "ticker": analysis["ticker"],
+                "price": analysis["price_fmt"],
+                "rsi": analysis["rsi"],
+                "macd": analysis["macd_hist"],
+                "ma20": analysis["ma20"],
+                "decision": "💎 低位反弹",
+                "setup": "低位反弹信号",
+                "buy_low": buy_low,
+                "buy_high": buy_high,
+                "stop": stop,
+                "stop_pct": stop_pct,
+                "target1": target1,
+                "target2": target2,
+                "score": score,
+                "reasons": "、".join(reasons)
+            })
+
+        except Exception as e:
+            print("rebound error:", ticker, e)
             continue
 
-    return picks[:3]
+    return sorted(picks, key=lambda x: x["score"], reverse=True)[:5]
 
 
 @app.route("/", methods=["GET", "POST"])

@@ -72,16 +72,6 @@ UNIVERSE = [
     "QQQ","SPY","SMH","IGV","SPMO"
 ]
 
-QQQ_TICKERS = [
-    "AAPL","MSFT","NVDA","AMZN","META","GOOGL","GOOG",
-    "AVGO","TSLA","AMD","NFLX","COST","ADBE","PEP",
-    "CSCO","TMUS","INTC","QCOM","AMAT","TXN",
-    "MU","INTU","ISRG","BKNG","ADP","VRTX",
-    "LRCX","PANW","KLAC","SNPS","CDNS","MAR",
-    "CRWD","FTNT","MELI","MRVL","ASML","CTAS",
-    "NXPI","WDAY","TEAM","ORLY","PAYX","ROST",
-    "ODFL","KDP","FAST","CPRT","CHTR","PCAR"
-]
 
 MARKET_TICKERS = ["SPY", "QQQ"]
 
@@ -136,8 +126,17 @@ def summarize_news_with_ai(title, summary):
         return summary
     
 
-BREAKOUT_CACHE = {"time": 0, "data": []}
-BREAKOUT_CACHE_TTL = 60 * 30   # 30分钟缓存
+HUNTER_CACHE = {"time": 0, "data": []}
+HUNTER_CACHE_TTL = 60 * 30
+
+
+def load_tickers(filename):
+    try:
+        with open(f"data/{filename}", "r") as f:
+            return [x.strip().upper() for x in f.readlines() if x.strip()]
+    except Exception as e:
+        print("load ticker error:", e)
+        return []
 
 
 def clean_num(x):
@@ -148,70 +147,82 @@ def clean_num(x):
 
 
 def scan_market_hunter():
-    tickers = QQQ_TICKERS
+    now = time.time()
+    if HUNTER_CACHE["data"] and now - HUNTER_CACHE["time"] < HUNTER_CACHE_TTL:
+        return HUNTER_CACHE["data"]
+
+    tickers = load_tickers("spy.txt")
     results = []
 
-    qqq_analysis, _, _, _ = analyze_ticker("QQQ")
-    qqq_change = clean_num(qqq_analysis.get("change_pct", 0)) if qqq_analysis else 0
+    # QQQ 参考强弱
+    qqq_df = get_history("QQQ", days=180, interval="1d")
+    qqq_change = 0
+
+    if qqq_df is not None and not qqq_df.empty and len(qqq_df) >= 2:
+        qqq_df.columns = [str(c).capitalize() for c in qqq_df.columns]
+        qqq_close = float(qqq_df["Close"].iloc[-1])
+        qqq_prev = float(qqq_df["Close"].iloc[-2])
+        qqq_change = round((qqq_close / qqq_prev - 1) * 100, 2)
 
     for ticker in tickers:
         try:
             df = get_history(ticker, days=180, interval="1d")
 
             if df is None or df.empty or len(df) < 120:
-                print("Hunter skip:", ticker, "no enough data")
                 continue
 
             df.columns = [str(c).capitalize() for c in df.columns]
-
             close = float(df["Close"].iloc[-1])
             prev_close = float(df["Close"].iloc[-2])
-
+            high = float(df["High"].iloc[-1])
+            low = float(df["Low"].iloc[-1])
             ma20 = float(df["Close"].rolling(20).mean().iloc[-1])
             ma60 = float(df["Close"].rolling(60).mean().iloc[-1])
             ma120 = float(df["Close"].rolling(120).mean().iloc[-1])
             high20 = float(df["High"].rolling(20).max().iloc[-2])
+            low20 = float(df["Low"].rolling(20).min().iloc[-2])
             change_pct = round((close / prev_close - 1) * 100, 2)
+            rs_strength = round(change_pct - qqq_change, 2)
             vol = float(df["Volume"].iloc[-1])
             vol20 = float(df["Volume"].rolling(20).mean().iloc[-1])
             volume_ratio = round(vol / vol20, 2) if vol20 else 0
+            dollar_volume = close * vol
+
+            # RSI
             delta = df["Close"].diff()
             gain = delta.where(delta > 0, 0).rolling(14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
             rs = gain / loss
             rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 2)
+
+            # BOLL
             mid = df["Close"].rolling(20).mean()
             std = df["Close"].rolling(20).std()
             bb_upper = float((mid + 2 * std).iloc[-1])
             bb_lower = float((mid - 2 * std).iloc[-1])
             boll_pct = round(((close - bb_lower) / (bb_upper - bb_lower)) * 100, 1) if bb_upper != bb_lower else 50
 
-            if close <= 0 or ma20 <= 0 or ma60 <= 0:
-                print("Hunter bad data:", ticker, analysis.get("price"), analysis.get("ma20"), analysis.get("ma60"))
+            # ATR 波动
+            tr1 = df["High"] - df["Low"]
+            tr2 = abs(df["High"] - df["Close"].shift())
+            tr3 = abs(df["Low"] - df["Close"].shift())
+            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+            atr14 = float(tr.rolling(14).mean().iloc[-1])
+            atr_pct = round((atr14 / close) * 100, 2)
+
+            # 过滤垃圾 / 低波动 / 无资金
+            if close < 20:
                 continue
-
-            if ma120 <= 0:
-                ma120 = ma60
-
-            if prev_close <= 0:
-                prev_close = close
-
-            # 如果 analysis 没有 high20，就从 df 里补
-            if high20 <= 0 and df is not None and not df.empty:
-                df.columns = [str(c).capitalize() for c in df.columns]
-                if "High" in df.columns and len(df) >= 21:
-                    high20 = clean_num(df["High"].rolling(20).max().iloc[-2])
-
-            if high20 <= 0:
-                high20 = close
-
-            rs_strength = round(change_pct - qqq_change, 2)
+            if atr_pct < 2.0:
+                continue
+            if dollar_volume < 50_000_000:
+                continue
 
             score = 0
             reasons = []
             setup_type = "👀 观察"
 
-            # 1️⃣ 强势回调：最优先
+            # 强势回调：优先
             if (
                 close > ma20 > ma60
                 and abs(close - ma20) / ma20 <= 0.035
@@ -219,32 +230,33 @@ def scan_market_hunter():
                 and boll_pct < 80
             ):
                 setup_type = "🟡 强势回调"
-                score += 6
+                score += 7
                 reasons += ["趋势回踩MA20", "低风险位置"]
 
-            # 2️⃣ 主升浪
+            # 主升浪
             elif (
-                close > ma20 > ma60 >= ma120
+                close > ma20 > ma60 > ma120
                 and 55 <= rsi <= 72
                 and rs_strength > 0
                 and boll_pct < 90
             ):
                 setup_type = "🚀 主升浪"
-                score += 5
-                reasons += ["多头结构", "中期趋势强", f"RSI健康 {round(rsi,1)}", f"强过QQQ {rs_strength}%"]
+                score += 6
+                reasons += ["多头结构", "中期趋势强", f"强过QQQ {rs_strength}%"]
 
-            # 3️⃣ 突破
+            # 真突破
             elif (
                 close > high20
+                and volume_ratio >= 1.2
                 and 55 <= rsi <= 72
                 and rs_strength > 0
                 and boll_pct < 92
             ):
-                setup_type = "🔥 突破"
-                score += 4
-                reasons += ["突破20日高", f"RSI健康 {round(rsi,1)}"]
+                setup_type = "🔥 真突破"
+                score += 6
+                reasons += ["突破20日高", "放量确认"]
 
-            # 4️⃣ 低位启动
+            # 低位启动
             elif (
                 close > ma20
                 and prev_close < ma20
@@ -252,66 +264,82 @@ def scan_market_hunter():
                 and 20 <= boll_pct <= 65
             ):
                 setup_type = "💎 低位启动"
-                score += 3
+                score += 4
                 reasons += ["重新站回MA20", "低位转强"]
 
+            # 加分
             if rs_strength > 1:
                 score += 2
                 reasons.append("明显强过QQQ")
             elif rs_strength > 0.5:
                 score += 1
                 reasons.append("略强QQQ")
-
-            if close >= high20 * 0.98:
+            if volume_ratio >= 1.5:
+                score += 2
+                reasons.append("明显放量")
+            elif volume_ratio >= 1.0:
                 score += 1
-                reasons.append("接近20日突破")
+                reasons.append("量能正常")
+            if close >= high * 0.98:
+                score += 1
+                reasons.append("收盘靠近高位")
 
+            # 风险扣分
             if rsi >= 75:
                 score -= 3
                 reasons.append("RSI过热")
-
             if boll_pct >= 95:
                 score -= 4
-                reasons.append("接近BOLL上轨")
+                reasons.append("严重接近上轨")
             elif boll_pct >= 88:
                 score -= 2
                 reasons.append("防追高")
-
-            if volume_ratio < 0.5:
-                reasons.append("成交量偏低")
-
-            if score < 4:
+            if volume_ratio < 0.8:
+                score -= 1
+                reasons.append("等待放量确认")
+            if score < 5:
                 continue
 
+            # 买区 / 止损 / 目标
             buy_low = round(close * 0.985, 2)
             buy_high = round(close * 1.01, 2)
-            stop = round(min(ma20 * 0.97, close * 0.94), 2)
+            stop = round(min(ma20 * 0.97, low20 * 0.98, close * 0.94), 2)
             target1 = round(close * 1.06, 2)
             target2 = round(close * 1.12, 2)
+            stop_pct = round((close - stop) / close * 100, 1)
 
             if boll_pct > 90 or rsi > 74:
+                risk_level = "高"
                 entry_status = "⚠️ 不追高"
-            elif setup_type in ["🚀 主升浪", "🟡 强势回调"]:
-                entry_status = "✅ 可观察"
+            elif stop_pct > 8:
+                risk_level = "中"
+                entry_status = "👀 等更好位置"
+            elif volume_ratio < 0.8:
+                risk_level = "中"
+                entry_status = "👀 等放量确认"
             else:
-                entry_status = "👀 观察"
-
+                risk_level = "较低"
+                entry_status = "✅ 可观察"
             results.append({
                 "ticker": ticker,
                 "price": round(close, 2),
                 "score": score,
-                "change_pct": round(change_pct, 2),
+               "change_pct": change_pct,
                 "setup_type": setup_type,
                 "entry_status": entry_status,
-                "rsi": round(rsi, 2),
-                "boll_pct": round(boll_pct, 1),
-                "volume_ratio": round(volume_ratio, 2),
-                "rs_strength": round(rs_strength, 2),
+                "risk_level": risk_level,
+                "rsi": rsi,
+                "boll_pct": boll_pct,
+                "volume_ratio": volume_ratio,
+                "rs_strength": rs_strength,
+                "atr_pct": atr_pct,
+                "dollar_volume": round(dollar_volume / 1_000_000, 1),
                 "high20": round(high20, 2),
                 "reasons": "、".join(reasons),
                 "buy_low": buy_low,
                 "buy_high": buy_high,
                 "stop": stop,
+                "stop_pct": stop_pct,
                 "target1": target1,
                 "target2": target2
             })
@@ -319,8 +347,12 @@ def scan_market_hunter():
         except Exception as e:
             print("Hunter error:", ticker, e)
 
-    return sorted(results, key=lambda x: x["score"], reverse=True)
+    results = sorted(results, key=lambda x: x["score"], reverse=True)[:20]
 
+    HUNTER_CACHE["time"] = now
+    HUNTER_CACHE["data"] = results
+
+    return results
 
 def get_insider_data(ticker):   
 

@@ -99,29 +99,22 @@ body{
         </div>
     </div>
 
-    <div style="margin-top:8px;color:#facc15;font-weight:700;">
-        {{ s.setup_type }}
+    <div style="color:#facc15;font-weight:700;">
+        {{ s.setup_type }} ｜ {{ s.entry_status }}
     </div>
-
-    <div class="row">
-        <div>RSI {{ s.rsi }}</div>
-        <div>Vol {{ s.volume_ratio }}x</div>
-        <div>强过QQQ {{ s.rs_strength }}%</div>
+    <div>
+        RSI {{ s.rsi }} ｜ Vol {{ s.volume_ratio }}x ｜ ATR {{ s.atr_pct }}%
     </div>
-
-    <div class="row">
-        <div>20日高 {{ s.high20 }}</div>
-        <div>BOLL {{ s.boll_pct }}%</div>
+    <div>
+        强过QQQ {{ s.rs_strength }}% ｜ 风险：{{ s.risk_level }}
     </div>
-
-    <div class="reason">
-        {{ s.reason }}
-    </div>
-
-    <div class="reason">
+    <div>
         买区：${{ s.buy_low }} - ${{ s.buy_high }}<br>
-        止损：${{ s.stop }}<br>
+        止损：${{ s.stop }}（{{ s.stop_pct }}%）<br>
         目标：${{ s.target1 }} / ${{ s.target2 }}
+    </div>
+    <div style="color:#cbd5e1;margin-top:8px;">
+        {{ s.reasons }}
     </div>
 
 </div>

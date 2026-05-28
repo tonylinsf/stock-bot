@@ -72,7 +72,7 @@ body{
 <a href="/" class="back-btn">← 返回首页</a>
 
 <div class="title">
-🚀 QQQ 突破扫描
+🧠 AI 市场猎手
 </div>
 
 {% for s in results %}
@@ -99,28 +99,29 @@ body{
         </div>
     </div>
 
-    <div class="row">
-        <div>
-            RSI {{ s.rsi }}
-        </div>
-
-        <div>
-            Vol {{ s.volume_ratio }}x
-        </div>
+    <div style="margin-top:8px;color:#facc15;font-weight:700;">
+        {{ s.setup_type }}
     </div>
 
     <div class="row">
-        <div>
-            20日高 {{ s.high20 }}
-        </div>
+        <div>RSI {{ s.rsi }}</div>
+        <div>Vol {{ s.volume_ratio }}x</div>
+        <div>强过QQQ {{ s.rs_strength }}%</div>
+    </div>
 
-        <div>
-            52周高 {{ s.high52 }}
-        </div>
+    <div class="row">
+        <div>20日高 {{ s.high20 }}</div>
+        <div>BOLL {{ s.boll_pct }}%</div>
     </div>
 
     <div class="reason">
         {{ s.reason }}
+    </div>
+
+    <div class="reason">
+        买区：${{ s.buy_low }} - ${{ s.buy_high }}<br>
+        止损：${{ s.stop }}<br>
+        目标：${{ s.target1 }} / ${{ s.target2 }}
     </div>
 
 </div>

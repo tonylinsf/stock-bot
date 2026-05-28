@@ -73,11 +73,14 @@ UNIVERSE = [
 ]
 
 QQQ_TICKERS = [
-    "NVDA","MSFT","AAPL","AVGO","AMZN","META","GOOGL","GOOG","TSLA","NFLX",
-    "COST","AMD","PLTR","ADBE","CSCO","PEP","TMUS","INTU","QCOM","AMAT",
-    "TXN","ISRG","BKNG","AMGN","HON","VRTX","MU","PANW","LRCX","ADP",
-    "ADI","MELI","KLAC","CRWD","SBUX","GILD","MDLZ","REGN","SNPS","CDNS",
-    "MAR","PYPL","ORLY","ABNB","CTAS","MNST","CSX","NXPI","MRVL","ROP"
+    "AAPL","MSFT","NVDA","AMZN","META","GOOGL","GOOG",
+    "AVGO","TSLA","AMD","NFLX","COST","ADBE","PEP",
+    "CSCO","TMUS","INTC","QCOM","AMAT","TXN",
+    "MU","INTU","ISRG","BKNG","ADP","VRTX",
+    "LRCX","PANW","KLAC","SNPS","CDNS","MAR",
+    "CRWD","FTNT","MELI","MRVL","ASML","CTAS",
+    "NXPI","WDAY","TEAM","ORLY","PAYX","ROST",
+    "ODFL","KDP","FAST","CPRT","CHTR","PCAR"
 ]
 
 MARKET_TICKERS = ["SPY", "QQQ"]
@@ -137,7 +140,7 @@ BREAKOUT_CACHE = {"time": 0, "data": []}
 BREAKOUT_CACHE_TTL = 60 * 30   # 30分钟缓存
 
 
-def scan_qqq_breakouts():
+def scan_market_hunter():
     now = time.time()
 
     if BREAKOUT_CACHE["data"] and now - BREAKOUT_CACHE["time"] < BREAKOUT_CACHE_TTL:
@@ -147,23 +150,29 @@ def scan_qqq_breakouts():
 
     for ticker in QQQ_TICKERS:
         try:
-            df = get_history(ticker, days=120, interval="1d")
+            df = get_history(ticker, days=180, interval="1d")
 
-            if df is None or df.empty or len(df) < 60:
+            if df is None or df.empty or len(df) < 80:
                 continue
 
             close = float(df["Close"].iloc[-1])
             prev_close = float(df["Close"].iloc[-2])
+            high = float(df["High"].iloc[-1])
+            low = float(df["Low"].iloc[-1])
 
             ma20 = float(df["Close"].rolling(20).mean().iloc[-1])
             ma60 = float(df["Close"].rolling(60).mean().iloc[-1])
+            ma120 = float(df["Close"].rolling(120).mean().iloc[-1])
 
             high20 = float(df["High"].rolling(20).max().iloc[-2])
+            high50 = float(df["High"].rolling(50).max().iloc[-2])
             high52 = float(df["High"].rolling(120).max().iloc[-1])
 
             vol = float(df["Volume"].iloc[-1])
             vol20 = float(df["Volume"].rolling(20).mean().iloc[-1])
             volume_ratio = round(vol / vol20, 2) if vol20 else 0
+
+            change_pct = round(((close - prev_close) / prev_close) * 100, 2)
 
             # RSI
             delta = df["Close"].diff()
@@ -172,41 +181,134 @@ def scan_qqq_breakouts():
             rs = gain / loss
             rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 2)
 
-            # BOLL位置
+            # BOLL
             mid = df["Close"].rolling(20).mean()
             std = df["Close"].rolling(20).std()
             upper = float((mid + 2 * std).iloc[-1])
             lower = float((mid - 2 * std).iloc[-1])
             boll_pct = round(((close - lower) / (upper - lower)) * 100, 1) if upper != lower else 50
 
-            change_pct = round(((close - prev_close) / prev_close) * 100, 2)
+            # Relative Strength vs QQQ
+            qqq_df = get_history("QQQ", days=10, interval="1d")
+            rs_strength = 0
+            if qqq_df is not None and not qqq_df.empty and len(qqq_df) >= 2:
+                qqq_last = float(qqq_df["Close"].iloc[-1])
+                qqq_prev = float(qqq_df["Close"].iloc[-2])
+                qqq_pct = ((qqq_last - qqq_prev) / qqq_prev) * 100
+                rs_strength = round(change_pct - qqq_pct, 2)
+
+            # 收盘位置：越接近当天高位越强
+            close_position = round(((close - low) / (high - low)) * 100, 1) if high != low else 50
 
             score = 0
             reasons = []
 
-            if close > ma20:
+            # 趋势
+            if close > ma20 > ma60:
                 score += 2
-                reasons.append("站上MA20")
+                reasons.append("多头结构")
 
-            if ma20 > ma60:
+            if ma20 > ma60 > ma120:
                 score += 2
-                reasons.append("MA20>MA60")
+                reasons.append("中期趋势强")
 
-            if close >= high20 * 0.98:
+            # 突破
+            if close > high20:
+                score += 3
+                reasons.append("突破20日高")
+            elif close >= high20 * 0.98:
                 score += 2
                 reasons.append("接近20日突破")
 
+            if close > high50:
+                score += 2
+                reasons.append("突破50日高")
+
+            # 动能
             if 55 <= rsi <= 75:
                 score += 2
                 reasons.append(f"RSI健康 {rsi}")
-
-            if volume_ratio >= 1.2:
-                score += 2
-                reasons.append(f"放量 {volume_ratio}x")
-
-            if boll_pct > 85:
+            elif rsi > 80:
                 score -= 2
-                reasons.append("接近上轨，不追高")
+                reasons.append("RSI过热")
+
+            # 成交量
+            if volume_ratio >= 1.5:
+                score += 2
+                reasons.append(f"明显放量 {volume_ratio}x")
+            elif volume_ratio >= 1.2:
+                score += 1
+                reasons.append(f"温和放量 {volume_ratio}x")
+
+            # 强过QQQ
+            if rs_strength > 1:
+                score += 2
+                reasons.append(f"强过QQQ {rs_strength}%")
+            elif rs_strength > 0:
+                score += 1
+                reasons.append(f"略强QQQ {rs_strength}%")
+
+            # 不追高
+            if boll_pct > 88:
+                score -= 2
+                reasons.append("接近上轨，防追高")
+
+            if close_position >= 70:
+                score += 1
+                reasons.append("收盘靠近高位")
+
+            # 类型判断
+            setup_type = "👀 观察"
+
+            # 1️⃣ 主升浪
+            if (
+                close > ma20 > ma60 > ma120
+                and 55 <= rsi <= 75
+                and rs_strength > 0
+            ):
+                setup_type = "🚀 主升浪"
+
+            # 2️⃣ 突破
+            elif (
+                close > high20
+                and volume_ratio >= 1.2
+                and 55 <= rsi <= 75
+            ):
+                setup_type = "🔥 突破"
+
+            # 3️⃣ 低位启动
+            elif (
+                close > ma20
+                and prev_close < ma20
+                and 45 <= rsi <= 60
+                and 20 <= boll_pct <= 60
+            ):
+                setup_type = "💎 低位启动"
+
+            # 4️⃣ 强势回调
+            elif (
+                close > ma60
+                and abs(close - ma20) / ma20 <= 0.04
+                and ma20 > ma60
+                and 40 <= rsi <= 60
+            ):
+                setup_type = "🟡 强势回调"
+
+            if setup_type == "🚀 主升浪":
+                score += 4
+            elif setup_type == "🔥 突破":
+                score += 4
+            elif setup_type == "💎 低位启动":
+                score += 3
+            elif setup_type == "🟡 强势回调":
+                score += 3    
+
+            # 买点 / 止损 / 目标
+            buy_low = round(max(ma20, close * 0.985), 2)
+            buy_high = round(close * 1.01, 2)
+            stop = round(min(ma20 * 0.97, close * 0.94), 2)
+            target1 = round(close * 1.06, 2)
+            target2 = round(close * 1.12, 2)
 
             if score >= 6:
                 results.append({
@@ -219,6 +321,13 @@ def scan_qqq_breakouts():
                     "boll_pct": boll_pct,
                     "high20": round(high20, 2),
                     "high52": round(high52, 2),
+                    "rs_strength": rs_strength,
+                    "setup_type": setup_type,
+                    "buy_low": buy_low,
+                    "buy_high": buy_high,
+                    "stop": stop,
+                    "target1": target1,
+                    "target2": target2,
                     "reason": "、".join(reasons)
                 })
 
@@ -230,7 +339,7 @@ def scan_qqq_breakouts():
     BREAKOUT_CACHE["time"] = now
     BREAKOUT_CACHE["data"] = results
 
-    return results   
+    return results
 
 
 def get_insider_data(ticker):   
@@ -2188,10 +2297,10 @@ def scan_rebound():
     picks = get_rebound_signals()
     return render_template("rebound.html", picks=picks)
 
-@app.route("/scan_breakout")
-def scan_breakout():
-    results = scan_qqq_breakouts()
-    return render_template("breakout.html", results=results)
+@app.route("/market_hunter")
+def market_hunter():
+    results = scan_market_hunter()
+    return render_template("market_hunter.html", results=results)
 
 @app.route("/news/<ticker>")
 def stock_news(ticker):

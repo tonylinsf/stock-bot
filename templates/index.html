@@ -575,10 +575,12 @@
       </div>
   </div>
 
-    <div style="margin-top:10px;">
-        <a href="/market_hunter">
-            <button type="button">🧠 AI 市场猎手</button>
-        </a>
+    <a href="/market_hunter" onclick="showHunterLoading()">
+        <button type="button" id="hunterBtn">🧠 AI 市场猎手</button>
+    </a>
+    <div id="hunterLoading"
+         style="display:none; margin-top:10px; color:#93c5fd; font-weight:700;">
+        ⏳ AI 市场猎手正在扫描 QQQ 成份股，请稍等...
     </div>
 
     <div style="margin-top:10px;">
@@ -999,6 +1001,19 @@ function showLoading() {
 <script>
 function showSectorLoading() {
     document.getElementById("sectorLoading").style.display = "block";
+}
+</script>
+
+<script>
+function showHunterLoading() {
+    const msg = document.getElementById("hunterLoading");
+    const btn = document.getElementById("hunterBtn");
+
+    if (msg) msg.style.display = "block";
+    if (btn) {
+        btn.innerText = "⏳ 扫描中...";
+        btn.disabled = true;
+    }
 }
 </script>
 

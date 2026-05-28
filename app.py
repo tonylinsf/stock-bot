@@ -140,206 +140,186 @@ BREAKOUT_CACHE = {"time": 0, "data": []}
 BREAKOUT_CACHE_TTL = 60 * 30   # 30分钟缓存
 
 
+def clean_num(x):
+    try:
+        return float(str(x).replace("$", "").replace("%", "").replace("x", "").replace(",", "").strip())
+    except:
+        return 0
+
+
 def scan_market_hunter():
-    now = time.time()
-
-    if BREAKOUT_CACHE["data"] and now - BREAKOUT_CACHE["time"] < BREAKOUT_CACHE_TTL:
-        return BREAKOUT_CACHE["data"]
-
+    tickers = QQQ_TICKERS
     results = []
 
-    for ticker in QQQ_TICKERS:
+    qqq_analysis, _, _, _ = analyze_ticker("QQQ")
+    qqq_change = clean_num(qqq_analysis.get("change_pct", 0)) if qqq_analysis else 0
+
+    for ticker in tickers:
         try:
             df = get_history(ticker, days=180, interval="1d")
 
-            if df is None or df.empty or len(df) < 80:
+            if df is None or df.empty or len(df) < 120:
+                print("Hunter skip:", ticker, "no enough data")
                 continue
+
+            df.columns = [str(c).capitalize() for c in df.columns]
 
             close = float(df["Close"].iloc[-1])
             prev_close = float(df["Close"].iloc[-2])
-            high = float(df["High"].iloc[-1])
-            low = float(df["Low"].iloc[-1])
 
             ma20 = float(df["Close"].rolling(20).mean().iloc[-1])
             ma60 = float(df["Close"].rolling(60).mean().iloc[-1])
             ma120 = float(df["Close"].rolling(120).mean().iloc[-1])
-
             high20 = float(df["High"].rolling(20).max().iloc[-2])
-            high50 = float(df["High"].rolling(50).max().iloc[-2])
-            high52 = float(df["High"].rolling(120).max().iloc[-1])
-
+            change_pct = round((close / prev_close - 1) * 100, 2)
             vol = float(df["Volume"].iloc[-1])
             vol20 = float(df["Volume"].rolling(20).mean().iloc[-1])
             volume_ratio = round(vol / vol20, 2) if vol20 else 0
-
-            change_pct = round(((close - prev_close) / prev_close) * 100, 2)
-
-            # RSI
             delta = df["Close"].diff()
             gain = delta.where(delta > 0, 0).rolling(14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
             rs = gain / loss
             rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 2)
-
-            # BOLL
             mid = df["Close"].rolling(20).mean()
             std = df["Close"].rolling(20).std()
-            upper = float((mid + 2 * std).iloc[-1])
-            lower = float((mid - 2 * std).iloc[-1])
-            boll_pct = round(((close - lower) / (upper - lower)) * 100, 1) if upper != lower else 50
+            bb_upper = float((mid + 2 * std).iloc[-1])
+            bb_lower = float((mid - 2 * std).iloc[-1])
+            boll_pct = round(((close - bb_lower) / (bb_upper - bb_lower)) * 100, 1) if bb_upper != bb_lower else 50
 
-            # Relative Strength vs QQQ
-            qqq_df = get_history("QQQ", days=10, interval="1d")
-            rs_strength = 0
-            if qqq_df is not None and not qqq_df.empty and len(qqq_df) >= 2:
-                qqq_last = float(qqq_df["Close"].iloc[-1])
-                qqq_prev = float(qqq_df["Close"].iloc[-2])
-                qqq_pct = ((qqq_last - qqq_prev) / qqq_prev) * 100
-                rs_strength = round(change_pct - qqq_pct, 2)
+            if close <= 0 or ma20 <= 0 or ma60 <= 0:
+                print("Hunter bad data:", ticker, analysis.get("price"), analysis.get("ma20"), analysis.get("ma60"))
+                continue
 
-            # 收盘位置：越接近当天高位越强
-            close_position = round(((close - low) / (high - low)) * 100, 1) if high != low else 50
+            if ma120 <= 0:
+                ma120 = ma60
+
+            if prev_close <= 0:
+                prev_close = close
+
+            # 如果 analysis 没有 high20，就从 df 里补
+            if high20 <= 0 and df is not None and not df.empty:
+                df.columns = [str(c).capitalize() for c in df.columns]
+                if "High" in df.columns and len(df) >= 21:
+                    high20 = clean_num(df["High"].rolling(20).max().iloc[-2])
+
+            if high20 <= 0:
+                high20 = close
+
+            rs_strength = round(change_pct - qqq_change, 2)
 
             score = 0
             reasons = []
-
-            # 趋势
-            if close > ma20 > ma60:
-                score += 2
-                reasons.append("多头结构")
-
-            if ma20 > ma60 > ma120:
-                score += 2
-                reasons.append("中期趋势强")
-
-            # 突破
-            if close > high20:
-                score += 3
-                reasons.append("突破20日高")
-            elif close >= high20 * 0.98:
-                score += 2
-                reasons.append("接近20日突破")
-
-            if close > high50:
-                score += 2
-                reasons.append("突破50日高")
-
-            # 动能
-            if 55 <= rsi <= 75:
-                score += 2
-                reasons.append(f"RSI健康 {rsi}")
-            elif rsi > 80:
-                score -= 2
-                reasons.append("RSI过热")
-
-            # 成交量
-            if volume_ratio >= 1.5:
-                score += 2
-                reasons.append(f"明显放量 {volume_ratio}x")
-            elif volume_ratio >= 1.2:
-                score += 1
-                reasons.append(f"温和放量 {volume_ratio}x")
-
-            # 强过QQQ
-            if rs_strength > 1:
-                score += 2
-                reasons.append(f"强过QQQ {rs_strength}%")
-            elif rs_strength > 0:
-                score += 1
-                reasons.append(f"略强QQQ {rs_strength}%")
-
-            # 不追高
-            if boll_pct > 88:
-                score -= 2
-                reasons.append("接近上轨，防追高")
-
-            if close_position >= 70:
-                score += 1
-                reasons.append("收盘靠近高位")
-
-            # 类型判断
             setup_type = "👀 观察"
 
-            # 1️⃣ 主升浪
+            # 1️⃣ 强势回调：最优先
             if (
-                close > ma20 > ma60 > ma120
-                and 55 <= rsi <= 75
+                close > ma20 > ma60
+                and abs(close - ma20) / ma20 <= 0.035
+                and 45 <= rsi <= 62
+                and boll_pct < 80
+            ):
+                setup_type = "🟡 强势回调"
+                score += 6
+                reasons += ["趋势回踩MA20", "低风险位置"]
+
+            # 2️⃣ 主升浪
+            elif (
+                close > ma20 > ma60 >= ma120
+                and 55 <= rsi <= 72
                 and rs_strength > 0
+                and boll_pct < 90
             ):
                 setup_type = "🚀 主升浪"
+                score += 5
+                reasons += ["多头结构", "中期趋势强", f"RSI健康 {round(rsi,1)}", f"强过QQQ {rs_strength}%"]
 
-            # 2️⃣ 突破
+            # 3️⃣ 突破
             elif (
                 close > high20
-                and volume_ratio >= 1.2
-                and 55 <= rsi <= 75
+                and 55 <= rsi <= 72
+                and rs_strength > 0
+                and boll_pct < 92
             ):
                 setup_type = "🔥 突破"
+                score += 4
+                reasons += ["突破20日高", f"RSI健康 {round(rsi,1)}"]
 
-            # 3️⃣ 低位启动
+            # 4️⃣ 低位启动
             elif (
                 close > ma20
                 and prev_close < ma20
                 and 45 <= rsi <= 60
-                and 20 <= boll_pct <= 60
+                and 20 <= boll_pct <= 65
             ):
                 setup_type = "💎 低位启动"
-
-            # 4️⃣ 强势回调
-            elif (
-                close > ma60
-                and abs(close - ma20) / ma20 <= 0.04
-                and ma20 > ma60
-                and 40 <= rsi <= 60
-            ):
-                setup_type = "🟡 强势回调"
-
-            if setup_type == "🚀 主升浪":
-                score += 4
-            elif setup_type == "🔥 突破":
-                score += 4
-            elif setup_type == "💎 低位启动":
                 score += 3
-            elif setup_type == "🟡 强势回调":
-                score += 3    
+                reasons += ["重新站回MA20", "低位转强"]
 
-            # 买点 / 止损 / 目标
-            buy_low = round(max(ma20, close * 0.985), 2)
+            if rs_strength > 1:
+                score += 2
+                reasons.append("明显强过QQQ")
+            elif rs_strength > 0.5:
+                score += 1
+                reasons.append("略强QQQ")
+
+            if close >= high20 * 0.98:
+                score += 1
+                reasons.append("接近20日突破")
+
+            if rsi >= 75:
+                score -= 3
+                reasons.append("RSI过热")
+
+            if boll_pct >= 95:
+                score -= 4
+                reasons.append("接近BOLL上轨")
+            elif boll_pct >= 88:
+                score -= 2
+                reasons.append("防追高")
+
+            if volume_ratio < 0.5:
+                reasons.append("成交量偏低")
+
+            if score < 4:
+                continue
+
+            buy_low = round(close * 0.985, 2)
             buy_high = round(close * 1.01, 2)
             stop = round(min(ma20 * 0.97, close * 0.94), 2)
             target1 = round(close * 1.06, 2)
             target2 = round(close * 1.12, 2)
 
-            if score >= 6:
-                results.append({
-                    "ticker": ticker,
-                    "price": round(close, 2),
-                    "change_pct": change_pct,
-                    "score": score,
-                    "rsi": rsi,
-                    "volume_ratio": volume_ratio,
-                    "boll_pct": boll_pct,
-                    "high20": round(high20, 2),
-                    "high52": round(high52, 2),
-                    "rs_strength": rs_strength,
-                    "setup_type": setup_type,
-                    "buy_low": buy_low,
-                    "buy_high": buy_high,
-                    "stop": stop,
-                    "target1": target1,
-                    "target2": target2,
-                    "reason": "、".join(reasons)
-                })
+            if boll_pct > 90 or rsi > 74:
+                entry_status = "⚠️ 不追高"
+            elif setup_type in ["🚀 主升浪", "🟡 强势回调"]:
+                entry_status = "✅ 可观察"
+            else:
+                entry_status = "👀 观察"
+
+            results.append({
+                "ticker": ticker,
+                "price": round(close, 2),
+                "score": score,
+                "change_pct": round(change_pct, 2),
+                "setup_type": setup_type,
+                "entry_status": entry_status,
+                "rsi": round(rsi, 2),
+                "boll_pct": round(boll_pct, 1),
+                "volume_ratio": round(volume_ratio, 2),
+                "rs_strength": round(rs_strength, 2),
+                "high20": round(high20, 2),
+                "reasons": "、".join(reasons),
+                "buy_low": buy_low,
+                "buy_high": buy_high,
+                "stop": stop,
+                "target1": target1,
+                "target2": target2
+            })
 
         except Exception as e:
-            print("Breakout scan error:", ticker, e)
+            print("Hunter error:", ticker, e)
 
-    results = sorted(results, key=lambda x: x["score"], reverse=True)[:10]
-
-    BREAKOUT_CACHE["time"] = now
-    BREAKOUT_CACHE["data"] = results
-
-    return results
+    return sorted(results, key=lambda x: x["score"], reverse=True)
 
 
 def get_insider_data(ticker):   

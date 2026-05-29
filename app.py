@@ -590,6 +590,45 @@ def get_company_news(ticker, limit=5):
         return []
 
 
+def get_pe_label(ticker):
+    try:
+        url = "https://finnhub.io/api/v1/stock/metric"
+        params = {
+            "symbol": ticker,
+            "metric": "all",
+            "token": FINNHUB_API_KEY
+        }
+        r = requests.get(url, params=params, timeout=8)
+        data = r.json().get("metric", {})
+        pe = data.get("peNormalizedAnnual") or data.get("peTTM")
+        if not pe:
+            return "", ""
+        pe = round(float(pe), 1)
+        if pe < 15:
+            label = "最便宜"
+            pe_color = "#22c55e"
+        elif pe < 30:
+            label = "合理"
+            pe_color = "#facc15"
+        else:
+            label = "偏贵"
+            pe_color = "#ef4444"
+        return {
+            "pe_text": f"{pe}x",
+            "pe_label": label,
+            "pe_color": pe_color
+        }
+
+    except:
+
+        return {
+            "pe_text": "",
+            "pe_label": "",
+            "pe_color": "#ffffff"
+
+        }
+
+
 def get_real_time_price(ticker):
     try:
         data = get_history(ticker, days=2)
@@ -1263,6 +1302,8 @@ def analyze_ticker(ticker):
     pct = None
     open_signal = "暂无盘前数据"
 
+    pe_info = get_pe_label(ticker)
+
     pre_price = info.get("preMarketPrice", None)
     post_price = info.get("postMarketPrice")
 
@@ -1768,6 +1809,9 @@ def analyze_ticker(ticker):
         "rr_ratio": rr_ratio,
         "support_text": support_text,
         "resistance_text": resistance_text,
+        "pe_text": pe_info["pe_text"],
+        "pe_label": pe_info["pe_label"],
+        "pe_color": pe_info["pe_color"],
         "flow_signal": "",
         "ma20": fmt_money(ma20),
         "ma50": fmt_money(ma50),
@@ -2178,6 +2222,7 @@ def get_rebound_signals():
             ma60 = clean_num(analysis.get("ma60", 0))
             boll_pct = clean_num(analysis.get("boll_pct", 50))
             volume_ratio = clean_num(analysis.get("volume_ratio", 1))
+        
             if price <= 0 or ma20 <= 0:
                 continue
 
@@ -2207,20 +2252,33 @@ def get_rebound_signals():
                 reasons.append("量能正常")
 
             # 太高不要
-            if rsi > 60 or boll_pct > 75:
+            if rsi > 60 or boll_pct > 85:
                 continue
             if score < 5:
                 continue
             support = max(ma20 * 0.97, price * 0.94)
             stop = round(support * 0.98, 2)
             stop_pct = round((price - stop) / price * 100, 1)
-            if stop_pct > 8:
+            if stop_pct > 10:
                 continue
 
             buy_low = round(price * 0.985, 2)
             buy_high = round(price * 1.005, 2)
             target1 = round(price * 1.06, 2)
             target2 = round(price * 1.12, 2)
+            risk_pct = round((price - stop) / price * 100, 1)
+            reward_pct = round((target1 - price) / price * 100, 1)
+            rr = round(reward_pct / risk_pct, 2) if risk_pct > 0 else 0
+
+            if rr < 1.2:
+                continue
+            if rr >= 3:
+                rr_grade = "🔥 极佳"
+            elif rr >= 2:
+                rr_grade = "🟢 优秀"
+            else:
+                rr_grade = "🟡 合格"
+
             picks.append({
                 "ticker": analysis["ticker"],
                 "price": analysis["price_fmt"],
@@ -2236,6 +2294,8 @@ def get_rebound_signals():
                 "target1": target1,
                 "target2": target2,
                 "score": score,
+                "risk_pct": risk_pct,
+                "rr": rr,
                 "reasons": "、".join(reasons)
             })
 
@@ -2243,7 +2303,11 @@ def get_rebound_signals():
             print("rebound error:", ticker, e)
             continue
 
-    return sorted(picks, key=lambda x: x["score"], reverse=True)[:5]
+    return sorted(
+        picks,
+        key=lambda x: (x["rr"], x["score"]),
+        reverse=True
+    )[:3]
 
 
 @app.route("/", methods=["GET", "POST"])

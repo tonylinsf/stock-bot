@@ -424,6 +424,15 @@
       opacity: 0.85;
     }
 
+    .stock-pe{
+      font-size:18px;
+      font-weight:700;
+      color:#facc15;
+      text-align:center;
+      margin-top:8px;
+      margin-bottom:8px;
+    }
+
     .stock-trend {
       text-align: center;
       margin-top: 6px;
@@ -631,6 +640,12 @@
           {{ analysis.change_val }} / {{ analysis.change_pct }}
         </span>
       </div>
+
+      {% if analysis.pe_text %}
+      <div class="stock-pe" style="color: {{ analysis.pe_color }};">
+          {{ analysis.pe_text }} ｜ {{ analysis.pe_label }}
+      </div>
+      {% endif %}
 
       <div class="stock-trend">
         {{ analysis.trend_arrow }} {{ analysis.trend_label }}
@@ -875,11 +890,10 @@
         <tr>
           <th>股票</th>
           <th>价格</th>
-          <th>RSI</th>
-          <th>MACD</th>
-          <th>MA20</th>
           <th>买入低</th>
           <th>买入高</th>
+          <th>目标1</th>
+          <th>目标2</th>
           <th>止损</th>
         </tr>
       </thead>
@@ -888,11 +902,10 @@
         <tr>
           <td><b>{{ p.ticker }}</b></td>
           <td>{{ p.price }}</td>
-          <td>{{ p.rsi }}</td>
-          <td>{{ p.macd }}</td>
-          <td>{{ p.ma20 }}</td>
           <td>{{ p.buy_low }}</td>
           <td>{{ p.buy_high }}</td>
+          <td>${{ row.target1 }}</td>
+          <td>${{ row.target2 }}</td>
           <td>{{ p.stop }}</td>
         </tr>
         {% endfor %}

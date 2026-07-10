@@ -1211,83 +1211,148 @@ def get_intraday_signal(ticker):
     }
 
 
-def build_short_options_status(price, macd_hist, intraday):
-    """Build an honest stock-side confirmation card.
+def build_short_options_status(
+    price,
+    macd_hist,
+    intraday,
+    rsi,
+    ma20,
+    ma60,
+    ma120,
+    boll_pct,
+    relative_strength,
+    change_pct,
+):
+    """Build a higher-quality stock-side Smart Money confirmation score.
 
-    This card uses only verifiable price, VWAP, same-time volume and MACD data.
-    Real Call/Put flow, dealer gamma and dark-pool direction remain unavailable
-    until dedicated data sources are connected.
+    This is a rules-based confirmation model using only existing stock data.
+    It does not claim to be options flow, dealer positioning, or a measured
+    historical win rate. The score represents current signal agreement.
     """
     signals = []
     risks = []
-    earned = 0
-    available_weight = 0
+    earned = 0.0
+    available = 0.0
 
+    def add_signal(weight, result, positive_text, neutral_text=None, negative_text=None, partial=0.5):
+        nonlocal earned, available
+        available += weight
+        if result == "positive":
+            earned += weight
+            signals.append({"type": "positive", "text": positive_text})
+        elif result == "neutral":
+            earned += weight * partial
+            signals.append({"type": "neutral", "text": neutral_text or positive_text})
+        else:
+            signals.append({"type": "negative", "text": negative_text or neutral_text or positive_text})
+
+    # 1) VWAP persistence — strongest intraday confirmation.
     if intraday:
         minutes = min(int(intraday.get("above_vwap_minutes") or 0), 390)
         vwap_value = float(intraday.get("vwap") or price)
-        above_vwap = price > vwap_value
-        available_weight += 35
-        if above_vwap and minutes >= 10:
-            earned += 35
-            signals.append({"type": "positive", "text": f"股价连续{minutes}分钟站稳VWAP"})
-        elif above_vwap:
-            earned += 18
-            signals.append({"type": "neutral", "text": f"股价位于VWAP上方，确认{minutes}分钟"})
+        if price > vwap_value and minutes >= 20:
+            add_signal(22, "positive", f"股价连续{minutes}分钟站稳VWAP")
+        elif price > vwap_value and minutes >= 5:
+            add_signal(22, "neutral", "", f"股价位于VWAP上方，已确认{minutes}分钟", "")
         else:
-            signals.append({"type": "negative", "text": "股价尚未站稳VWAP"})
+            add_signal(22, "negative", "", "", "股价尚未站稳VWAP")
 
+        # 2) Same-time relative volume, not full-day volume ratio.
         rel_vol = intraday.get("relative_volume")
         if rel_vol is not None:
-            available_weight += 30
-            if rel_vol >= 1.30:
-                earned += 30
-                signals.append({"type": "positive", "text": f"同时段相对成交量{rel_vol:.2f}倍"})
+            rel_vol = float(rel_vol)
+            if rel_vol >= 1.35:
+                add_signal(18, "positive", f"同时段相对成交量{rel_vol:.2f}倍")
             elif rel_vol >= 0.90:
-                earned += 15
-                signals.append({"type": "neutral", "text": f"同时段相对成交量{rel_vol:.2f}倍"})
+                add_signal(18, "neutral", "", f"同时段相对成交量{rel_vol:.2f}倍", "")
             else:
-                signals.append({"type": "negative", "text": f"同时段相对成交量仅{rel_vol:.2f}倍"})
+                add_signal(18, "negative", "", "", f"同时段相对成交量仅{rel_vol:.2f}倍")
 
-        available_weight += 20
+        # 3) Intraday momentum. Avoid rewarding an already overextended move.
         momentum = float(intraday.get("momentum") or 0)
-        if momentum >= 1:
-            earned += 20
-            signals.append({"type": "positive", "text": f"盘中动能为正（{momentum:+.2f}%）"})
-        elif momentum > -0.5:
-            earned += 10
-            signals.append({"type": "neutral", "text": f"盘中动能中性（{momentum:+.2f}%）"})
+        if 0.6 <= momentum <= 4.0:
+            add_signal(12, "positive", f"盘中动能偏强（{momentum:+.2f}%）")
+        elif -0.5 < momentum < 0.6 or 4.0 < momentum <= 6.0:
+            add_signal(12, "neutral", "", f"盘中动能中性（{momentum:+.2f}%）", "")
         else:
-            signals.append({"type": "negative", "text": f"盘中动能偏弱（{momentum:+.2f}%）"})
+            add_signal(12, "negative", "", "", f"盘中动能偏弱或过热（{momentum:+.2f}%）")
     else:
         risks.append("盘中VWAP及同时段成交量数据不足")
 
-    available_weight += 15
+    # 4) MACD confirmation.
     if macd_hist > 0:
-        earned += 15
-        signals.append({"type": "positive", "text": "MACD柱状值为正"})
+        add_signal(12, "positive", "MACD柱状值为正")
+    elif macd_hist > -0.15:
+        add_signal(12, "neutral", "", "MACD接近翻正", "")
     else:
-        signals.append({"type": "negative", "text": "MACD柱状值尚未转正"})
+        add_signal(12, "negative", "", "", "MACD柱状值仍为负")
 
-    score = round(earned / available_weight * 100) if available_weight else None
+    # 5) Moving-average structure. This reduces false positives from one-day pops.
+    if price > ma20 > ma60 and price > ma120:
+        add_signal(14, "positive", "价格与均线结构偏多")
+    elif price > ma20 and price >= ma60:
+        add_signal(14, "neutral", "", "价格站上短中期均线", "")
+    else:
+        add_signal(14, "negative", "", "", "均线结构尚未形成多头确认")
+
+    # 6) RSI sweet spot. Do not reward overbought conditions.
+    if 48 <= rsi <= 68:
+        add_signal(9, "positive", f"RSI处于健康强势区（{rsi:.1f}）")
+    elif 40 <= rsi < 48 or 68 < rsi <= 75:
+        add_signal(9, "neutral", "", f"RSI处于观察区（{rsi:.1f}）", "")
+    else:
+        add_signal(9, "negative", "", "", f"RSI偏弱或过热（{rsi:.1f}）")
+
+    # 7) Relative strength versus benchmark.
+    if relative_strength >= 0.8:
+        add_signal(8, "positive", f"相对大盘强度领先（{relative_strength:+.2f}%）")
+    elif relative_strength > -0.5:
+        add_signal(8, "neutral", "", f"相对大盘表现中性（{relative_strength:+.2f}%）", "")
+    else:
+        add_signal(8, "negative", "", "", f"相对大盘表现偏弱（{relative_strength:+.2f}%）")
+
+    # 8) Bollinger location / extension risk.
+    if 35 <= boll_pct <= 78:
+        add_signal(5, "positive", "价格位置未明显过热")
+    elif 20 <= boll_pct < 35 or 78 < boll_pct <= 90:
+        add_signal(5, "neutral", "", "价格接近波动区边缘", "")
+    else:
+        add_signal(5, "negative", "", "", "价格位置偏极端，追价风险较高")
+
+    raw_score = round(earned / available * 100) if available else None
+
+    # Hard confirmation guardrails: do not call it strong when key evidence is absent.
+    if raw_score is not None and intraday:
+        rel_vol = intraday.get("relative_volume")
+        above_vwap = price > float(intraday.get("vwap") or price)
+        if not above_vwap or (rel_vol is not None and float(rel_vol) < 0.75):
+            raw_score = min(raw_score, 54)
+        if macd_hist <= 0 and price < ma20:
+            raw_score = min(raw_score, 39)
+
+    score = raw_score
     if score is None:
         status = "数据不足"
         status_class = "neutral"
-    elif score >= 75:
-        status = "空头回补特征较强"
+    elif score >= 80:
+        status = "股票端资金确认较强"
         status_class = "positive"
-    elif score >= 55:
-        status = "回补迹象增强"
+    elif score >= 65:
+        status = "资金回流迹象增强"
         status_class = "positive"
-    elif score >= 35:
+    elif score >= 45:
         status = "多空信号分歧"
         status_class = "neutral"
     else:
-        status = "暂未确认回补"
+        status = "资金确认偏弱"
         status_class = "negative"
 
-    risks.append("当前为股票端确认信号，不是历史胜率")
-    risks.append("真实期权资金流、Gamma及Dark Pool尚未接入")
+    # Show only the most useful signals: negatives first, then positives/neutral.
+    order = {"negative": 0, "positive": 1, "neutral": 2}
+    signals = sorted(signals, key=lambda x: order.get(x["type"], 9))[:6]
+
+    risks.append("当前分数是多因子信号一致度，不是历史胜率")
+    risks.append("未包含真实Call/Put Flow、Gamma及Dark Pool")
 
     return {
         "status": status,
@@ -1295,12 +1360,12 @@ def build_short_options_status(price, macd_hist, intraday):
         "score": score,
         "history_rate": None,
         "history_sample": 0,
-        "signals": signals[:5],
+        "signals": signals,
         "risks": risks[:2],
         "updated_at": datetime.now().strftime("%H:%M"),
         "options_connected": False,
+        "model_version": "Stock Multi-Factor V2",
     }
-
 
 def estimate_smart_money(price, vwap, volume_ratio, momentum):
     score = 0
@@ -1596,6 +1661,13 @@ def analyze_ticker(ticker):
         price=price,
         macd_hist=macd_hist,
         intraday=intraday,
+        rsi=rsi,
+        ma20=ma20,
+        ma60=ma60,
+        ma120=ma120,
+        boll_pct=boll_pct,
+        relative_strength=relative_strength,
+        change_pct=change_pct,
     )
 
     # ===== 综合评分 =====
@@ -1993,6 +2065,7 @@ def analyze_ticker(ticker):
         "final_decision": final_decision,
         "technical_score": trend_score,
         "intraday_score": short_options_status.get("score"),
+        "stock_flow_score": short_options_status.get("score"),
         "options_score": None,
         "options_connected": short_options_status.get("options_connected", False),
         "tech_signal": tech_signal,

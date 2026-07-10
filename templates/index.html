@@ -83,7 +83,7 @@
       <div class="bar-list">
         <div class="bar-row"><span>📈 技术面</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.technical_score or 0 }}%"></div></div><b>{{ analysis.technical_score }}</b></div>
         <div class="bar-row"><span>⚡ 盘中确认</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.intraday_score or 0 }}%"></div></div><b>{{ analysis.intraday_score or '--' }}</b></div>
-        <div class="bar-row"><span>🩸 期权资金</span><div class="bar-track"><div class="bar-fill pending"></div></div><span class="pending-text">待接入</span></div>
+        <div class="bar-row"><span>💰 股票资金</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.stock_flow_score or 0 }}%"></div></div><b>{{ analysis.stock_flow_score or '--' }}</b></div>
         <div class="bar-row"><span>💎 估值</span><div class="bar-track"><div class="bar-fill" style="width:{% if '便宜' in analysis.pe_label %}80{% elif '合理' in analysis.pe_label %}60{% elif '偏贵' in analysis.pe_label %}30{% else %}45{% endif %}%"></div></div><b>{% if '便宜' in analysis.pe_label %}80{% elif '合理' in analysis.pe_label %}60{% elif '偏贵' in analysis.pe_label %}30{% else %}45{% endif %}</b></div>
       </div>
     </div>
@@ -121,7 +121,7 @@
   <section class="card">
     <div class="signal-head">
       <div><h2 class="section-title" style="margin-bottom:8px">🩸 Smart Money</h2><div class="signal-status {{ analysis.short_options.status_class }}">{% if analysis.short_options.status_class == 'positive' %}🟢{% elif analysis.short_options.status_class == 'negative' %}🔴{% else %}🟡{% endif %} {{ analysis.short_options.status }}</div></div>
-      <div style="text-align:right"><div class="signal-score">{{ analysis.short_options.score or '--' }}</div><div class="muted">信号一致度</div><div class="muted">{{ analysis.short_options.updated_at }}</div></div>
+      <div style="text-align:right"><div class="signal-score">{{ analysis.short_options.score or '--' }}</div><div class="muted">多因子一致度</div><div class="muted">{{ analysis.short_options.updated_at }}</div></div>
     </div>
     <div class="signal-list">
       {% for s in analysis.short_options.signals %}
@@ -129,7 +129,7 @@
       {% endfor %}
     </div>
     <div class="risk-list">{% for r in analysis.short_options.risks %}<div class="risk-item">⚠ {{ r }}</div>{% endfor %}</div>
-    <div class="note-box">真实 Call / Put Flow、Dealer Gamma 与 Dark Pool 接入后，会自动替换“待接入”状态，不会用普通股票成交量冒充期权资金。</div>
+    <div class="note-box">当前使用 Stock Multi-Factor V2：VWAP、同时段量比、盘中动能、MACD、均线结构、RSI、相对大盘强度及价格位置共同确认。它是股票端资金判断，不冒充真实期权资金。</div>
   </section>
 
   <section class="card">

@@ -28,8 +28,15 @@
     .signal-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.signal-status{font-size:21px;font-weight:950}.positive{color:var(--green)}.negative{color:var(--red)}.neutral{color:var(--yellow)}.signal-score{font-size:28px;font-weight:950}.signal-list,.risk-list{display:grid;gap:8px;margin-top:13px}.signal-item{color:#dbe8f7}.risk-item{color:var(--yellow)}.note-box{margin-top:12px;padding:10px 12px;border-radius:11px;background:rgba(76,201,255,.07);color:#a9def5;font-size:13px}
     .market-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.market-card{background:#0c1727;border:1px solid var(--line);border-radius:15px;padding:14px}.market-top{display:flex;justify-content:space-between;align-items:center}.market-name{font-size:21px;font-weight:900}.market-price{font-size:22px;font-weight:900}.market-small{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:9px}
     .dashboard-hero{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center}.dashboard-score{width:138px;height:138px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) calc(var(--market-score)*1%),#20304a 0);position:relative}.dashboard-score:before{content:"";position:absolute;width:106px;height:106px;border-radius:50%;background:#0d1728}.dashboard-score-inner{position:relative;text-align:center}.dashboard-score-inner b{font-size:38px;display:block}.dashboard-score-inner span{font-size:12px;color:var(--muted)}.dashboard-summary{display:grid;gap:10px}.dashboard-line{display:flex;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,.07)}.index-detail{margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;color:var(--muted)}.index-detail b{display:block;color:var(--text);font-size:14px;margin-top:3px}.strategy-box{padding:14px;border-radius:13px;background:rgba(67,223,140,.07);border:1px solid rgba(67,223,140,.18);line-height:1.65}.rank-badge{font-weight:900;color:var(--yellow)}
+
+    .pro-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+    .pro-metric{background:#081221;border:1px solid #21314a;border-radius:13px;padding:12px}
+    .pro-metric .k{color:var(--muted);font-size:12px;font-weight:800}.pro-metric .v{font-size:18px;font-weight:950;margin-top:5px}
+    .reason-list{display:grid;gap:9px;margin-top:14px}.reason-row{padding:10px 12px;border-radius:11px;background:rgba(255,255,255,.035);line-height:1.45}
+    .breadth-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.breadth-box{background:#081221;border:1px solid #21314a;border-radius:13px;padding:12px;text-align:center}.breadth-box b{font-size:21px;display:block;margin-top:5px}.breadth-box span{color:var(--muted);font-size:12px}
+    .index-tech{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}.index-tech div{color:var(--muted);font-size:11px}.index-tech b{display:block;color:var(--text);font-size:13px;margin-top:3px}.index-summary{margin-top:10px;padding:9px 10px;border-radius:10px;background:rgba(76,201,255,.06);color:#b8def1;font-size:12px;line-height:1.5}
     .error{background:#401d26;border:1px solid #7f2634;padding:13px;border-radius:12px;color:#ffd1d6}
-    @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.dashboard-hero{grid-template-columns:1fr}.dashboard-score{margin:auto}.index-detail{grid-template-columns:repeat(2,1fr)}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
+    @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.dashboard-hero{grid-template-columns:1fr}.dashboard-score{margin:auto}.index-detail{grid-template-columns:repeat(2,1fr)}.pro-grid,.breadth-grid{grid-template-columns:repeat(2,1fr)}.index-tech{grid-template-columns:repeat(2,1fr)}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
   </style>
 </head>
 <body>
@@ -61,12 +68,8 @@
     </form>
     <div id="loadingMsg" style="display:none;margin-top:10px;color:#8fb3ff;font-weight:800">⏳ 正在分析中...</div>
     <div class="button-grid">
-      <a href="/market" onclick="return showButtonLoading('marketBtn','⏳ 正在分析大盘...')">
-        <button id="marketBtn" type="button">📊 查看大盘状态</button>
-      </a>
-      <a href="/opportunities" onclick="return showButtonLoading('opportunityBtn','⏳ 正在打开今日机会...')">
-        <button id="opportunityBtn" type="button">⭐ 今日机会</button>
-      </a>
+      <a href="/market" onclick="return showButtonLoading('marketBtn','⏳ 正在分析大盘...')"><button id="marketBtn" type="button">📊 查看大盘状态</button></a>
+      <a href="/opportunities" onclick="return showButtonLoading('opportunityBtn','⏳ 正在打开今日机会...')"><button id="opportunityBtn" type="button">⭐ 今日机会</button></a>
     </div>
   </section>
 
@@ -150,36 +153,68 @@
 
   {% if market_dashboard %}
   <section class="card">
-    <h2 class="section-title">📊 大盘总览</h2>
+    <h2 class="section-title">📊 大盘专业总览</h2>
     <div class="dashboard-hero">
       <div class="dashboard-score" style="--market-score:{{ market_dashboard.score }}"><div class="dashboard-score-inner"><b>{{ market_dashboard.score }}</b><span>/ 100</span></div></div>
       <div class="dashboard-summary">
+        <div class="dashboard-line"><b>市场阶段</b><strong class="{{ market_dashboard.bias_class }}">{{ market_dashboard.regime }}</strong></div>
         <div class="dashboard-line"><b>市场方向</b><strong class="{{ market_dashboard.bias_class }}">{{ market_dashboard.bias }}</strong></div>
-        <div class="dashboard-line"><b>四大指数上涨率</b><strong>{{ market_dashboard.participation }}%</strong></div>
-        <div class="dashboard-line"><b>市场风险</b><strong class="{{ market_dashboard.risk_class }}">{{ market_dashboard.risk_label }}</strong></div>
+        <div class="dashboard-line"><b>指数确认</b><strong>{{ market_dashboard.cross_index_label }}</strong></div>
+        <div class="dashboard-line"><b>波动环境</b><strong class="{{ market_dashboard.risk_class }}">{{ market_dashboard.volatility_regime }}</strong></div>
         <div class="dashboard-line"><b>市场风格</b><span>{{ market_dashboard.style_text }}</span></div>
       </div>
     </div>
+    <div class="pro-grid">
+      <div class="pro-metric"><div class="k">趋势结构</div><div class="v">{{ market_dashboard.trend_score }}/100</div></div>
+      <div class="pro-metric"><div class="k">市场广度</div><div class="v">{{ market_dashboard.breadth_score }}/100</div></div>
+      <div class="pro-metric"><div class="k">盘中确认</div><div class="v">{{ market_dashboard.intraday_score }}/100</div></div>
+      <div class="pro-metric"><div class="k">相对强弱</div><div class="v">{{ market_dashboard.relative_strength_score }}/100</div></div>
+      <div class="pro-metric"><div class="k">指数同步</div><div class="v">{{ market_dashboard.cross_index_score }}/100</div></div>
+      <div class="pro-metric"><div class="k">波动评分</div><div class="v">{{ market_dashboard.volatility_score }}/100</div></div>
+    </div>
+    <div class="reason-list">{% for r in market_dashboard.reasons %}<div class="reason-row">{{ r }}</div>{% endfor %}</div>
   </section>
+
+  {% if market_dashboard.breadth %}
+  <section class="card">
+    <h2 class="section-title">📈 市场广度（股票池抽样）</h2>
+    <div class="breadth-grid">
+      <div class="breadth-box"><span>上涨股票</span><b>{{ market_dashboard.breadth.up_pct|default('--') }}%</b></div>
+      <div class="breadth-box"><span>站上 MA20</span><b>{{ market_dashboard.breadth.above_ma20_pct|default('--') }}%</b></div>
+      <div class="breadth-box"><span>站上 MA60</span><b>{{ market_dashboard.breadth.above_ma60_pct|default('--') }}%</b></div>
+      <div class="breadth-box"><span>站上 MA120</span><b>{{ market_dashboard.breadth.above_ma120_pct|default('--') }}%</b></div>
+      <div class="breadth-box"><span>MACD 为正</span><b>{{ market_dashboard.breadth.macd_positive_pct|default('--') }}%</b></div>
+      <div class="breadth-box"><span>强于 SPY</span><b>{{ market_dashboard.breadth.outperform_spy_pct|default('--') }}%</b></div>
+    </div>
+    <div class="note-box">样本 {{ market_dashboard.breadth.sample_size|default('--') }} 只，结果缓存约15分钟，避免重复扫描拖慢服务器。</div>
+  </section>
+  {% endif %}
   {% endif %}
 
   {% if market_cards %}
   <section class="card">
-    <h2 class="section-title">四大指数趋势</h2>
+    <h2 class="section-title">四大指数技术结构</h2>
     <div class="market-cards">
       {% for m in market_cards %}
       <div class="market-card">
         <div class="market-top"><span class="market-name">{{ m.ticker }}</span><span class="market-price {{ m.change_class }}">{{ m.price }}</span></div>
-        <div class="market-small"><span>{{ m.change_val or '' }} {{ m.change_pct }}</span><span>评分 {{ m.score }}</span></div>
+        <div class="market-small"><span>{{ m.change_val or '' }} {{ m.change_pct }}</span><span>综合 {{ m.score }}</span></div>
         {% if m.ticker != 'VIX' %}
-        <div class="index-detail">
+        <div class="index-tech">
+          <div>趋势结构<b>{{ m.trend_score_v3|default('--') }}</b></div>
+          <div>ADX<b>{{ m.adx|default('--') }}</b></div>
+          <div>+DI / -DI<b>{{ m.plus_di|default('--') }} / {{ m.minus_di|default('--') }}</b></div>
+          <div>MA20斜率<b>{{ m.ma20_slope_5d|default('--') }}%</b></div>
+          <div>MA60斜率<b>{{ m.ma60_slope_10d|default('--') }}%</b></div>
+          <div>20日突破<b>{{ m.breakout_label|default('--') }}</b></div>
+          <div>RS 1日<b>{{ m.rs_1d|default('--') }}%</b></div>
+          <div>RS 5日<b>{{ m.rs_5d|default('--') }}%</b></div>
+          <div>RS 20日<b>{{ m.rs_20d|default('--') }}%</b></div>
           <div>RSI<b>{{ m.rsi }}</b></div>
-          <div>量比<b>{{ m.volume_ratio }}x</b></div>
-          <div>技术<b>{{ m.technical_score or '--' }}</b></div>
-          <div>盘中<b>{{ m.intraday_score or '--' }}</b></div>
-          <div>MA20<b>{{ m.ma20 }}</b></div>
-          <div>趋势<b>{{ m.trend_label or m.setup }}</b></div>
+          <div>同时段量比<b>{{ m.volume_ratio }}x</b></div>
+          <div>盘中确认<b>{{ m.intraday_score or '--' }}</b></div>
         </div>
+        <div class="index-summary">{{ m.regime_label_v3|default(m.trend_label or m.setup) }}</div>
         {% else %}
         <div class="index-detail"><div>当日变化<b>{{ m.change_pct }}</b></div><div>RSI<b>{{ m.rsi }}</b></div><div>风险指标<b>波动率</b></div></div>
         {% endif %}
@@ -192,7 +227,9 @@
   {% if market_dashboard %}
   <section class="card">
     <h2 class="section-title">🧭 今日市场策略</h2>
-    <div class="strategy-box"><b>{{ market_dashboard.bias }}</b><br>{{ market_dashboard.strategy }}</div>
+    <div class="strategy-box"><b>{{ market_dashboard.regime }}｜{{ market_dashboard.bias }}</b><br>{{ market_dashboard.strategy }}</div>
+    <div class="wide-row"><b>建议仓位</b><div>{% if market_dashboard.score >= 75 %}70%–90%{% elif market_dashboard.score >= 60 %}50%–70%{% elif market_dashboard.score >= 45 %}30%–50%{% else %}0%–30%{% endif %}</div></div>
+    <div class="wide-row"><b>适合策略</b><div>{% if market_dashboard.score >= 60 %}强势回调、突破回踩、强于SPY的领涨股{% else %}等待确认、减少追高、优先防守{% endif %}</div></div>
     {% if market_dashboard.strongest %}<div class="wide-row"><b>🥇 最强指数</b><div><span class="rank-badge">{{ market_dashboard.strongest.ticker }}</span>　{{ market_dashboard.strongest.change_pct }}</div></div>{% endif %}
     {% if market_dashboard.weakest %}<div class="wide-row"><b>相对落后</b><div>{{ market_dashboard.weakest.ticker }}　{{ market_dashboard.weakest.change_pct }}</div></div>{% endif %}
   </section>
@@ -201,21 +238,8 @@
   {% if market_status and market_status.sector_rotation %}<section class="card"><h2 class="section-title">🔥 板块轮动</h2>{% for s in market_status.sector_rotation %}<div class="wide-row"><b>{{ loop.index }}. {{ s.ticker }} {{ s.name }}</b><div><span style="color:{% if s.change > 0 %}#43df8c{% else %}#ff747b{% endif %};font-weight:900">{{ s.change }}%</span>　{{ s.status }}</div></div>{% endfor %}</section>{% endif %}
 </div>
 <script>
-function showLoading(){
-  const m=document.getElementById('loadingMsg');
-  const b=document.getElementById('analyzeBtn');
-  if(m)m.style.display='block';
-  if(b){b.disabled=true;b.innerText='⏳ 正在分析股票...';b.style.opacity='0.65';}
-}
-function showButtonLoading(buttonId,text){
-  const b=document.getElementById(buttonId);
-  if(!b||b.disabled)return false;
-  b.disabled=true;
-  b.innerText=text;
-  b.style.opacity='0.65';
-  b.style.cursor='not-allowed';
-  return true;
-}
+function showLoading(){const m=document.getElementById('loadingMsg');const b=document.getElementById('analyzeBtn');if(m)m.style.display='block';if(b){b.disabled=true;b.innerText='⏳ 正在分析股票...';b.style.opacity='.65'}}
+function showButtonLoading(id,text){const b=document.getElementById(id);if(!b||b.disabled)return false;b.disabled=true;b.innerText=text;b.style.opacity='.65';return true}
 function loadAIAnalysis(ticker){const b=document.getElementById('aiBtn'),l=document.getElementById('aiLoading'),r=document.getElementById('aiResult');if(b.disabled)return;b.disabled=true;b.innerText='分析中...';l.style.display='block';r.innerText='';fetch(`/api/ai_analysis/${ticker}`).then(x=>x.json()).then(d=>{l.style.display='none';r.innerText=(d.cached?'✅ 使用4小时内缓存：\n\n':'')+(d.ai_analysis||'暂时无法生成 AI 分析');b.innerText='✅ 已生成'}).catch(()=>{l.style.display='none';r.innerText='AI 分析失败，请稍后再试。';b.disabled=false;b.innerText='重新生成 AI 分析'})}
 </script>
 </body>

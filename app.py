@@ -110,39 +110,41 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
-# 先用一批高流动性股票，避免太多垃圾信号
-UNIVERSE = [
-    # ===== Mega Cap AI =====
-    "NVDA","MSFT","META","AMZN","GOOGL","GOOG","AAPL",
+# 今日机会股票池：优先读取 data/spy.txt，避免把股票写死在 app.py
+def load_universe():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    universe_path = os.path.join(base_dir, "data", "spy.txt")
 
-    # ===== AI / Software =====
-    "PLTR","SNOW","NOW","CRM","ORCL","ADBE","INTU",
+    try:
+        with open(universe_path, "r", encoding="utf-8") as f:
+            symbols = []
+            seen = set()
+            for raw_line in f:
+                line = raw_line.strip().upper()
+                if not line or line.startswith("#"):
+                    continue
+                # 容许 txt 内有逗号或空格分隔，但建议一行一只股票
+                for symbol in line.replace(",", " ").split():
+                    if symbol and symbol not in seen:
+                        seen.add(symbol)
+                        symbols.append(symbol)
 
-    # ===== Semiconductor =====
-    "AVGO","AMD","MU","QCOM","LRCX","AMAT","KLAC",
-    "ASML","TSM","ARM","INTC",
+        if symbols:
+            print(f"✅ Loaded {len(symbols)} symbols from data/spy.txt")
+            return symbols
+    except Exception as e:
+        print(f"⚠️ Unable to load data/spy.txt: {e}")
 
-    # ===== Momentum / SPMO =====
-    "JPM","GE","CAT","XOM","NFLX","CSCO",
+    # 文件不存在或为空时的安全备用股票池，避免网站直接报错
+    return [
+        "NVDA", "MSFT", "META", "AMZN", "GOOGL", "AAPL", "TSLA",
+        "AVGO", "AMD", "PLTR", "NOW", "CRM", "ORCL", "TSM",
+        "ANET", "PANW", "CRWD", "ISRG", "LLY", "RKLB",
+        "SPY", "QQQ", "SOXX", "SMH", "IGV", "SPMO",
+    ]
 
-    # ===== AI Infra / Cloud =====
-    "ANET","PANW","CRWD","DDOG","MDB","NET",
-    "GLW","OKLO","POET","IREN","NBIS","LITE",
 
-    # ===== Robotics / Future AI =====
-    "ISRG","TSLA","RXRX",
-
-    # 医药 / 医疗
-    "LLY","NVO","VRTX","REGN",
-    "UNH","ABBV","MRK","TMO","DHR",
-
-    # 太空 / 国防
-    "RKLB","LUNR","ASTS","PL","SPIR",
-    "KTOS","AVAV","RTX","LMT","NOC"
-
-    # ===== ETF / Market =====
-    "QQQ","SPY","SMH","IGV","SPMO"
-]
+UNIVERSE = load_universe()
 
 
 MARKET_TICKERS = ["SPY", "QQQ", "SOXX", "DIA"]
@@ -2349,14 +2351,200 @@ def get_vix_card():
         }
 
 
+
+# ===== Market Technical V3 helpers =====
+MARKET_TECH_CACHE = {"data": None, "time": 0}
+MARKET_TECH_TTL = 300  # 5 minutes
+MARKET_BREADTH_CACHE = {"data": None, "time": 0}
+MARKET_BREADTH_TTL = 900  # 15 minutes
+MARKET_BREADTH_LIMIT = int(os.getenv("MARKET_BREADTH_LIMIT", "30"))
+
+def _safe_float(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        if isinstance(value, str):
+            value = value.replace("$", "").replace(",", "").replace("%", "").replace("x", "").strip()
+        return float(value)
+    except Exception:
+        return default
+
+def calculate_adx(df, period=14):
+    """Return ADX, +DI and -DI from daily OHLC data."""
+    if df is None or df.empty or len(df) < period + 5:
+        return 0.0, 0.0, 0.0
+    high = df["High"].astype(float)
+    low = df["Low"].astype(float)
+    close = df["Close"].astype(float)
+    up_move = high.diff()
+    down_move = -low.diff()
+    plus_dm = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
+    minus_dm = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
+    tr = pd.concat([
+        high - low,
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs(),
+    ], axis=1).max(axis=1)
+    atr = tr.ewm(alpha=1 / period, adjust=False).mean().replace(0, np.nan)
+    plus_di = 100 * plus_dm.ewm(alpha=1 / period, adjust=False).mean() / atr
+    minus_di = 100 * minus_dm.ewm(alpha=1 / period, adjust=False).mean() / atr
+    dx = ((plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)) * 100
+    adx = dx.ewm(alpha=1 / period, adjust=False).mean()
+    return (
+        round(float(adx.iloc[-1]) if pd.notna(adx.iloc[-1]) else 0.0, 2),
+        round(float(plus_di.iloc[-1]) if pd.notna(plus_di.iloc[-1]) else 0.0, 2),
+        round(float(minus_di.iloc[-1]) if pd.notna(minus_di.iloc[-1]) else 0.0, 2),
+    )
+
+def _pct_return(series, periods):
+    if series is None or len(series) <= periods:
+        return 0.0
+    old = float(series.iloc[-periods-1])
+    new = float(series.iloc[-1])
+    return ((new / old) - 1) * 100 if old else 0.0
+
+def build_index_technical(ticker, spy_returns=None):
+    """Technical structure for one market ETF. Uses daily bars only."""
+    try:
+        df = get_history(ticker, days=220, interval="1d")
+        if df is None or df.empty or len(df) < 130:
+            return {}
+        df = df.copy()
+        df.columns = [str(c).capitalize() for c in df.columns]
+        close = df["Close"].astype(float)
+        high = df["High"].astype(float)
+        low = df["Low"].astype(float)
+        volume = df["Volume"].astype(float)
+        price = float(close.iloc[-1])
+        ma20 = float(close.rolling(20).mean().iloc[-1])
+        ma60 = float(close.rolling(60).mean().iloc[-1])
+        ma120 = float(close.rolling(120).mean().iloc[-1])
+        ma20_5 = float(close.rolling(20).mean().iloc[-6])
+        ma60_10 = float(close.rolling(60).mean().iloc[-11])
+        ma20_slope = ((ma20 / ma20_5) - 1) * 100 if ma20_5 else 0
+        ma60_slope = ((ma60 / ma60_10) - 1) * 100 if ma60_10 else 0
+        _, _, hist = calc_macd(close)
+        macd_hist = float(hist.iloc[-1])
+        rsi = float(calc_rsi(close).iloc[-1])
+        adx, plus_di, minus_di = calculate_adx(df)
+        tr = pd.concat([(high-low), (high-close.shift()).abs(), (low-close.shift()).abs()], axis=1).max(axis=1)
+        atr14 = float(tr.rolling(14).mean().iloc[-1])
+        atr_pct = (atr14 / price * 100) if price else 0
+        high20_prev = float(high.rolling(20).max().iloc[-2])
+        low20_prev = float(low.rolling(20).min().iloc[-2])
+        vol20 = float(volume.rolling(20).mean().iloc[-1])
+        volume_ratio = float(volume.iloc[-1] / vol20) if vol20 else 0
+
+        trend_score = 0
+        reasons = []
+        if price > ma20: trend_score += 15; reasons.append("价格站上MA20")
+        else: reasons.append("价格低于MA20")
+        if price > ma60: trend_score += 15
+        if price > ma120: trend_score += 10
+        if ma20 > ma60: trend_score += 15
+        if ma60 > ma120: trend_score += 10
+        if ma20_slope > 0.3: trend_score += 10
+        elif ma20_slope > 0: trend_score += 5
+        if macd_hist > 0: trend_score += 10
+        if adx >= 25 and plus_di > minus_di: trend_score += 15
+        elif adx >= 18 and plus_di > minus_di: trend_score += 8
+        trend_score = max(0, min(100, round(trend_score)))
+
+        if trend_score >= 75 and price > high20_prev: stage = "主升趋势"
+        elif trend_score >= 70: stage = "上升趋势"
+        elif price > ma20 and price < max(ma60, ma120): stage = "反弹，尚未反转"
+        elif trend_score >= 50: stage = "震荡修复"
+        elif price < ma20 and price < ma60: stage = "下跌趋势"
+        else: stage = "中性震荡"
+
+        returns = {"1d": _pct_return(close, 1), "5d": _pct_return(close, 5), "20d": _pct_return(close, 20)}
+        rs = {}
+        if spy_returns and ticker != "SPY":
+            rs = {k: round(returns[k] - spy_returns.get(k, 0), 2) for k in returns}
+        else:
+            rs = {"1d": 0.0, "5d": 0.0, "20d": 0.0}
+
+        breakout = price > high20_prev and volume_ratio >= 1.2
+        return {
+            "trend_score_v3": trend_score, "market_stage": stage,
+            "adx": adx, "plus_di": plus_di, "minus_di": minus_di,
+            "ma20_slope": round(ma20_slope, 2), "ma60_slope": round(ma60_slope, 2),
+            "macd_hist_v3": round(macd_hist, 4), "atr_pct_v3": round(atr_pct, 2),
+            "rs_1d": rs["1d"], "rs_5d": rs["5d"], "rs_20d": rs["20d"],
+            "return_1d": round(returns["1d"], 2), "return_5d": round(returns["5d"], 2), "return_20d": round(returns["20d"], 2),
+            "breakout_confirmed": breakout, "volume_ratio_daily": round(volume_ratio, 2),
+            "technical_reasons_v3": reasons,
+        }
+    except Exception as exc:
+        print(f"Market technical error {ticker}: {exc}")
+        return {}
+
+def get_market_breadth_v3(spy_return_1d=0.0):
+    """Breadth from the configured universe, cached and capped for Render stability."""
+    now = time.time()
+    if MARKET_BREADTH_CACHE["data"] and now - MARKET_BREADTH_CACHE["time"] < MARKET_BREADTH_TTL:
+        return MARKET_BREADTH_CACHE["data"]
+    try:
+        symbols = list(dict.fromkeys(UNIVERSE))[:max(10, MARKET_BREADTH_LIMIT)]
+    except Exception:
+        symbols = []
+    stats = {"valid": 0, "up": 0, "ma20": 0, "ma60": 0, "ma120": 0, "macd": 0, "rsi50": 0, "outperform": 0}
+    for ticker in symbols:
+        try:
+            df = get_history(ticker, days=150, interval="1d")
+            if df is None or df.empty or len(df) < 125:
+                continue
+            df = df.copy(); df.columns = [str(c).capitalize() for c in df.columns]
+            close = df["Close"].astype(float)
+            price = float(close.iloc[-1]); prev = float(close.iloc[-2])
+            ma20 = float(close.rolling(20).mean().iloc[-1]); ma60 = float(close.rolling(60).mean().iloc[-1]); ma120 = float(close.rolling(120).mean().iloc[-1])
+            _, _, hist = calc_macd(close); rsi = float(calc_rsi(close).iloc[-1])
+            ret = ((price / prev) - 1) * 100 if prev else 0
+            stats["valid"] += 1
+            stats["up"] += ret > 0
+            stats["ma20"] += price > ma20
+            stats["ma60"] += price > ma60
+            stats["ma120"] += price > ma120
+            stats["macd"] += float(hist.iloc[-1]) > 0
+            stats["rsi50"] += rsi > 50
+            stats["outperform"] += ret > spy_return_1d
+        except Exception:
+            continue
+    n = stats["valid"]
+    pct = lambda key: round(stats[key] / n * 100) if n else 0
+    data = {
+        "sample_size": n, "requested_size": len(symbols),
+        "up_pct": pct("up"), "above_ma20_pct": pct("ma20"), "above_ma60_pct": pct("ma60"),
+        "above_ma120_pct": pct("ma120"), "macd_positive_pct": pct("macd"),
+        "rsi_above_50_pct": pct("rsi50"), "outperform_spy_pct": pct("outperform"),
+    }
+    data["score"] = round(
+        data["above_ma20_pct"] * .25 + data["above_ma60_pct"] * .20 + data["above_ma120_pct"] * .15 +
+        data["macd_positive_pct"] * .15 + data["rsi_above_50_pct"] * .10 + data["outperform_spy_pct"] * .15
+    )
+    if data["up_pct"] >= 60 and data["above_ma20_pct"] >= 55: data["label"] = "广度健康"
+    elif data["up_pct"] >= 50: data["label"] = "广度一般"
+    else: data["label"] = "广度偏弱"
+    MARKET_BREADTH_CACHE["data"] = data; MARKET_BREADTH_CACHE["time"] = now
+    return data
+
 def get_market_cards():
     cards = []
 
+    # Daily multi-period relative strength uses SPY as the common baseline.
+    spy_tech = build_index_technical("SPY")
+    spy_returns = {
+        "1d": spy_tech.get("return_1d", 0),
+        "5d": spy_tech.get("return_5d", 0),
+        "20d": spy_tech.get("return_20d", 0),
+    }
+
     for t in MARKET_TICKERS:
         analysis, _, _, err = analyze_ticker(t)
+        technical_v3 = spy_tech if t == "SPY" else build_index_technical(t, spy_returns)
 
         if err or not analysis:
-            cards.append({
+            card = {
                 "ticker": t,
                 "price": "--",
                 "change_pct": "--",
@@ -2368,20 +2556,13 @@ def get_market_cards():
                 "ma20": "--",
                 "ma60": "--",
                 "boll_pos": "--",
-            })
+            }
         else:
-            cards.append({
+            card = {
                 "ticker": t,
-
-                # 价格（已经带 $）
                 "price": analysis.get("price_fmt"),
-
-                # 涨跌 %
                 "change_pct": analysis.get("change_pct"),
-
-                # 红绿
                 "change_class": "up" if (analysis.get("change_num") or 0) >= 0 else "down",
-
                 "decision": analysis.get("decision"),
                 "score": analysis.get("final_score") or analysis.get("score") or 0,
                 "technical_score": analysis.get("technical_score") or 0,
@@ -2392,7 +2573,6 @@ def get_market_cards():
                 "trend_label": analysis.get("trend_label"),
                 "trend_arrow": analysis.get("trend_arrow"),
                 "vwap_status": (analysis.get("short_options") or {}).get("vwap_status", "--"),
-
                 "ma20": analysis.get("ma20"),
                 "ma60": analysis.get("ma60"),
                 "boll_pos": analysis.get("boll_pos"),
@@ -2404,58 +2584,116 @@ def get_market_cards():
                 "session_diff": analysis.get("session_diff"),
                 "session_pct": analysis.get("session_pct"),
                 "change_val": analysis.get("change_val"),
-            })
+            }
+        card.update(technical_v3)
+        cards.append(card)
 
     cards.append(get_vix_card())
     return cards
 
 def build_market_dashboard(cards, market_status):
-    """Build a lightweight market dashboard from already-fetched cards.
-    No extra API calls are made here.
-    """
+    """Market Regime V3: trend, breadth, intraday, cross-index and volatility."""
     index_cards = [c for c in cards if c.get("ticker") in MARKET_TICKERS]
     vix_card = next((c for c in cards if c.get("ticker") == "VIX"), {})
+    by_ticker = {c.get("ticker"): c for c in index_cards}
 
-    valid_scores = [clean_num(c.get("score")) for c in index_cards if clean_num(c.get("score")) > 0]
-    market_score = round(sum(valid_scores) / len(valid_scores)) if valid_scores else 50
+    # 1) Daily trend structure (ADX, MA slopes and multi-period structure)
+    trend_values = [_safe_float(c.get("trend_score_v3")) for c in index_cards if c.get("trend_score_v3") is not None]
+    trend_score = round(sum(trend_values) / len(trend_values)) if trend_values else 50
 
-    positive = sum(1 for c in index_cards if clean_num(c.get("change_pct")) > 0)
+    # 2) Breadth from the configured universe. Cached 15 minutes and capped by env setting.
+    spy_return_1d = _safe_float((by_ticker.get("SPY") or {}).get("return_1d"))
+    breadth = get_market_breadth_v3(spy_return_1d)
+    breadth_score = int(breadth.get("score") or 0)
+
+    # 3) Intraday confirmation from already-computed stock analysis fields.
+    intraday_values = [_safe_float(c.get("intraday_score")) for c in index_cards if _safe_float(c.get("intraday_score")) >= 0]
+    intraday_score = round(sum(intraday_values) / len(intraday_values)) if intraday_values else 50
+
+    # 4) Cross-index confirmation.
+    confirming = sum(1 for c in index_cards if _safe_float(c.get("trend_score_v3")) >= 60)
+    cross_index_score = round(confirming / len(index_cards) * 100) if index_cards else 0
+    if confirming == 4: cross_label = "4/4 全面确认"
+    elif confirming == 3: cross_label = "3/4 多数确认"
+    elif confirming == 2: cross_label = "2/4 结构分化"
+    elif confirming == 1: cross_label = "1/4 上涨集中"
+    else: cross_label = "0/4 全面偏弱"
+
+    # 5) Relative strength persistence, not only today's change.
+    rs_points = []
+    for c in index_cards:
+        if c.get("ticker") == "SPY":
+            continue
+        vals = [_safe_float(c.get("rs_1d")), _safe_float(c.get("rs_5d")), _safe_float(c.get("rs_20d"))]
+        rs_points.append(sum(1 for x in vals if x > 0) / 3 * 100)
+    relative_strength_score = round(sum(rs_points) / len(rs_points)) if rs_points else 50
+
+    # 6) Volatility regime combines VIX level/change and SPY ATR.
+    vix_price = _safe_float(vix_card.get("price"), 20)
+    vix_change = _safe_float(vix_card.get("change_pct"), 0)
+    spy_atr = _safe_float((by_ticker.get("SPY") or {}).get("atr_pct_v3"), 1.5)
+    if vix_price < 16 and vix_change <= 3 and spy_atr < 1.8:
+        volatility_regime, volatility_score = "低波动多头", 85
+    elif vix_price < 22 and vix_change < 8:
+        volatility_regime, volatility_score = "正常波动", 65
+    elif vix_change >= 8 or vix_price >= 25:
+        volatility_regime, volatility_score = "风险升高", 25
+    else:
+        volatility_regime, volatility_score = "高波动环境", 40
+
+    market_score = round(
+        trend_score * .30 + breadth_score * .25 + intraday_score * .20 +
+        cross_index_score * .10 + relative_strength_score * .10 + volatility_score * .05
+    )
+    # Hard caps reduce false bullish readings when participation or core indices are weak.
+    if breadth_score < 35:
+        market_score = min(market_score, 60)
+    if _safe_float((by_ticker.get("SPY") or {}).get("trend_score_v3")) < 40 and _safe_float((by_ticker.get("QQQ") or {}).get("trend_score_v3")) < 40:
+        market_score = min(market_score, 45)
+
+    positive = sum(1 for c in index_cards if _safe_float(c.get("change_pct")) > 0)
     participation = round(positive / len(index_cards) * 100) if index_cards else 0
-
-    ranked = sorted(index_cards, key=lambda c: clean_num(c.get("change_pct")), reverse=True)
+    ranked = sorted(index_cards, key=lambda c: _safe_float(c.get("change_pct")), reverse=True)
     strongest = ranked[0] if ranked else {}
     weakest = ranked[-1] if ranked else {}
 
-    vix_price = clean_num(vix_card.get("price"))
-    if vix_price and vix_price < 16:
-        risk_label, risk_class = "中等偏低", "positive"
-    elif vix_price and vix_price < 22:
-        risk_label, risk_class = "中等", "neutral"
+    if market_score >= 75 and breadth_score >= 60:
+        bias, bias_class, strategy = "偏多", "positive", "顺势持有，优先强势回调与放量突破，避免追弱势反弹"
+        regime = "主升趋势" if trend_score >= 75 else "上涨趋势"
+    elif market_score >= 60:
+        bias, bias_class, strategy = "震荡偏多", "neutral", "控制仓位，优先强于SPY且站稳VWAP的股票"
+        regime = "指数偏强，仍需广度确认" if breadth_score < 55 else "上涨初期"
+    elif market_score >= 45:
+        bias, bias_class, strategy = "震荡", "neutral", "轻仓观察，等待成交量与指数同步确认"
+        regime = "结构分化"
     else:
-        risk_label, risk_class = "偏高", "negative"
+        bias, bias_class, strategy = "偏弱", "negative", "减少追涨，等待SPY和QQQ重新站稳关键均线"
+        regime = "下跌或弱势修复"
 
-    if market_score >= 75 and participation >= 75:
-        bias, bias_class, strategy = "偏多", "positive", "可顺势做强势股，回调优先，不宜盲目追高"
-    elif market_score >= 55:
-        bias, bias_class, strategy = "震荡偏多", "neutral", "控制仓位，优先选择强于SPY与QQQ的股票"
-    elif market_score >= 40:
-        bias, bias_class, strategy = "震荡", "neutral", "轻仓观察，等待指数与成交量同步确认"
-    else:
-        bias, bias_class, strategy = "偏弱", "negative", "减少追涨，等待SPY与QQQ重新站稳关键均线"
+    if vix_price < 16: risk_label, risk_class = "中等偏低", "positive"
+    elif vix_price < 22: risk_label, risk_class = "中等", "neutral"
+    else: risk_label, risk_class = "偏高", "negative"
 
-    style_text = ""
+    style_text = "市场风格暂不明确"
     if strongest:
         style_text = f"{strongest.get('ticker')}领涨"
-        if strongest.get("ticker") == "SOXX":
-            style_text += "，半导体与AI方向占优"
-        elif strongest.get("ticker") == "QQQ":
-            style_text += "，科技成长占优"
-        elif strongest.get("ticker") == "DIA":
-            style_text += "，传统蓝筹占优"
-        else:
-            style_text += "，大盘整体较强"
+        if strongest.get("ticker") == "SOXX": style_text += "，半导体与AI方向占优"
+        elif strongest.get("ticker") == "QQQ": style_text += "，科技成长占优"
+        elif strongest.get("ticker") == "DIA": style_text += "，传统蓝筹占优"
+        else: style_text += "，大盘整体较强"
     if weakest:
         style_text += f"；{weakest.get('ticker')}相对落后"
+
+    reasons = []
+    if trend_score >= 65: reasons.append("✓ 日线趋势结构偏强")
+    else: reasons.append("△ 日线趋势尚未全面确认")
+    if breadth_score >= 60: reasons.append(f"✓ 市场广度健康（MA20上方 {breadth.get('above_ma20_pct', 0)}%）")
+    elif breadth_score >= 45: reasons.append(f"△ 市场广度一般（MA20上方 {breadth.get('above_ma20_pct', 0)}%）")
+    else: reasons.append(f"✕ 市场广度偏弱（MA20上方 {breadth.get('above_ma20_pct', 0)}%）")
+    reasons.append(f"{'✓' if intraday_score >= 60 else '△' if intraday_score >= 45 else '✕'} 盘中确认 {intraday_score}/100")
+    reasons.append(f"{'✓' if confirming >= 3 else '△' if confirming == 2 else '✕'} 指数确认：{cross_label}")
+    if volatility_score >= 65: reasons.append(f"✓ 波动环境：{volatility_regime}")
+    else: reasons.append(f"⚠ 波动环境：{volatility_regime}")
 
     return {
         "score": market_score,
@@ -2465,10 +2703,22 @@ def build_market_dashboard(cards, market_status):
         "risk_label": risk_label,
         "risk_class": risk_class,
         "strategy": strategy,
-        "style_text": style_text or "市场风格暂不明确",
+        "style_text": style_text,
         "strongest": strongest,
         "weakest": weakest,
         "vix": vix_card,
+        # V3 technical fields (safe for future template use)
+        "regime": regime,
+        "trend_score": trend_score,
+        "breadth_score": breadth_score,
+        "intraday_score": intraday_score,
+        "cross_index_score": cross_index_score,
+        "cross_index_label": cross_label,
+        "relative_strength_score": relative_strength_score,
+        "volatility_score": volatility_score,
+        "volatility_regime": volatility_regime,
+        "breadth": breadth,
+        "reasons": reasons,
     }
 
 def get_market_status():

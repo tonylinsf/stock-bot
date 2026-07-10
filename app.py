@@ -110,15 +110,39 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
-def load_universe():
-    with open("data/spy.txt", "r") as f:
-        return [
-            line.strip().upper()
-            for line in f
-            if line.strip() and not line.startswith("#")
-        ]
+# 先用一批高流动性股票，避免太多垃圾信号
+UNIVERSE = [
+    # ===== Mega Cap AI =====
+    "NVDA","MSFT","META","AMZN","GOOGL","GOOG","AAPL",
 
-UNIVERSE = load_universe()
+    # ===== AI / Software =====
+    "PLTR","SNOW","NOW","CRM","ORCL","ADBE","INTU",
+
+    # ===== Semiconductor =====
+    "AVGO","AMD","MU","QCOM","LRCX","AMAT","KLAC",
+    "ASML","TSM","ARM","INTC",
+
+    # ===== Momentum / SPMO =====
+    "JPM","GE","CAT","XOM","NFLX","CSCO",
+
+    # ===== AI Infra / Cloud =====
+    "ANET","PANW","CRWD","DDOG","MDB","NET",
+    "GLW","OKLO","POET","IREN","NBIS","LITE",
+
+    # ===== Robotics / Future AI =====
+    "ISRG","TSLA","RXRX",
+
+    # 医药 / 医疗
+    "LLY","NVO","VRTX","REGN",
+    "UNH","ABBV","MRK","TMO","DHR",
+
+    # 太空 / 国防
+    "RKLB","LUNR","ASTS","PL","SPIR",
+    "KTOS","AVAV","RTX","LMT","NOC"
+
+    # ===== ETF / Market =====
+    "QQQ","SPY","SMH","IGV","SPMO"
+]
 
 
 MARKET_TICKERS = ["SPY", "QQQ", "SOXX", "DIA"]
@@ -192,6 +216,69 @@ def clean_num(x):
         return float(str(x).replace("$", "").replace("%", "").replace("x", "").replace(",", "").strip())
     except:
         return 0
+
+
+OPPORTUNITY_SECTORS = {
+    # Mega-cap / software
+    "NVDA":"AI / 半导体", "MSFT":"软件 / 云计算", "META":"互联网 / AI",
+    "AMZN":"电商 / 云计算", "GOOGL":"互联网 / AI", "GOOG":"互联网 / AI",
+    "AAPL":"消费电子", "PLTR":"AI 软件", "SNOW":"云数据", "NOW":"企业软件",
+    "CRM":"企业软件", "ORCL":"数据库 / 云计算", "ADBE":"软件", "INTU":"金融软件",
+    # Semiconductors
+    "AVGO":"半导体 / AI", "AMD":"半导体 / AI", "MU":"存储芯片",
+    "QCOM":"半导体", "LRCX":"半导体设备", "AMAT":"半导体设备",
+    "KLAC":"半导体设备", "ASML":"半导体设备", "TSM":"晶圆代工",
+    "ARM":"芯片架构", "INTC":"半导体",
+    # Infra / cloud
+    "ANET":"AI 网络", "PANW":"网络安全", "CRWD":"网络安全",
+    "DDOG":"云监控", "MDB":"数据库", "NET":"云网络", "GLW":"光通信",
+    "OKLO":"核能 / AI 电力", "POET":"光通信", "IREN":"AI 数据中心",
+    "NBIS":"AI 基建", "LITE":"光通信",
+    # Other growth
+    "ISRG":"医疗机器人", "TSLA":"电动车 / 机器人", "RXRX":"AI 制药",
+    "LLY":"医药", "NVO":"医药", "VRTX":"生物科技", "REGN":"生物科技",
+    "UNH":"医疗保险", "ABBV":"医药", "MRK":"医药", "TMO":"生命科学", "DHR":"生命科学",
+    "RKLB":"太空", "LUNR":"太空", "ASTS":"卫星通信", "PL":"卫星数据",
+    "SPIR":"卫星数据", "KTOS":"国防科技", "AVAV":"无人机", "RTX":"国防",
+    "LMT":"国防", "NOC":"国防",
+    "JPM":"金融", "GE":"工业", "CAT":"工业", "XOM":"能源",
+    "NFLX":"流媒体", "CSCO":"网络设备",
+    "QQQ":"科技 ETF", "SPY":"大盘 ETF", "SMH":"半导体 ETF",
+    "IGV":"软件 ETF", "SPMO":"动量 ETF",
+}
+
+
+def opportunity_details(raw_score, risk_level, entry_status, reasons):
+    """Convert the compact scanner score into a clearer 0-100 display.
+
+    This is a model confidence score, not a historical win rate.
+    """
+    score_100 = max(0, min(100, round(45 + raw_score * 5)))
+
+    if score_100 >= 90:
+        grade, stars = "S级机会", 5
+    elif score_100 >= 82:
+        grade, stars = "A级机会", 4
+    elif score_100 >= 72:
+        grade, stars = "B级机会", 3
+    elif score_100 >= 62:
+        grade, stars = "C级观察", 2
+    else:
+        grade, stars = "D级观察", 1
+
+    if "不追高" in entry_status:
+        action = "🔴 暂不追高"
+    elif "等更好位置" in entry_status:
+        action = "🟡 等待回踩"
+    elif "等放量" in entry_status:
+        action = "🟡 等待放量确认"
+    elif risk_level == "较低" and score_100 >= 82:
+        action = "🟢 可分批关注"
+    else:
+        action = "🟡 继续观察"
+
+    reasons_list = [r.strip() for r in str(reasons).split("、") if r.strip()]
+    return score_100, grade, stars, action, reasons_list
 
 
 def scan_market_hunter():
@@ -368,11 +455,21 @@ def scan_market_hunter():
             else:
                 risk_level = "较低"
                 entry_status = "✅ 可观察"
+            display_score, opportunity_grade, opportunity_stars, action_text, reasons_list = opportunity_details(
+                score, risk_level, entry_status, reasons
+            )
+
             results.append({
                 "ticker": ticker,
                 "price": round(close, 2),
                 "score": score,
-               "change_pct": change_pct,
+                "display_score": display_score,
+                "opportunity_grade": opportunity_grade,
+                "opportunity_stars": opportunity_stars,
+                "action_text": action_text,
+                "sector": OPPORTUNITY_SECTORS.get(ticker, "成长股"),
+                "historical_rate_text": "数据累积中",
+                "change_pct": change_pct,
                 "setup_type": setup_type,
                 "entry_status": entry_status,
                 "risk_level": risk_level,
@@ -384,6 +481,7 @@ def scan_market_hunter():
                 "dollar_volume": round(dollar_volume / 1_000_000, 1),
                 "high20": round(high20, 2),
                 "reasons": "、".join(reasons),
+                "reasons_list": reasons_list,
                 "buy_low": buy_low,
                 "buy_high": buy_high,
                 "stop": stop,
@@ -395,7 +493,7 @@ def scan_market_hunter():
         except Exception as e:
             print("Hunter error:", ticker, e)
 
-    results = sorted(results, key=lambda x: x["score"], reverse=True)[:20]
+    results = sorted(results, key=lambda x: x.get("display_score", 0), reverse=True)[:20]
 
     HUNTER_CACHE["time"] = now
     HUNTER_CACHE["data"] = results

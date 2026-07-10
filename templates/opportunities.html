@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <style>
     :root{--bg:#07101f;--panel:#0d1728;--line:#24334b;--text:#eef4ff;--muted:#91a2bb;--blue:#4d8dff;--green:#43df8c;--yellow:#ffd05a;--red:#ff747b}
-    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#152746 0,#07101f 42%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}.container{max-width:920px;margin:auto;padding:12px}.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.top h1{margin:0;font-size:26px}.back{color:white;text-decoration:none;background:#1b2a42;border:1px solid #314766;border-radius:11px;padding:9px 12px;font-weight:800}.card{background:linear-gradient(145deg,rgba(17,31,52,.98),rgba(10,20,36,.98));border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 14px 34px rgba(0,0,0,.26)}.intro{color:var(--muted);line-height:1.65}.scan-btn{width:100%;border:0;border-radius:13px;background:linear-gradient(135deg,#2d6be8,#367ff7);color:white;font-weight:900;padding:14px 18px;font-size:16px;cursor:pointer}.scan-btn:disabled{opacity:.65;cursor:not-allowed}.loading{display:none;margin-top:10px;color:#8fb3ff;font-weight:800;text-align:center}.section-title{font-size:18px;font-weight:900;margin:0 0 12px}.count{color:var(--muted);font-size:13px}.opportunity{background:#081221;border:1px solid #21314a;border-radius:14px;padding:13px;margin-top:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.ticker{font-size:23px;font-weight:950}.score{font-size:20px;font-weight:950;color:var(--yellow)}.price{font-size:18px;font-weight:850;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}.setup{color:var(--yellow);font-weight:850;margin-top:9px}.meta{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:13px;margin-top:8px}.plan{margin-top:10px;line-height:1.55;color:#dbe8f7}.reason{margin-top:8px;color:#cbd5e1;line-height:1.5}.empty{text-align:center;color:var(--muted);padding:16px}.cache-note{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}@media(max-width:620px){.container{padding:10px}.top h1{font-size:22px}.card{padding:13px}.ticker{font-size:21px}.row{align-items:center}}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#152746 0,#07101f 42%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}.container{max-width:920px;margin:auto;padding:12px}.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.top h1{margin:0;font-size:26px}.back{color:white;text-decoration:none;background:#1b2a42;border:1px solid #314766;border-radius:11px;padding:9px 12px;font-weight:800}.card{background:linear-gradient(145deg,rgba(17,31,52,.98),rgba(10,20,36,.98));border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 14px 34px rgba(0,0,0,.26)}.intro{color:var(--muted);line-height:1.65}.scan-btn{width:100%;border:0;border-radius:13px;background:linear-gradient(135deg,#2d6be8,#367ff7);color:white;font-weight:900;padding:14px 18px;font-size:16px;cursor:pointer}.scan-btn:disabled{opacity:.65;cursor:not-allowed}.loading{display:none;margin-top:10px;color:#8fb3ff;font-weight:800;text-align:center}.section-title{font-size:18px;font-weight:900;margin:0 0 12px}.count{color:var(--muted);font-size:13px}.opportunity{background:#081221;border:1px solid #21314a;border-radius:14px;padding:13px;margin-top:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.ticker{font-size:23px;font-weight:950}.score{text-align:right}.score-main{font-size:22px;font-weight:950;color:var(--yellow)}.grade{margin-top:2px;color:#ffd86b;font-size:13px;font-weight:850}.stars{letter-spacing:1px;color:#ffd05a;font-size:14px}.price{font-size:18px;font-weight:850;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}.setup{color:var(--yellow);font-weight:850;margin-top:9px}.meta{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:13px;margin-top:8px}.plan{margin-top:10px;line-height:1.55;color:#dbe8f7}.reason{margin-top:10px;color:#cbd5e1;line-height:1.5}.action{display:inline-block;margin-top:9px;padding:6px 10px;border-radius:999px;background:#12243b;font-weight:900}.details-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.detail-box{background:#0d1b2d;border:1px solid #223651;border-radius:10px;padding:9px}.detail-label{font-size:12px;color:var(--muted);margin-bottom:3px}.detail-value{font-weight:850}.buy{color:#8fb3ff}.target{color:var(--green)}.stop{color:var(--red)}.reason-list{margin-top:10px;display:grid;gap:5px}.reason-item{color:#d8e4f3}.history-note{margin-top:10px;color:#8fa2bc;font-size:12px;border-top:1px solid #1d2d43;padding-top:9px}.empty{text-align:center;color:var(--muted);padding:16px}.cache-note{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}@media(max-width:620px){.container{padding:10px}.top h1{font-size:22px}.card{padding:13px}.ticker{font-size:21px}.row{align-items:flex-start}.details-grid{grid-template-columns:1fr 1fr}}
   </style>
 </head>
 <body>
@@ -18,7 +18,7 @@
 
   {% if not scanned %}
   <section class="card">
-    <form method="post" action="/opportunities" onsubmit="startScan()" style="margin-top:14px">
+    <form method="post" action="/opportunities" onsubmit="startScan()">
       <button id="scanBtn" class="scan-btn" type="submit">⭐ 开始扫描今日机会</button>
       <div id="scanLoading" class="loading">⏳ 正在扫描并分类，请稍等...</div>
     </form>
@@ -50,15 +50,32 @@
           <div>
             <div class="ticker">{{ s.ticker }}</div>
             <div class="price">${{ s.price }}　<span class="{% if s.change_pct >= 0 %}up{% else %}down{% endif %}">{{ '%+.2f'|format(s.change_pct) }}%</span></div>
+            <div class="action">{{ s.action_text }}</div>
           </div>
-          <div class="score">{{ s.score }} 分</div>
+          <div class="score">
+            <div class="score-main">{{ s.display_score }} /100</div>
+            <div class="stars">{% for _ in range(s.opportunity_stars) %}★{% endfor %}{% for _ in range(5-s.opportunity_stars) %}☆{% endfor %}</div>
+            <div class="grade">{{ s.opportunity_grade }}</div>
+          </div>
         </div>
-        <div class="setup">{{ s.setup_type }} ｜ {{ s.entry_status }}</div>
+        <div class="setup">{{ s.setup_type }}</div>
         <div class="meta">
-          <span>RSI {{ s.rsi }}</span><span>量比 {{ s.volume_ratio }}x</span><span>强过QQQ {{ s.rs_strength }}%</span><span>风险 {{ s.risk_level }}</span>
+          <span>{{ s.sector }}</span><span>RSI {{ s.rsi }}</span><span>量比 {{ s.volume_ratio }}x</span><span>强过QQQ {{ s.rs_strength }}%</span><span>风险 {{ s.risk_level }}</span>
         </div>
-        <div class="plan">买区：${{ s.buy_low }} – ${{ s.buy_high }}<br>止损：${{ s.stop }}（{{ s.stop_pct }}%）<br>目标：${{ s.target1 }} / ${{ s.target2 }}</div>
-        <div class="reason">{{ s.reasons }}</div>
+
+        <div class="details-grid">
+          <div class="detail-box"><div class="detail-label">买入区</div><div class="detail-value buy">${{ s.buy_low }} – ${{ s.buy_high }}</div></div>
+          <div class="detail-box"><div class="detail-label">止损</div><div class="detail-value stop">${{ s.stop }}（{{ s.stop_pct }}%）</div></div>
+          <div class="detail-box"><div class="detail-label">目标 1</div><div class="detail-value target">${{ s.target1 }}</div></div>
+          <div class="detail-box"><div class="detail-label">目标 2</div><div class="detail-value target">${{ s.target2 }}</div></div>
+        </div>
+
+        <div class="reason-list">
+          {% for reason in s.reasons_list %}
+          <div class="reason-item">✓ {{ reason }}</div>
+          {% endfor %}
+        </div>
+        <div class="history-note">历史模型有效率：{{ s.historical_rate_text }}（目前评分是信号一致度，不是历史胜率）</div>
       </div>
       {% endfor %}
     </section>

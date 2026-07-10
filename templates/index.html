@@ -27,8 +27,9 @@
     .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metric{background:#081221;border:1px solid #21314a;border-radius:12px;padding:11px}.metric .k{color:#8fb3ff;font-weight:800;font-size:12px}.metric .v{font-size:17px;font-weight:850;margin-top:6px}.wide-row{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:12px 0;border-top:1px solid rgba(255,255,255,.08)}
     .signal-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.signal-status{font-size:21px;font-weight:950}.positive{color:var(--green)}.negative{color:var(--red)}.neutral{color:var(--yellow)}.signal-score{font-size:28px;font-weight:950}.signal-list,.risk-list{display:grid;gap:8px;margin-top:13px}.signal-item{color:#dbe8f7}.risk-item{color:var(--yellow)}.note-box{margin-top:12px;padding:10px 12px;border-radius:11px;background:rgba(76,201,255,.07);color:#a9def5;font-size:13px}
     .market-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.market-card{background:#0c1727;border:1px solid var(--line);border-radius:15px;padding:14px}.market-top{display:flex;justify-content:space-between;align-items:center}.market-name{font-size:21px;font-weight:900}.market-price{font-size:22px;font-weight:900}.market-small{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:9px}
+    .dashboard-hero{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center}.dashboard-score{width:138px;height:138px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) calc(var(--market-score)*1%),#20304a 0);position:relative}.dashboard-score:before{content:"";position:absolute;width:106px;height:106px;border-radius:50%;background:#0d1728}.dashboard-score-inner{position:relative;text-align:center}.dashboard-score-inner b{font-size:38px;display:block}.dashboard-score-inner span{font-size:12px;color:var(--muted)}.dashboard-summary{display:grid;gap:10px}.dashboard-line{display:flex;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,.07)}.index-detail{margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;color:var(--muted)}.index-detail b{display:block;color:var(--text);font-size:14px;margin-top:3px}.strategy-box{padding:14px;border-radius:13px;background:rgba(67,223,140,.07);border:1px solid rgba(67,223,140,.18);line-height:1.65}.rank-badge{font-weight:900;color:var(--yellow)}
     .error{background:#401d26;border:1px solid #7f2634;padding:13px;border-radius:12px;color:#ffd1d6}
-    @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
+    @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.dashboard-hero{grid-template-columns:1fr}.dashboard-score{margin:auto}.index-detail{grid-template-columns:repeat(2,1fr)}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
   </style>
 </head>
 <body>
@@ -41,14 +42,17 @@
     </div>
   </header>
 
+  {% if market_status %}
   <section class="card market-light">
-    <h2>今日大盘灯号　🟢 趋势健康</h2>
+    <h2>今日大盘灯号　{{ market_status.label }}</h2>
     <div class="market-lines">
-      <div>趋势向上 + 情绪正常，可持有或顺势</div>
+      <div>{{ market_status.desc }}</div>
       <div>🌡️ 市场温度：{{ market_status.temp }} / 100</div>
+      <div>🧠 VIX：{{ market_status.vix_text }}</div>
       <div>🔥 开盘预测：{{ market_status.open_signal }}</div>
     </div>
   </section>
+  {% endif %}
 
   <section class="card">
     <form method="post" action="/" class="search" onsubmit="showLoading()">
@@ -142,9 +146,57 @@
   <section class="card"><h2 class="section-title">快捷资料</h2><div class="button-grid"><a href="/news/{{ analysis.ticker }}" target="_blank"><button type="button">📰 公司新闻</button></a><a href="/insider/{{ analysis.ticker }}" target="_blank"><button type="button">🏦 机构动向</button></a></div></section>
   {% endif %}
 
-  {% if market_cards %}<section class="card"><h2 class="section-title">大盘与资产</h2><div class="market-cards">{% for m in market_cards %}<div class="market-card"><div class="market-top"><span class="market-name">{{ m.ticker }}</span><span class="market-price {{ m.change_class }}">{{ m.price }}</span></div><div class="market-small"><span>{{ m.change_val }} / {{ m.change_pct }}</span><span>评分 {{ m.score }}</span></div><div class="market-small"><span>RSI {{ m.rsi }}</span><span>Vol {{ m.volume_ratio }}x</span></div></div>{% endfor %}</div></section>{% endif %}
+  {% if market_dashboard %}
+  <section class="card">
+    <h2 class="section-title">📊 大盘总览</h2>
+    <div class="dashboard-hero">
+      <div class="dashboard-score" style="--market-score:{{ market_dashboard.score }}"><div class="dashboard-score-inner"><b>{{ market_dashboard.score }}</b><span>/ 100</span></div></div>
+      <div class="dashboard-summary">
+        <div class="dashboard-line"><b>市场方向</b><strong class="{{ market_dashboard.bias_class }}">{{ market_dashboard.bias }}</strong></div>
+        <div class="dashboard-line"><b>四大指数上涨率</b><strong>{{ market_dashboard.participation }}%</strong></div>
+        <div class="dashboard-line"><b>市场风险</b><strong class="{{ market_dashboard.risk_class }}">{{ market_dashboard.risk_label }}</strong></div>
+        <div class="dashboard-line"><b>市场风格</b><span>{{ market_dashboard.style_text }}</span></div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
 
-  {% if market_status.sector_rotation %}<section class="card"><h2 class="section-title">🔥 板块轮动</h2>{% for s in market_status.sector_rotation %}<div class="wide-row"><b>{{ s.ticker }} {{ s.name }}</b><div><span style="color:{% if s.change > 0 %}#43df8c{% else %}#ff747b{% endif %};font-weight:900">{{ s.change }}%</span>　{{ s.status }}</div></div>{% endfor %}</section>{% endif %}
+  {% if market_cards %}
+  <section class="card">
+    <h2 class="section-title">四大指数趋势</h2>
+    <div class="market-cards">
+      {% for m in market_cards %}
+      <div class="market-card">
+        <div class="market-top"><span class="market-name">{{ m.ticker }}</span><span class="market-price {{ m.change_class }}">{{ m.price }}</span></div>
+        <div class="market-small"><span>{{ m.change_val or '' }} {{ m.change_pct }}</span><span>评分 {{ m.score }}</span></div>
+        {% if m.ticker != 'VIX' %}
+        <div class="index-detail">
+          <div>RSI<b>{{ m.rsi }}</b></div>
+          <div>量比<b>{{ m.volume_ratio }}x</b></div>
+          <div>技术<b>{{ m.technical_score or '--' }}</b></div>
+          <div>盘中<b>{{ m.intraday_score or '--' }}</b></div>
+          <div>MA20<b>{{ m.ma20 }}</b></div>
+          <div>趋势<b>{{ m.trend_label or m.setup }}</b></div>
+        </div>
+        {% else %}
+        <div class="index-detail"><div>当日变化<b>{{ m.change_pct }}</b></div><div>RSI<b>{{ m.rsi }}</b></div><div>风险指标<b>波动率</b></div></div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if market_dashboard %}
+  <section class="card">
+    <h2 class="section-title">🧭 今日市场策略</h2>
+    <div class="strategy-box"><b>{{ market_dashboard.bias }}</b><br>{{ market_dashboard.strategy }}</div>
+    {% if market_dashboard.strongest %}<div class="wide-row"><b>🥇 最强指数</b><div><span class="rank-badge">{{ market_dashboard.strongest.ticker }}</span>　{{ market_dashboard.strongest.change_pct }}</div></div>{% endif %}
+    {% if market_dashboard.weakest %}<div class="wide-row"><b>相对落后</b><div>{{ market_dashboard.weakest.ticker }}　{{ market_dashboard.weakest.change_pct }}</div></div>{% endif %}
+  </section>
+  {% endif %}
+
+  {% if market_status and market_status.sector_rotation %}<section class="card"><h2 class="section-title">🔥 板块轮动</h2>{% for s in market_status.sector_rotation %}<div class="wide-row"><b>{{ loop.index }}. {{ s.ticker }} {{ s.name }}</b><div><span style="color:{% if s.change > 0 %}#43df8c{% else %}#ff747b{% endif %};font-weight:900">{{ s.change }}%</span>　{{ s.status }}</div></div>{% endfor %}</section>{% endif %}
 </div>
 <script>
 function showLoading(){const m=document.getElementById('loadingMsg');const b=document.getElementById('analyzeBtn');if(m)m.style.display='block';if(b)b.innerText='分析中...'}

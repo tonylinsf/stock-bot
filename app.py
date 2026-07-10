@@ -145,7 +145,7 @@ UNIVERSE = [
 ]
 
 
-MARKET_TICKERS = ["SPY", "QQQ"]
+MARKET_TICKERS = ["SPY", "QQQ", "SOXX", "DIA"]
 
 CACHE = {}
 CACHE_TTL = 60 
@@ -670,12 +670,21 @@ def get_pe_label(ticker):
             "metric": "all",
             "token": FINNHUB_API_KEY
         }
+
         r = requests.get(url, params=params, timeout=8)
         data = r.json().get("metric", {})
+
         pe = data.get("peNormalizedAnnual") or data.get("peTTM")
+
         if not pe:
-            return "", ""
+            return {
+                "pe_text": "",
+                "pe_label": "",
+                "pe_color": "#ffffff"
+            }
+
         pe = round(float(pe), 1)
+
         if pe < 15:
             label = "最便宜"
             pe_color = "#22c55e"
@@ -685,19 +694,20 @@ def get_pe_label(ticker):
         else:
             label = "偏贵"
             pe_color = "#ef4444"
+
         return {
             "pe_text": f"{pe}x",
             "pe_label": label,
             "pe_color": pe_color
         }
 
-    except:
+    except Exception as e:
+        print(f"PE data error for {ticker}: {e}")
 
         return {
             "pe_text": "",
             "pe_label": "",
             "pe_color": "#ffffff"
-
         }
 
 
@@ -2299,9 +2309,15 @@ def get_market_cards():
                 "change_class": "up" if (analysis.get("change_num") or 0) >= 0 else "down",
 
                 "decision": analysis.get("decision"),
-                "score": analysis.get("score"),
+                "score": analysis.get("final_score") or analysis.get("score") or 0,
+                "technical_score": analysis.get("technical_score") or 0,
+                "intraday_score": analysis.get("intraday_score") or 0,
+                "stock_flow_score": analysis.get("stock_flow_score") or 0,
                 "rsi": analysis.get("rsi"),
                 "setup": analysis.get("setup"),
+                "trend_label": analysis.get("trend_label"),
+                "trend_arrow": analysis.get("trend_arrow"),
+                "vwap_status": (analysis.get("short_options") or {}).get("vwap_status", "--"),
 
                 "ma20": analysis.get("ma20"),
                 "ma60": analysis.get("ma60"),
@@ -2319,6 +2335,68 @@ def get_market_cards():
     cards.append(get_vix_card())
     return cards
 
+def build_market_dashboard(cards, market_status):
+    """Build a lightweight market dashboard from already-fetched cards.
+    No extra API calls are made here.
+    """
+    index_cards = [c for c in cards if c.get("ticker") in MARKET_TICKERS]
+    vix_card = next((c for c in cards if c.get("ticker") == "VIX"), {})
+
+    valid_scores = [clean_num(c.get("score")) for c in index_cards if clean_num(c.get("score")) > 0]
+    market_score = round(sum(valid_scores) / len(valid_scores)) if valid_scores else 50
+
+    positive = sum(1 for c in index_cards if clean_num(c.get("change_pct")) > 0)
+    participation = round(positive / len(index_cards) * 100) if index_cards else 0
+
+    ranked = sorted(index_cards, key=lambda c: clean_num(c.get("change_pct")), reverse=True)
+    strongest = ranked[0] if ranked else {}
+    weakest = ranked[-1] if ranked else {}
+
+    vix_price = clean_num(vix_card.get("price"))
+    if vix_price and vix_price < 16:
+        risk_label, risk_class = "中等偏低", "positive"
+    elif vix_price and vix_price < 22:
+        risk_label, risk_class = "中等", "neutral"
+    else:
+        risk_label, risk_class = "偏高", "negative"
+
+    if market_score >= 75 and participation >= 75:
+        bias, bias_class, strategy = "偏多", "positive", "可顺势做强势股，回调优先，不宜盲目追高"
+    elif market_score >= 55:
+        bias, bias_class, strategy = "震荡偏多", "neutral", "控制仓位，优先选择强于SPY与QQQ的股票"
+    elif market_score >= 40:
+        bias, bias_class, strategy = "震荡", "neutral", "轻仓观察，等待指数与成交量同步确认"
+    else:
+        bias, bias_class, strategy = "偏弱", "negative", "减少追涨，等待SPY与QQQ重新站稳关键均线"
+
+    style_text = ""
+    if strongest:
+        style_text = f"{strongest.get('ticker')}领涨"
+        if strongest.get("ticker") == "SOXX":
+            style_text += "，半导体与AI方向占优"
+        elif strongest.get("ticker") == "QQQ":
+            style_text += "，科技成长占优"
+        elif strongest.get("ticker") == "DIA":
+            style_text += "，传统蓝筹占优"
+        else:
+            style_text += "，大盘整体较强"
+    if weakest:
+        style_text += f"；{weakest.get('ticker')}相对落后"
+
+    return {
+        "score": market_score,
+        "bias": bias,
+        "bias_class": bias_class,
+        "participation": participation,
+        "risk_label": risk_label,
+        "risk_class": risk_class,
+        "strategy": strategy,
+        "style_text": style_text or "市场风格暂不明确",
+        "strongest": strongest,
+        "weakest": weakest,
+        "vix": vix_card,
+    }
+
 def get_market_status():
     now = time.time()
     if MARKET_STATUS_CACHE["data"] and now - MARKET_STATUS_CACHE["time"] < MARKET_CACHE_TTL:
@@ -2331,6 +2409,7 @@ def get_market_status():
     label = "⚪ 数据不足"
     desc = "暂时无法判断市场状态"
     color = "gray"
+    sector_rotation = []
 
     try:
         # === SPY / QQQ ===
@@ -2613,6 +2692,7 @@ def index():
         top_picks=top_picks,
         market_cards=market_cards,
         market_status=market_status,
+        market_dashboard=None,
     )
 
 
@@ -2666,7 +2746,8 @@ def health():
 def market():
     market_filter = get_market_filter()
     market_cards = get_market_cards()
-    market_status= get_market_status()
+    market_status = get_market_status()
+    market_dashboard = build_market_dashboard(market_cards, market_status)
 
     return render_template(
         "index.html",
@@ -2679,6 +2760,7 @@ def market():
         top_picks=[],
         market_cards=market_cards,
         market_status=market_status,
+        market_dashboard=market_dashboard,
     )
 
 @app.route("/scan_rebound")

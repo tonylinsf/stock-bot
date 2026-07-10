@@ -1,5 +1,7 @@
 import os
 import time
+import hmac
+import secrets
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -10,7 +12,7 @@ from alpaca.data.enums import DataFeed
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
-from flask import jsonify
+from flask import jsonify, session, redirect, url_for, flash
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
 
@@ -23,6 +25,76 @@ except Exception:
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.getenv("APP_SECRET_KEY") or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("RENDER", "").lower() == "true",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+)
+
+
+def load_login_users():
+    """Load up to 4 login accounts from Render environment variables."""
+    users = {}
+    for i in range(1, 5):
+        username = os.getenv(f"LOGIN_USER_{i}", "").strip()
+        password = os.getenv(f"LOGIN_PASSWORD_{i}", "")
+        if username and password:
+            users[username.lower()] = {
+                "username": username,
+                "password": password,
+            }
+    return users
+
+
+def is_safe_next_url(target):
+    return bool(target) and target.startswith("/") and not target.startswith("//")
+
+
+@app.before_request
+def require_login():
+    public_endpoints = {"login", "health", "static"}
+    if request.endpoint in public_endpoints:
+        return None
+    if not session.get("logged_in"):
+        next_url = request.full_path if request.query_string else request.path
+        return redirect(url_for("login", next=next_url))
+    return None
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("logged_in"):
+        return redirect(url_for("index"))
+
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        users = load_login_users()
+        account = users.get(username.lower())
+
+        valid_user = account is not None
+        valid_password = valid_user and hmac.compare_digest(password, account["password"])
+
+        if valid_password:
+            session.clear()
+            session.permanent = True
+            session["logged_in"] = True
+            session["username"] = account["username"]
+            next_url = request.form.get("next", "")
+            return redirect(next_url if is_safe_next_url(next_url) else url_for("index"))
+
+        error = "用户名或密码不正确"
+
+    return render_template("login.html", error=error, next=request.args.get("next", ""))
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 USE_ALPACA = True
 USE_POLYGON_FALLBACK = True

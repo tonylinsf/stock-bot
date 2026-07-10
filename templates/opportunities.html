@@ -18,7 +18,6 @@
 
   {% if not scanned %}
   <section class="card">
-    <div class="intro">把原来的「AI 市场猎手」和「低位反弹扫描」合并成一次扫描。页面打开时不会自动运行，只有按下按钮才会请求数据，减少 Render 卡住或重复请求。</div>
     <form method="post" action="/opportunities" onsubmit="startScan()" style="margin-top:14px">
       <button id="scanBtn" class="scan-btn" type="submit">⭐ 开始扫描今日机会</button>
       <div id="scanLoading" class="loading">⏳ 正在扫描并分类，请稍等...</div>

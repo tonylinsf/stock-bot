@@ -2,1098 +2,147 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
-  <title>Smartai Polygon Pro</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  <title>SmartAI Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <style>
-    :root {
-      --bg: #080d1a;
-      --card: #111827;
-      --card2: #0b1220;
-      --line: #1f2937;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --blue: #2563eb;
-      --green: #16a34a;
-      --yellow: #ca8a04;
-      --red: #dc2626;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      background: radial-gradient(circle at top, #111d35 0, #080d1a 45%);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-      font-size: 14px;
-    }
-
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 10px;
-    }
-
-    .top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 30px;
-      font-weight: 900;
-      letter-spacing: -0.4px;
-    }
-
-    .sub {
-      color: var(--muted);
-      margin-top: 6px;
-      font-size: 14px;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 7px 11px;
-      border-radius: 999px;
-      background: #1e293b;
-      color: #bfdbfe;
-      font-size: 13px;
-      font-weight: 800;
-    }
-
-    .card {
-      width: 100%;
-      background: rgba(17, 24, 39, 0.92);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 12px;
-      box-shadow: 0 18px 45px rgba(0,0,0,0.25);
-    }
-
-    .error {
-      background: #3f1d1d;
-      border: 1px solid #7f1d1d;
-      color: #fecaca;
-      padding: 14px;
-      border-radius: 12px;
-      line-height: 1.6;
-    }
-
-    /* 表格 */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    th, td {
-      text-align: left;
-      padding: 12px;
-      border-bottom: 1px solid #1f2937;
-      font-size: 14px;
-      vertical-align: top;
-    }
-
-    th {
-      color: #93c5fd;
-      background: #020617;
-      font-weight: 900;
-    }
-
-    tr:hover {
-      background: #0f172a;
-    }
-
-    .market-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-
-    .market-table th {
-      text-align: left;
-      color: #8fb3ff;
-      font-size: 13px;
-      padding: 6px 8px;
-    }
-
-    .market-table td {
-      padding: 10px 8px;
-      font-weight: 600;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-
-    /* 通用 */
-    .up { color: #4ade80; }
-    .down { color: #f87171; }
-    .neutral { color: #aaa; }
-
-    .highlight {
-      font-weight: bold;
-      color: #4ade80;
-    }
-
-    .section-title {
-      font-size: 20px;
-      font-weight: 900;
-      margin: 0 0 14px;
-    }
-
-    .ai {
-      white-space: pre-wrap;
-      line-height: 1.65;
-      color: #dbeafe;
-    }
-
-    ul {
-      margin: 0;
-      padding-left: 20px;
-      line-height: 1.65;
-      color: #cbd5e1;
-    }
-
-    /* 搜索区 */
-    .search {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    input {
-      background: #020617;
-      color: white;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 12px 14px;
-      min-width: 230px;
-      font-size: 16px;
-      outline: none;
-    }
-
-    button {
-      border: 0;
-      border-radius: 12px;
-      padding: 12px 18px;
-      background: var(--blue);
-      color: white;
-      font-weight: 900;
-      cursor: pointer;
-      font-size: 15px;
-    }
- 
-    /* 大盘灯号 */
-    .market-light {
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 12px;
-      border-left: 6px solid var(--blue);
-    }
-
-    .market-light.green,
-    .market-light.bull {
-      border-left-color: #4ade80;
-      background: rgba(74, 222, 128, 0.05);
-    }
-
-    .market-light.yellow,
-    .market-light.neutral {
-      border-left-color: #facc15;
-      background: rgba(250, 204, 21, 0.05);
-    }
-
-    .market-light.red,
-    .market-light.bear {
-      border-left-color: #f87171;
-      background: rgba(248, 113, 113, 0.05);
-    }
-
-    .market-title {
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .market-label {
-      font-size: 20px;
-      font-weight: 800;
-    }
-
-    .market-sub {
-      margin-top: 6px;
-      font-size: 13px;
-      color: #9ca3af;
-    }
-
-    .market-open {
-      text-align: right;
-      font-size: 14px;
-      color: #ffd166;
-      margin-top: 6px;
-    }
-
-    .market-light {
-      display: block;
-      text-align: left;
-    }
-
-    .market-light .light-title {
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
- 
-    .market-light .light-label {
-      font-size: 26px;
-      font-weight: 900;
-      margin-bottom: 6px;
-    }
-
-    .market-light .light-sub {
-      font-size: 14px;
-      color: #cbd5e1;
-      margin-bottom: 10px;
-    }
-
-    .market-light .light-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      align-items: center;
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    /* 大盘卡片 SPY / QQQ / VIX */
-    .market-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .market-card {
-      background: rgba(20, 30, 50, 0.6);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.3);
-    }
-
-    .market-top-row {
-      display: grid;
-      grid-template-columns: 0.8fr 1.4fr 0.8fr;
-      align-items: center;
-      width: 100%;
-    }
-
-    .market-name {
-      text-align: right;
-      font-size: 28px;
-      font-weight: 800;
-      padding-right: 10px;
-    }
-
-    .market-price {
-      text-align: center;
-      font-size: 28px;
-      font-weight: 800;
-    }
-
-    .market-change {
-      text-align: left;
-      padding-left: 10px;
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-
-    .market-session {
-      width: 100%;
-      text-align: center;
-      font-size: 13px;
-      font-weight: 600;
-      margin-top: 6px;
-    }
-
-    .market-body {
-      display: flex;
-      justify-content: space-between;
-      font-size: 14px;
-      margin-bottom: 10px;
-    }
-
-    .market-side {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      opacity: 0.8;
-    }
-
-    .market-extra {
-      display: flex;
-      justify-content: center;
-      gap: 18px;
-      margin-top: 6px;
-      font-size: 13px;
-      opacity: 0.8;
-    }
-
-    .light-line {
-      margin-top: 8px;
-      font-size: 15px;
-      line-height: 1.5;
-    }
-
-    /* 个股详情 */
-    .stock-head-top {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .stock-head-top span:first-child {
-      text-align: left;
-    }
-
-    .stock-symbol {
-      text-align: center;
-      font-size: 34px;
-      font-weight: 900;
-    }
-
-    .stock-date {
-      text-align: right;
-      font-size: 18px;
-      opacity: 0.9;
-    }
-
-    .stock-price-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      align-items: center;
-      width: 100%;
-    }
-
-    .stock-price {
-      text-align: right;
-      padding-right: 20px;
-      font-size: 40px;
-      font-weight: 800;
-      letter-spacing: 1px;
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    .stock-change {
-      text-align: left;
-      padding-left: 20px;
-      font-size: 20px;
-      font-weight: 700;
-      opacity: 0.95;
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    .stock-session {
-      text-align: center;
-      margin-top: 8px;
-      font-size: 18px;
-      font-weight: 700;
-    }
-
-    .stock-open {
-      text-align: center;
-      font-size: 15px;
-      font-weight: 600;
-      color: #ffd166;
-      margin: 8px 0;
-      background: rgba(255, 209, 102, 0.08);
-      padding: 6px 10px;
-      border-radius: 6px;  
-    }
-
-    .stock-meta {
-      text-align: center;
-      margin-top: 6px;
-      font-size: 14px;
-      opacity: 0.85;
-    }
-
-    .stock-pe{
-      font-size:18px;
-      font-weight:700;
-      color:#facc15;
-      text-align:center;
-      margin-top:8px;
-      margin-bottom:8px;
-    }
-
-    .stock-trend {
-      text-align: center;
-      margin-top: 6px;
-      font-size: 16px;
-      font-weight: 700;
-      color: #ffd166;
-    }
-
-    /* 技术指标 / 交易计划 */
-    .boll-line {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .risk-line {
-      margin-top: 10px;
-      text-align: center;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    /* 图表 */
-    .chart-wrap {
-      height: 220px;
-      max-height: 220px;
-      position: relative;
-    }
-
-    /* Mobile */
-    @media (max-width: 900px) {
-      .top { display: block; }
-    }
-
-    @media (max-width: 600px) {
-      body {
-        font-size: 14px;
-      }
-
-      .container {
-        padding: 14px;
-      }
-
-      h1 {
-        font-size: 20px;
-      }
-
-      h2,
-      .section-title {
-        font-size: 16px;
-      }
-
-      .card {
-        padding: 10px;
-      }
-
-      input,
-      button {
-        width: 100%;
-        font-size: 16px;
-      }
-
-      th, td {
-        padding: 9px;
-        font-size: 13px;
-      }
-
-      .stock-symbol {
-        font-size: 24px;
-      }
-
-      .stock-price {
-        font-size: 30px;
-        padding-right: 12px;
-      }
-
-      .stock-change {
-        font-size: 16px;
-        padding-left: 12px;
-      }
-
-      .stock-session {
-        font-size: 15px;
-      }
-
-      .stock-open {
-        font-size: 14px;
-      }
-
-      .market-name {
-        font-size: 24px;
-      }
-
-      .market-price {
-        font-size: 26px;
-      }
-
-      .market-change {
-        font-size: 14px;
-      }
-
-      .market-body,
-      .market-side,
-      .market-extra {
-        font-size: 13px;
-      }
-
-      .chart-wrap {
-        height: 240px;
-        max-height: 240px;
-      }
-    }
- </style>
+    :root{
+      --bg:#07101f;--panel:#0d1728;--panel2:#101d31;--line:#24334b;
+      --text:#eef4ff;--muted:#91a2bb;--blue:#4d8dff;--green:#43df8c;
+      --yellow:#ffd05a;--red:#ff747b;--cyan:#4cc9ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(circle at top,#152746 0,#07101f 42%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+    .container{max-width:920px;margin:auto;padding:12px}
+    .brand{padding:10px 4px 16px}.brand h1{font-size:27px;margin:0;font-weight:900}.brand p{margin:5px 0 0;color:var(--muted)}
+    .card{background:linear-gradient(145deg,rgba(17,31,52,.98),rgba(10,20,36,.98));border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 14px 34px rgba(0,0,0,.26)}
+    .section-title{font-size:18px;font-weight:900;margin:0 0 14px}.muted{color:var(--muted)}
+    .search{display:grid;grid-template-columns:1fr auto;gap:10px}input{width:100%;background:#050b17;color:white;border:1px solid #344763;border-radius:13px;padding:14px;font-size:16px;outline:none}
+    button{border:0;border-radius:13px;background:linear-gradient(135deg,#2d6be8,#367ff7);color:white;font-weight:900;padding:13px 18px;font-size:15px;cursor:pointer}.button-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}.button-grid a button{width:100%}
+    .market-light{border-left:5px solid var(--green)}.market-light h2{margin:0 0 7px}.market-lines{display:grid;gap:7px;color:#d8e3f4}
+    .hero-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}.hero-symbol{text-align:center;font-size:34px;font-weight:950}.hero-date{text-align:right;color:var(--muted)}
+    .price-row{display:flex;justify-content:center;align-items:baseline;gap:22px;margin:14px 0 8px}.price{font-size:45px;font-weight:950}.change{font-size:22px;font-weight:850}.hero-meta{text-align:center;color:var(--muted);margin-top:8px}.pe{text-align:center;font-size:18px;font-weight:800}.decision{text-align:center;font-size:20px;font-weight:900;color:var(--yellow);margin:8px 0}.open{background:rgba(255,208,90,.09);color:var(--yellow);text-align:center;border-radius:10px;padding:9px;margin-top:10px}
+    .score-grid{display:grid;grid-template-columns:140px 1fr;gap:18px;align-items:center}.score-circle{width:132px;height:132px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) calc(var(--score)*1%),#20304a 0);position:relative}.score-circle:before{content:"";position:absolute;width:102px;height:102px;border-radius:50%;background:#0d1728}.score-value{z-index:1;text-align:center}.score-value b{display:block;font-size:34px}.score-value span{color:var(--muted);font-size:12px}
+    .bar-list{display:grid;gap:12px}.bar-row{display:grid;grid-template-columns:92px 1fr 46px;gap:9px;align-items:center}.bar-track{height:9px;background:#223149;border-radius:999px;overflow:hidden}.bar-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#43df8c);border-radius:999px}.bar-fill.pending{width:0!important}.pending-text{color:var(--muted);font-size:12px}
+    .plan-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.plan-box{background:#081221;border:1px solid #21314a;border-radius:13px;padding:12px 8px;text-align:center}.plan-box .label{color:#8fb3ff;font-weight:800;font-size:12px}.plan-box .val{font-weight:900;margin-top:7px}
+    .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metric{background:#081221;border:1px solid #21314a;border-radius:12px;padding:11px}.metric .k{color:#8fb3ff;font-weight:800;font-size:12px}.metric .v{font-size:17px;font-weight:850;margin-top:6px}.wide-row{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:12px 0;border-top:1px solid rgba(255,255,255,.08)}
+    .signal-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.signal-status{font-size:21px;font-weight:950}.positive{color:var(--green)}.negative{color:var(--red)}.neutral{color:var(--yellow)}.signal-score{font-size:28px;font-weight:950}.signal-list,.risk-list{display:grid;gap:8px;margin-top:13px}.signal-item{color:#dbe8f7}.risk-item{color:var(--yellow)}.note-box{margin-top:12px;padding:10px 12px;border-radius:11px;background:rgba(76,201,255,.07);color:#a9def5;font-size:13px}
+    .market-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.market-card{background:#0c1727;border:1px solid var(--line);border-radius:15px;padding:14px}.market-top{display:flex;justify-content:space-between;align-items:center}.market-name{font-size:21px;font-weight:900}.market-price{font-size:22px;font-weight:900}.market-small{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:9px}
+    .error{background:#401d26;border:1px solid #7f2634;padding:13px;border-radius:12px;color:#ffd1d6}
+    @media(max-width:650px){.container{padding:10px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
+  </style>
 </head>
-
 <body>
 <div class="container">
+  <header class="brand"><h1>SmartAI Pro</h1><p>Professional AI Trading Assistant</p></header>
 
-  <div class="top">
-    <div>
-      <h1>Smartai Polygon Pro</h1>
-      <div class="sub">Polygon 数据源 + 大盘过滤 + 技术指标 + Top 5 自动选股 + AI 建议</div>
+  <section class="card market-light">
+    <h2>今日大盘灯号　🟢 趋势健康</h2>
+    <div class="market-lines">
+      <div>趋势向上 + 情绪正常，可持有或顺势</div>
+      <div>🌡️ 市场温度：{{ market_status.temp }} / 100</div>
+      <div>🔥 开盘预测：{{ market_status.open_signal }}</div>
     </div>
-  </div>
+  </section>
 
-  <div class="card market-light green">
-    <div class="light-title">今日大盘灯号</div>
-    <div class="light-label">🟢 趋势健康</div>
-    <div class="light-sub">趋势向上 + 情绪正常，可持有或顺势</div>
-
-    <div class="light-line">🌡️ 市场温度：{{ market_status.temp }} / 100 （🔥 过热区）</div>
-    <div class="light-line">🧠 VIX：🙂 偏乐观：趋势正常</div>
-    <div class="light-line">🔥 开盘预测：{{ market_status.open_signal }}</div>
-  </div>
-
-  <div class="card">
+  <section class="card">
     <form method="post" action="/" class="search" onsubmit="showLoading()">
       <input name="ticker" value="{{ ticker }}" placeholder="输入股票：NVDA / TSLA / MSFT">
-      <button type="submit">分析股票</button>
-      <div id="loadingMsg" style="display:none; margin-top:10px; color:#93c5fd; font-weight:700;">
-        ⏳ 正在分析中，请稍等...
-      </div>
+      <button id="analyzeBtn" type="submit">分析股票</button>
     </form>
-    <div style="margin-top:10px;">
-        <a href="/market" onclick="showMarketLoading()">
-            <button type="button">📊 查看大盘状态</button>
-        </a>
-        <div id="marketLoading" style="display:none; margin-top:10px; color:#93c5fd;">
-            ⏳ 正在加载大盘数据...
-        </div>
+    <div id="loadingMsg" style="display:none;margin-top:10px;color:#8fb3ff;font-weight:800">⏳ 正在分析中...</div>
+    <div class="button-grid">
+      <a href="/market"><button type="button">📊 查看大盘状态</button></a>
+      <a href="/market_hunter"><button type="button">🧠 AI 市场猎手</button></a>
+      <a href="/market"><button type="button">🧭 板块轮动</button></a>
+      <a href="/scan_rebound"><button type="button">🔥 扫描低位反弹</button></a>
     </div>
+  </section>
 
-    <div style="margin-top:10px;">
-        <a href="/market_hunter" onclick="showHunterLoading()">
-            <button type="button" id="hunterBtn">🧠 AI 市场猎手</button>
-        </a>
-        <div id="hunterLoading"
-            style="display:none; margin-top:10px; color:#93c5fd; font-weight:700;">
-           ⏳ AI 市场猎手正在扫描 QQQ 成份股，请稍等...
-        </div>
-    </div>
-
-    <div style="margin-top:10px;">
-        <a href="/market" onclick="showSectorLoading()">
-            <button type="button">🧭 板块轮动</button>
-        </a>
-        <div id="sectorLoading"
-             style="display:none; margin-top:10px; color:#93c5fd;">
-            ⏳ 正在分析板块资金流向...
-        </div>
-    </div>
-
-    <div style="margin-top:10px;">
-        <a href="/scan_rebound" onclick="showScanLoading()">
-            <button type="button">🔥 扫描低位反弹机会</button>
-        </a>
-        <div id="scanLoading" style="display:none; margin-top:10px; color:#93c5fd;">
-            ⏳ 正在扫描低位反弹机会，请稍等...
-        </div>
-    </div>
-  </div>
-
-  {% if error %}
-  <div class="card">
-    <div class="error">
-      {{ error }}<br>
-      请检查 .env 是否有 POLYGON_API_KEY，或者股票代码是否正确。
-    </div>
-  </div>
-  {% endif %}
+  {% if error %}<section class="card"><div class="error">{{ error }}</div></section>{% endif %}
 
   {% if analysis %}
-  <div class="card">
-    <div class="stock-header">
-      <div class="stock-head-top">
-        <span>个股分析</span>
-        <span class="stock-symbol">{{ analysis.ticker }}</span>
-        <span class="stock-date">{{ analysis.price_date }}</span>
-      </div>
+  <section class="card">
+    <div class="hero-top"><span class="muted">个股分析</span><span class="hero-symbol">{{ analysis.ticker }}</span><span class="hero-date">{{ analysis.price_date }}</span></div>
+    <div class="price-row"><span class="price" style="color:{{ analysis.change_color }}">{{ analysis.price_fmt }}</span><span class="change" style="color:{{ analysis.change_color }}">{{ analysis.change_val }} / {{ analysis.change_pct }}</span></div>
+    {% if analysis.pe_text %}<div class="pe" style="color:{{ analysis.pe_color }}">{{ analysis.pe_text }} ｜ {{ analysis.pe_label }}</div>{% endif %}
+    <div class="decision">{{ analysis.final_decision }}</div>
+    <div class="hero-meta">{{ analysis.trend_arrow }} {{ analysis.trend_label }}　｜　Volume {{ analysis.volume }}　｜　Avg {{ analysis.vol20 }}</div>
+    <div class="open">🔥 开盘预测：{{ analysis.open_signal }}</div>
+  </section>
 
-      <div class="stock-price-row">
-        <span class="stock-price" style="color: {{ analysis.change_color }}">
-          {{ analysis.price_fmt }}
-        </span>
-        <span class="stock-change" style="color: {{ analysis.change_color }}">
-          {{ analysis.change_val }} / {{ analysis.change_pct }}
-        </span>
-      </div>
-
-      {% if analysis.pe_text %}
-      <div class="stock-pe" style="color: {{ analysis.pe_color }};">
-          {{ analysis.pe_text }} ｜ {{ analysis.pe_label }}
-      </div>
-      {% endif %}
-
-      <div class="stock-trend">
-        {{ analysis.trend_arrow }} {{ analysis.trend_label }}
-      </div>
-
-      {% if analysis.session_price %}
-      <div class="stock-session" style="color: {{ '#4cd964' if analysis.session_diff > 0 else '#ff6b6b' }}">
-        {{ analysis.session }}:
-        ${{ "%.2f"|format(analysis.session_price) }}
-        ({{ "%+.2f"|format(analysis.session_diff) }} / {{ "%+.2f"|format(analysis.session_pct) }}%)
-      </div>
-      {% endif %}
-
-      <div class="stock-open">
-        🔥 开盘预测：{{ analysis.open_signal }}
-      </div>
-      <div class="stock-meta">
-        Volume: {{ analysis.volume }}　
-        Avg Vol: {{ analysis.vol20 }}
+  <section class="card">
+    <h2 class="section-title">综合评分</h2>
+    <div class="score-grid">
+      <div class="score-circle" style="--score:{{ analysis.final_score or 0 }}"><div class="score-value"><b>{{ analysis.final_score }}</b><span>/ 100</span></div></div>
+      <div class="bar-list">
+        <div class="bar-row"><span>📈 技术面</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.technical_score or 0 }}%"></div></div><b>{{ analysis.technical_score }}</b></div>
+        <div class="bar-row"><span>⚡ 盘中确认</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.intraday_score or 0 }}%"></div></div><b>{{ analysis.intraday_score or '--' }}</b></div>
+        <div class="bar-row"><span>🩸 期权资金</span><div class="bar-track"><div class="bar-fill pending"></div></div><span class="pending-text">待接入</span></div>
+        <div class="bar-row"><span>💎 估值</span><div class="bar-track"><div class="bar-fill" style="width:{% if '便宜' in analysis.pe_label %}80{% elif '合理' in analysis.pe_label %}60{% elif '偏贵' in analysis.pe_label %}30{% else %}45{% endif %}%"></div></div><b>{% if '便宜' in analysis.pe_label %}80{% elif '合理' in analysis.pe_label %}60{% elif '偏贵' in analysis.pe_label %}30{% else %}45{% endif %}</b></div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <h2 class="section-title">技术指标</h2>
-    <table class="market-table">
-      <thead>
-        <tr>
-          <th>RSI</th>
-          <th>MACD</th>
-          <th>MA20</th>
-          <th>MA60</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>{{ analysis.rsi }}</td>
-          <td>{{ analysis.macd_hist }}</td>
-          <td>{{ analysis.ma20 }}</td>
-          <td>{{ analysis.ma60 }}</td>
-        </tr>
-        <tr>
-          <th>MA120</th>
-          <th>成交量倍数</th>
-          <th>52周高</th>
-          <th>52周低</th>
-        </tr>
-        <tr>
-          <td>{{ analysis.ma120 }}</td>
-          <td>{{ analysis.volume_ratio }}x</td>
-          <td>{{ analysis.high_52w }}</td>
-          <td>{{ analysis.low_52w }}</td>
-        </tr>
-        <tr>
-            <td style="color:#93c5fd;font-weight:700;">趋势阶段</td>
-            <td colspan="3">
-                <span style="color:{{ analysis.trend_stage_color }};font-weight:700;">
-                    {{ analysis.setup }}
-                </span>
-            </td>
-        </tr>
-        <tr>
-            <td>支撑/压力/空间</td>
-            <td colspan="3">
-                <span style="color:#4ade80;font-weight:700;">
-                    ${{ analysis.support }}
-                   （{{ analysis.support_text }}）
-                </span>
-                <span style="color:#94a3b8;padding:0 10px;">
-                    /
-                </span>
-                <span style="color:#f87171;font-weight:700;">
-                    ${{ analysis.resistance }}
-                   （{{ analysis.resistance_text }}）
-                </span>
-            </td>
-        </tr>
-        <tr>
-            <td>风险回报</td>
-            <td colspan="3">
-                <span style="color:#facc15;font-weight:700;">
-                    1 : {{ analysis.rr_ratio }}
-                </span>
-            </td>
-        </tr>
-        <tr>
-            <td style="color:white;">BOLL</td>
-            <td colspan="3" class="boll-line" style="color: {{ analysis.boll_color }};">
-                {{ analysis.boll_text or analysis.boll_pos }}
-            </td>
-        </tr>   
-        <tr>
-            <td style="color:#93c5fd;font-weight:700;">波动等级</td>
-            <td colspan="3">
-                <span style="color:#facc15;font-weight:700;">
-                    {{ analysis.volatility_level }}
-                </span>
-                <span style="color:#9ca3af;font-size:13px;">
-                   （ATR {{ analysis.atr_pct }}%）
-                </span>
-            </td>
-        </tr>
-
-        <tr>
-            <td style="color:#93c5fd;font-weight:700;">波动区间</td>
-            <td colspan="3">
-                <span style="color:#4ade80;">70%：${{ analysis.safe_low }} → ${{ analysis.safe_high }}</span>
-                <br>
-                <span style="color:#93c5fd;">25%：${{ analysis.future_low }} → ${{ analysis.future_high }}</span>
-                <br>
-                <span style="color:#f87171;">5%：${{ analysis.extreme_low }} → ${{ analysis.extreme_high }}</span>
-            </td>
-        </tr>
-
-        <tr>
-            <td style="color:#93c5fd;font-weight:700;">资金流向</td>
-            <td colspan="3">
-                <span style="color:#4ade80;">买入：{{ analysis.buy_flow }}</span>
-                &nbsp;&nbsp;
-                <span style="color:#f87171;">卖出：{{ analysis.sell_flow }}</span>
-            </td>
-        </tr>
-
-        <tr>
-            <td style="color:#93c5fd;font-weight:700;">主力状态</td>
-            <td colspan="3">
-                <span style="color:#4ade80;font-weight:700;">
-                    {{ analysis.smart_money_status }}
-                </span>
-                <span style="color:#facc15;margin-left:10px;">
-                    强度：{{ analysis.smart_money_strength }}/100
-                </span>
-                <span style="color:#cbd5e1;margin-left:10px;">
-                    确认度：{{ analysis.smart_money_confidence }}
-                </span>
-            </td>
-        </tr>
-
-        <tr>
-            <td style="color:#93c5fd;font-weight:700;">主力行为</td>
-            <td colspan="3">
-                <span style="color:#facc15;">
-                    {{ analysis.smart_money_behavior }}
-                </span>
-
-                {% if analysis.smart_money_risk %}
-                    <br>
-                    <span style="color:#fb7185;font-weight:700;">
-                        {{ analysis.smart_money_risk }}
-                    </span>
-                {% endif %}
-
-                {% if analysis.smart_money_rotation %}
-                    <br>
-                    <span style="color:#38bdf8;font-weight:700;">
-                        {{ analysis.smart_money_rotation }}
-                    </span>
-                {% endif %}
-            </td>
-        </tr>
-
-        </tbody>
-        </table>
-
-        <table class="market-table">
-            <thead>
-               <tr>
-                   <th>买入低</th>
-                   <th>买入高</th>
-                   <th>止损</th>
-                   <th>目标1</th>
-                   <th>目标2</th>
-               </tr>
-            </thead>
-
-            <tbody>
-               <tr>
-                   <td>{{ analysis.buy_low }}</td>
-                   <td>{{ analysis.buy_high }}</td>
-                   <td>{{ analysis.stop }}</td>
-                   <td>{{ analysis.target1 }}</td>
-                   <td>{{ analysis.target2 }}</td>
-               </tr>
-            </tbody>
-        </table>
-
-        <div style="color: {{ analysis.risk_color }};">
-            风险等级：{{ analysis.risk }}
-        </div>
-  
-  </div>
-
-  {% if analysis %}
-  <div class="card">
-    <h2>公司新闻</h2>
-
-    <a href="/news/{{ analysis.ticker }}" target="_blank">
-      <button type="button">📰 查看 {{ analysis.ticker }} 新闻</button>
-    </a>
-  </div>
-  {% endif %}
-
-  {% if analysis %}
-  <div class="card">
-      <a href="/insider/{{ analysis.ticker }}" target="_blank" onclick="showLoading()">
-          <button type="button">🏦 机构动向</button>
-      </a>
-  </div>
-  {% endif %}
-
-  <div class="card mt-4">
-    <div class="card-body">
-      <h4>AI 建议</h4>
-
-      <button id="aiBtn" class="btn btn-warning" onclick="loadAIAnalysis('{{ ticker }}')">
-        🤖 生成 AI 分析
-      </button>
-
-      <div id="aiLoading" style="display:none; margin-top:10px;">
-        🔄 AI 分析中...
-      </div>
-
-      <div id="aiResult" style="margin-top:15px; white-space:pre-line;"></div>
+  <section class="card">
+    <h2 class="section-title">交易计划</h2>
+    <div class="plan-grid">
+      <div class="plan-box"><div class="label">买入低</div><div class="val">{{ analysis.buy_low }}</div></div>
+      <div class="plan-box"><div class="label">买入高</div><div class="val">{{ analysis.buy_high }}</div></div>
+      <div class="plan-box"><div class="label">止损</div><div class="val down">{{ analysis.stop }}</div></div>
+      <div class="plan-box"><div class="label">目标1</div><div class="val up">{{ analysis.target1 }}</div></div>
+      <div class="plan-box"><div class="label">目标2</div><div class="val up">{{ analysis.target2 }}</div></div>
     </div>
-  </div>
+    <div class="wide-row"><b>波动区间</b><div><span class="up">70%：${{ analysis.safe_low }} → ${{ analysis.safe_high }}</span><br><span style="color:#8fb3ff">25%：${{ analysis.future_low }} → ${{ analysis.future_high }}</span><br><span class="down">5%：${{ analysis.extreme_low }} → ${{ analysis.extreme_high }}</span></div></div>
+    <div class="wide-row"><b>风险等级</b><div style="color:{{ analysis.risk_color }};font-weight:900">{{ analysis.risk }}</div></div>
+  </section>
 
-  <div class="card">
-    <h2 class="section-title">系统备注</h2>
-    <ul>
-      {% for n in analysis.notes %}
-      <li>{{ n }}</li>
+  <section class="card">
+    <h2 class="section-title">技术状态</h2>
+    <div class="metric-grid">
+      <div class="metric"><div class="k">RSI</div><div class="v">{{ analysis.rsi }}</div></div>
+      <div class="metric"><div class="k">MACD</div><div class="v">{{ analysis.macd_hist }}</div></div>
+      <div class="metric"><div class="k">MA20</div><div class="v">{{ analysis.ma20 }}</div></div>
+      <div class="metric"><div class="k">MA60</div><div class="v">{{ analysis.ma60 }}</div></div>
+      <div class="metric"><div class="k">MA120</div><div class="v">{{ analysis.ma120 }}</div></div>
+      <div class="metric"><div class="k">同时段量比</div><div class="v">{{ analysis.volume_ratio }}x</div></div>
+      <div class="metric"><div class="k">52周高</div><div class="v">{{ analysis.high_52w }}</div></div>
+      <div class="metric"><div class="k">52周低</div><div class="v">{{ analysis.low_52w }}</div></div>
+    </div>
+    <div class="wide-row"><b>趋势阶段</b><div style="color:{{ analysis.trend_stage_color }};font-weight:900">{{ analysis.setup }}</div></div>
+    <div class="wide-row"><b>支撑 / 压力</b><div><span class="up">${{ analysis.support }}（{{ analysis.support_text }}）</span>　/　<span class="down">${{ analysis.resistance }}（{{ analysis.resistance_text }}）</span></div></div>
+  </section>
+
+  <section class="card">
+    <div class="signal-head">
+      <div><h2 class="section-title" style="margin-bottom:8px">🩸 Smart Money</h2><div class="signal-status {{ analysis.short_options.status_class }}">{% if analysis.short_options.status_class == 'positive' %}🟢{% elif analysis.short_options.status_class == 'negative' %}🔴{% else %}🟡{% endif %} {{ analysis.short_options.status }}</div></div>
+      <div style="text-align:right"><div class="signal-score">{{ analysis.short_options.score or '--' }}</div><div class="muted">信号一致度</div><div class="muted">{{ analysis.short_options.updated_at }}</div></div>
+    </div>
+    <div class="signal-list">
+      {% for s in analysis.short_options.signals %}
+      <div class="signal-item {{ s.type }}">{% if s.type == 'positive' %}✓{% elif s.type == 'negative' %}✕{% else %}△{% endif %} {{ s.text }}</div>
       {% endfor %}
-    </ul>
-  </div>
+    </div>
+    <div class="risk-list">{% for r in analysis.short_options.risks %}<div class="risk-item">⚠ {{ r }}</div>{% endfor %}</div>
+    <div class="note-box">真实 Call / Put Flow、Dealer Gamma 与 Dark Pool 接入后，会自动替换“待接入”状态，不会用普通股票成交量冒充期权资金。</div>
+  </section>
+
+  <section class="card">
+    <h2 class="section-title">🤖 AI 分析</h2>
+    <button id="aiBtn" onclick="loadAIAnalysis('{{ ticker }}')">生成 AI 分析</button>
+    <div id="aiLoading" style="display:none;margin-top:10px">🔄 AI 分析中...</div>
+    <div id="aiResult" style="margin-top:14px;white-space:pre-line;line-height:1.65;color:#dbeafe"></div>
+  </section>
+
+  <section class="card"><h2 class="section-title">快捷资料</h2><div class="button-grid"><a href="/news/{{ analysis.ticker }}" target="_blank"><button type="button">📰 公司新闻</button></a><a href="/insider/{{ analysis.ticker }}" target="_blank"><button type="button">🏦 机构动向</button></a></div></section>
   {% endif %}
 
-  <div class="card" style="display:none;">
-    <h2 class="section-title">🔥 AI低位反弹扫描结果</h2>
-    {% if top_picks %}
-    <table>
-      <thead>
-        <tr>
-          <th>股票</th>
-          <th>价格</th>
-          <th>买入低</th>
-          <th>买入高</th>
-          <th>目标1</th>
-          <th>目标2</th>
-          <th>止损</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in top_picks %}
-        <tr>
-          <td><b>{{ p.ticker }}</b></td>
-          <td>{{ p.price }}</td>
-          <td>{{ p.buy_low }}</td>
-          <td>{{ p.buy_high }}</td>
-          <td>${{ row.target1 }}</td>
-          <td>${{ row.target2 }}</td>
-          <td>{{ p.stop }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="sub">暂时没有符合条件的低位反弹信号。</div>
-    {% endif %}
-  </div>
+  {% if market_cards %}<section class="card"><h2 class="section-title">大盘与资产</h2><div class="market-cards">{% for m in market_cards %}<div class="market-card"><div class="market-top"><span class="market-name">{{ m.ticker }}</span><span class="market-price {{ m.change_class }}">{{ m.price }}</span></div><div class="market-small"><span>{{ m.change_val }} / {{ m.change_pct }}</span><span>评分 {{ m.score }}</span></div><div class="market-small"><span>RSI {{ m.rsi }}</span><span>Vol {{ m.volume_ratio }}x</span></div></div>{% endfor %}</div></section>{% endif %}
 
-  <div class="market-cards">
-  {% for m in market_cards %}
-  <div class="market-card">
-
-    <!-- 第一行：左名 + 中价 + 右涨跌 -->
-    <div class="market-top-row">
-      <div class="market-name">{{ m.ticker }}</div>
-
-      <div class="market-price {{ m.change_class }}">
-        {{ m.price }}
-      </div>
-
-      <div class="market-change {{ m.change_class }}">
-        {{ m.change_val }}<br>
-        {{ m.change_pct }}
-      </div>
-    </div>
-
-    <!-- 第二行：盘前 / 盘后 放中间 -->
-    {% if m.session_price %}
-    <div class="market-session" style="color: {{ '#4cd964' if m.session_diff > 0 else '#ff6b6b' }}">
-      {{ m.session }}:
-      ${{ "%.2f"|format(m.session_price) }}
-      ({{ "%+.2f"|format(m.session_diff) }} / {{ "%+.2f"|format(m.session_pct) }}%)
-    </div>
-    {% endif %}
-
-    <!-- 下面资料 -->
-    <div class="market-body">
-      <div>决策: {{ m.decision }}</div>
-      <div>Setup: {{ m.setup }}</div>
-      <div>评分: {{ m.score }}</div>
-    </div>
-
-    <div class="market-side">
-      <div>RSI {{ m.rsi }}</div>
-      <div>MA20 {{ m.ma20 }}</div>
-      <div>MA60 {{ m.ma60 }}</div>
-    </div>
-
-    <div class="market-extra">
-      <div>52H {{ m.high_52w }}</div>
-      <div>52L {{ m.low_52w }}</div>
-      <div>Vol {{ m.volume_ratio }}x</div>
-    </div>
-
-    <div>
-      BOLL:
-      <span class="{% if '低吸' in m.boll_pos %}up{% elif '不追' in m.boll_pos %}down{% endif %}">
-        {{ m.boll_pos }}
-      </span>
-    </div>
-
-  </div>
-  {% endfor %}
-  </div>
-
-  <div class="card">
-      <h3>🔥 板块轮动</h3>
-
-      {% for s in market_status.sector_rotation or [] %}
-      <div style="
-            display:grid;
-            grid-template-columns: 1.3fr 0.8fr 0.8fr;
-            gap:8px;
-            padding:8px 0;
-            border-bottom:1px solid rgba(255,255,255,0.08);
-            align-items:center;       
-          ">
-          <div>
-              <b>{{ s.ticker }}</b>
-              {{ s.name }}
-          </div>
-
-          <div style="color:{% if s.change > 0 %}#4ade80{% else %}#f87171{% endif %}; font-weight:700;">
-              {{ s.change }}%
-          </div>
-
-          <div>
-              {{ s.status }}
-          </div>
-      </div>
-      {% endfor %}
-  </div>
+  {% if market_status.sector_rotation %}<section class="card"><h2 class="section-title">🔥 板块轮动</h2>{% for s in market_status.sector_rotation %}<div class="wide-row"><b>{{ s.ticker }} {{ s.name }}</b><div><span style="color:{% if s.change > 0 %}#43df8c{% else %}#ff747b{% endif %};font-weight:900">{{ s.change }}%</span>　{{ s.status }}</div></div>{% endfor %}</section>{% endif %}
 </div>
-
-
 <script>
-function showLoading() {
-  const msg = document.getElementById("loadingMsg");
-  const btn = document.getElementById("analyzeBtn");
-
-  if (msg) msg.style.display = "block";
-  if (btn) btn.innerText = "分析中...";
-}
+function showLoading(){const m=document.getElementById('loadingMsg');const b=document.getElementById('analyzeBtn');if(m)m.style.display='block';if(b)b.innerText='分析中...'}
+function loadAIAnalysis(ticker){const b=document.getElementById('aiBtn'),l=document.getElementById('aiLoading'),r=document.getElementById('aiResult');if(b.disabled)return;b.disabled=true;b.innerText='分析中...';l.style.display='block';r.innerText='';fetch(`/api/ai_analysis/${ticker}`).then(x=>x.json()).then(d=>{l.style.display='none';r.innerText=(d.cached?'✅ 使用4小时内缓存：\n\n':'')+(d.ai_analysis||'暂时无法生成 AI 分析');b.innerText='✅ 已生成'}).catch(()=>{l.style.display='none';r.innerText='AI 分析失败，请稍后再试。';b.disabled=false;b.innerText='重新生成 AI 分析'})}
 </script>
-
-<script>
-function showSectorLoading() {
-    document.getElementById("sectorLoading").style.display = "block";
-}
-</script>
-
-<script>
-function showHunterLoading() {
-    const msg = document.getElementById("hunterLoading");
-    const btn = document.getElementById("hunterBtn");
-
-    if (msg) msg.style.display = "block";
-    if (btn) {
-        btn.innerText = "⏳ 扫描中...";
-        btn.disabled = true;
-    }
-}
-</script>
-
-<script>
-function showMarketLoading() {
-  const msg = document.getElementById("marketLoading");
-  const btn = document.getElementById("marketBtn");
-
-  if (msg) msg.style.display = "block";
-  if (btn) btn.innerText = "加载中...";
-}
-</script>
-
-<script>
-function showLoading() {
-  const msg = document.getElementById("loadingMsg");
-  if (msg) msg.style.display = "block";
-}
-
-function showMarketLoading() {
-  const msg = document.getElementById("marketLoading");
-  if (msg) msg.style.display = "block";
-}
-
-function showScanLoading() {
-  const msg = document.getElementById("scanLoading");
-  if (msg) msg.style.display = "block";
-}
-</script>
-
-<script>
-function loadAIAnalysis(ticker) {
-  const btn = document.getElementById("aiBtn");
-  const loading = document.getElementById("aiLoading");
-  const result = document.getElementById("aiResult");
-
-  // 防重复点击
-  if (btn.disabled) return;
-
-  btn.disabled = true;
-  btn.innerText = "分析中...";
-  loading.style.display = "block";
-  result.innerText = "";
-
-  fetch(`/api/ai_analysis/${ticker}`)
-    .then(response => response.json())
-    .then(data => {
-      loading.style.display = "none";
-
-      // ✅ 加入 cache 判断（重点🔥）
-      if (data.cached) {
-        result.innerText = "✅ 使用4小时内缓存的 AI 分析：\n\n" + data.ai_analysis;
-      } else {
-        result.innerText = data.ai_analysis || "暂时无法生成 AI 分析";
-      }
-      btn.innerText = "✅ 已生成 AI 分析";
-    })
-    .catch(error => {
-      loading.style.display = "none";
-      result.innerText = "AI 分析失败，请稍后再试。";
-      btn.disabled = false;
-      btn.innerText = "🤖 重新生成 AI 分析";
-    });
-}
-</script>
-
 </body>
 </html>

@@ -1056,48 +1056,179 @@ def get_money_flow(ticker):
     
 
 def get_intraday_signal(ticker):
-    bars = get_history(ticker, days=1, interval="5m")
+    """Return stock-side intraday confirmation signals.
+
+    This deliberately does not invent options-flow, dealer gamma, or dark-pool
+    direction. Those fields remain unavailable until a real options-flow data
+    source is connected.
+    """
+    bars = get_history(ticker, days=10, interval="5m")
 
     if bars is None or bars.empty or len(bars) < 3:
         print("No intraday:", ticker)
         return None
-    
-    print("Intraday loaded:", ticker)
-    
-    total_volume = bars["Volume"].sum()
 
+    bars = bars.copy()
+    bars.columns = [str(c).capitalize() for c in bars.columns]
+    required = {"Open", "High", "Low", "Close", "Volume"}
+    if not required.issubset(bars.columns):
+        return None
+
+    # Normalize timestamps without assuming the feed timezone.
+    idx = pd.to_datetime(bars.index)
+    if getattr(idx, "tz", None) is not None:
+        idx = idx.tz_convert("America/New_York")
+    bars.index = idx
+    bars["session_date"] = bars.index.date
+
+    sessions = []
+    for _, session_df in bars.groupby("session_date"):
+        session_df = session_df.sort_index().copy()
+        if len(session_df) >= 3:
+            sessions.append(session_df)
+
+    if not sessions:
+        return None
+
+    today = sessions[-1]
+    current_bar_count = len(today)
+    total_volume = float(today["Volume"].sum())
     if total_volume <= 0:
         return None
 
-    vwap = (bars["Close"] * bars["Volume"]).sum() / total_volume
+    typical = (today["High"] + today["Low"] + today["Close"]) / 3
+    cumulative_volume = today["Volume"].cumsum()
+    today["VWAP"] = (typical * today["Volume"]).cumsum() / cumulative_volume.replace(0, np.nan)
 
-    first_price = float(bars["Close"].iloc[0])
-    last_price = float(bars["Close"].iloc[-1])
+    vwap = float(today["VWAP"].iloc[-1])
+    first_price = float(today["Close"].iloc[0])
+    last_price = float(today["Close"].iloc[-1])
+    momentum = ((last_price - first_price) / first_price) * 100 if first_price else 0
 
-    momentum = ((last_price - first_price) / first_price) * 100
+    consecutive_bars = 0
+    for _, row in today.iloc[::-1].iterrows():
+        if float(row["Close"]) > float(row["VWAP"]):
+            consecutive_bars += 1
+        else:
+            break
+    # A regular U.S. session has at most 390 minutes. Cap the value to prevent
+    # stale/misaligned intraday feeds from showing impossible durations.
+    above_vwap_minutes = min(consecutive_bars * 5, 390)
 
-    buy_flow = 0
-    sell_flow = 0
+    # Same-time relative volume: today's cumulative volume versus prior
+    # sessions at the same 5-minute bar count.
+    prior_same_time_volumes = []
+    for session_df in sessions[:-1][-20:]:
+        n = min(current_bar_count, len(session_df))
+        if n >= 3:
+            prior_same_time_volumes.append(float(session_df["Volume"].iloc[:n].sum()))
 
-    for _, row in bars.iterrows():
-        avg_price = (float(row["Open"]) + float(row["Close"])) / 2
-        money = avg_price * float(row["Volume"])
-
-        if row["Close"] > row["Open"]:
-            buy_flow += money
-        elif row["Close"] < row["Open"]:
-            sell_flow += money
-
-    flow_ratio = buy_flow / sell_flow if sell_flow > 0 else 999
+    if prior_same_time_volumes:
+        baseline = float(np.mean(prior_same_time_volumes))
+        relative_volume = total_volume / baseline if baseline > 0 else None
+    else:
+        relative_volume = None
 
     return {
         "vwap": vwap,
         "momentum": momentum,
-        "buy_flow_raw": buy_flow,
-        "sell_flow_raw": sell_flow,
-        "flow_ratio": flow_ratio
-    }    
-    
+        "above_vwap_minutes": above_vwap_minutes,
+        "relative_volume": round(relative_volume, 2) if relative_volume is not None else None,
+        "current_price": last_price,
+        "bar_count": current_bar_count,
+    }
+
+
+def build_short_options_status(price, macd_hist, intraday):
+    """Build an honest stock-side confirmation card.
+
+    This card uses only verifiable price, VWAP, same-time volume and MACD data.
+    Real Call/Put flow, dealer gamma and dark-pool direction remain unavailable
+    until dedicated data sources are connected.
+    """
+    signals = []
+    risks = []
+    earned = 0
+    available_weight = 0
+
+    if intraday:
+        minutes = min(int(intraday.get("above_vwap_minutes") or 0), 390)
+        vwap_value = float(intraday.get("vwap") or price)
+        above_vwap = price > vwap_value
+        available_weight += 35
+        if above_vwap and minutes >= 10:
+            earned += 35
+            signals.append({"type": "positive", "text": f"股价连续{minutes}分钟站稳VWAP"})
+        elif above_vwap:
+            earned += 18
+            signals.append({"type": "neutral", "text": f"股价位于VWAP上方，确认{minutes}分钟"})
+        else:
+            signals.append({"type": "negative", "text": "股价尚未站稳VWAP"})
+
+        rel_vol = intraday.get("relative_volume")
+        if rel_vol is not None:
+            available_weight += 30
+            if rel_vol >= 1.30:
+                earned += 30
+                signals.append({"type": "positive", "text": f"同时段相对成交量{rel_vol:.2f}倍"})
+            elif rel_vol >= 0.90:
+                earned += 15
+                signals.append({"type": "neutral", "text": f"同时段相对成交量{rel_vol:.2f}倍"})
+            else:
+                signals.append({"type": "negative", "text": f"同时段相对成交量仅{rel_vol:.2f}倍"})
+
+        available_weight += 20
+        momentum = float(intraday.get("momentum") or 0)
+        if momentum >= 1:
+            earned += 20
+            signals.append({"type": "positive", "text": f"盘中动能为正（{momentum:+.2f}%）"})
+        elif momentum > -0.5:
+            earned += 10
+            signals.append({"type": "neutral", "text": f"盘中动能中性（{momentum:+.2f}%）"})
+        else:
+            signals.append({"type": "negative", "text": f"盘中动能偏弱（{momentum:+.2f}%）"})
+    else:
+        risks.append("盘中VWAP及同时段成交量数据不足")
+
+    available_weight += 15
+    if macd_hist > 0:
+        earned += 15
+        signals.append({"type": "positive", "text": "MACD柱状值为正"})
+    else:
+        signals.append({"type": "negative", "text": "MACD柱状值尚未转正"})
+
+    score = round(earned / available_weight * 100) if available_weight else None
+    if score is None:
+        status = "数据不足"
+        status_class = "neutral"
+    elif score >= 75:
+        status = "空头回补特征较强"
+        status_class = "positive"
+    elif score >= 55:
+        status = "回补迹象增强"
+        status_class = "positive"
+    elif score >= 35:
+        status = "多空信号分歧"
+        status_class = "neutral"
+    else:
+        status = "暂未确认回补"
+        status_class = "negative"
+
+    risks.append("当前为股票端确认信号，不是历史胜率")
+    risks.append("真实期权资金流、Gamma及Dark Pool尚未接入")
+
+    return {
+        "status": status,
+        "status_class": status_class,
+        "score": score,
+        "history_rate": None,
+        "history_sample": 0,
+        "signals": signals[:5],
+        "risks": risks[:2],
+        "updated_at": datetime.now().strftime("%H:%M"),
+        "options_connected": False,
+    }
+
 
 def estimate_smart_money(price, vwap, volume_ratio, momentum):
     score = 0
@@ -1359,7 +1490,6 @@ def analyze_ticker(ticker):
     boll_pct = ((price - bb_lower) / (bb_upper - bb_lower)) * 100
     vol = float(last["Volume"])
     vol20 = float(last["VOL20"])
-    money_flow = get_money_flow(ticker)
 
     intraday = get_intraday_signal(ticker)
     if intraday:
@@ -1390,11 +1520,10 @@ def analyze_ticker(ticker):
         volume_signal = "正常"
 
     momentum = ((price - ma20) / ma20) * 100
-    smart_money = estimate_smart_money(
+    short_options_status = build_short_options_status(
         price=price,
-        vwap=vwap,
-        volume_ratio=volume_ratio,
-        momentum=momentum
+        macd_hist=macd_hist,
+        intraday=intraday,
     )
 
     # ===== 综合评分 =====
@@ -1428,12 +1557,12 @@ def analyze_ticker(ticker):
     elif relative_strength < -0.8:
         final_score -= 10
 
-    # 主力
-    if smart_money["strength"] >= 60:
-        final_score += 20
-
-    elif smart_money["strength"] <= 30:
-        final_score -= 10
+    # 盘中确认（只使用可验证的股价/VWAP/同时段量比）
+    if short_options_status["score"] is not None:
+        if short_options_status["score"] >= 70:
+            final_score += 15
+        elif short_options_status["score"] < 35:
+            final_score -= 5
 
     final_score = max(0, min(100, final_score))
 
@@ -1778,35 +1907,28 @@ def analyze_ticker(ticker):
         "safe_high": safe_high,
         "extreme_low": extreme_low,
         "extreme_high": extreme_high,
-        "volatility_level": volatility_level,
         "atr_pct": atr_pct,
+        "short_options": short_options_status,
         "atr": atr,
         "trend_score": trend_score,
         "trend_label": trend_label,
         "main_force": main_force,
         "macd_hist": round(macd_hist, 4),
-        "buy_flow": money_flow["buy_flow"],
-        "sell_flow": money_flow["sell_flow"],
-        "smart_money_status": smart_money["status"],
-        "smart_money_reasons": smart_money["reasons"],
-        "smart_money_strength": smart_money["strength"],
-        "smart_money_confidence": smart_money["confidence"],
-        "smart_money_behavior": smart_money["behavior"],
-        "smart_money_alert": smart_money["alert"],
-        "smart_money_risk": smart_money["risk_warning"],
-        "smart_money_rotation": smart_money["rotation"],
         "relative_strength": round(relative_strength, 2),
         "relative_signal": relative_signal,
         "volume_signal": volume_signal,
         "final_score": final_score,
         "final_decision": final_decision,
+        "technical_score": trend_score,
+        "intraday_score": short_options_status.get("score"),
+        "options_score": None,
+        "options_connected": short_options_status.get("options_connected", False),
         "tech_signal": tech_signal,
         "final_score": final_score,
         "trend_stage": trend_stage,
         "trend_stage_color": trend_stage_color,
         "support": support,
         "resistance": resistance,
-        "rr_ratio": rr_ratio,
         "support_text": support_text,
         "resistance_text": resistance_text,
         "pe_text": pe_info["pe_text"],
@@ -1845,8 +1967,6 @@ def analyze_ticker(ticker):
         "session_diff": diff,
         "session_pct": pct,
         "boll_pos": boll_pos,
-        "boll_text": boll_pos,
-        "boll_color": boll_color,
         "trend_arrow": "↑" if close > ma20 else "↓",
         "trend_label": "短线向上" if close > ma20 else "短线偏弱",
     }

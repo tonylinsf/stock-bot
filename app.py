@@ -110,39 +110,15 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
-# 先用一批高流动性股票，避免太多垃圾信号
-UNIVERSE = [
-    # ===== Mega Cap AI =====
-    "NVDA","MSFT","META","AMZN","GOOGL","GOOG","AAPL",
+def load_universe():
+    with open("data/spy.txt", "r") as f:
+        return [
+            line.strip().upper()
+            for line in f
+            if line.strip() and not line.startswith("#")
+        ]
 
-    # ===== AI / Software =====
-    "PLTR","SNOW","NOW","CRM","ORCL","ADBE","INTU",
-
-    # ===== Semiconductor =====
-    "AVGO","AMD","MU","QCOM","LRCX","AMAT","KLAC",
-    "ASML","TSM","ARM","INTC",
-
-    # ===== Momentum / SPMO =====
-    "JPM","GE","CAT","XOM","NFLX","CSCO",
-
-    # ===== AI Infra / Cloud =====
-    "ANET","PANW","CRWD","DDOG","MDB","NET",
-    "GLW","OKLO","POET","IREN","NBIS","LITE",
-
-    # ===== Robotics / Future AI =====
-    "ISRG","TSLA","RXRX",
-
-    # 医药 / 医疗
-    "LLY","NVO","VRTX","REGN",
-    "UNH","ABBV","MRK","TMO","DHR",
-
-    # 太空 / 国防
-    "RKLB","LUNR","ASTS","PL","SPIR",
-    "KTOS","AVAV","RTX","LMT","NOC"
-
-    # ===== ETF / Market =====
-    "QQQ","SPY","SMH","IGV","SPMO"
-]
+UNIVERSE = load_universe()
 
 
 MARKET_TICKERS = ["SPY", "QQQ", "SOXX", "DIA"]

@@ -2763,15 +2763,52 @@ def market():
         market_dashboard=market_dashboard,
     )
 
+@app.route("/opportunities", methods=["GET", "POST"])
+def opportunities():
+    """Unified on-demand scanner for today's opportunities.
+
+    GET only renders the page. The expensive market scan runs only after the
+    user presses the scan button (POST), which helps keep Render stable.
+    """
+    scanned = request.method == "POST"
+    results = scan_market_hunter() if scanned else []
+
+    categories = {
+        "breakout": [],
+        "pullback": [],
+        "early": [],
+        "trend": [],
+    }
+
+    for item in results:
+        setup = str(item.get("setup_type", ""))
+        if "突破" in setup:
+            categories["breakout"].append(item)
+        elif "回调" in setup:
+            categories["pullback"].append(item)
+        elif "低位" in setup or "启动" in setup:
+            categories["early"].append(item)
+        else:
+            categories["trend"].append(item)
+
+    return render_template(
+        "opportunities.html",
+        scanned=scanned,
+        results=results,
+        categories=categories,
+        cache_minutes=round(HUNTER_CACHE_TTL / 60),
+    )
+
+
+# Keep old bookmarks working without running the old duplicate scanners.
 @app.route("/scan_rebound")
 def scan_rebound():
-    picks = get_rebound_signals()
-    return render_template("rebound.html", picks=picks)
+    return redirect(url_for("opportunities"))
+
 
 @app.route("/market_hunter")
 def market_hunter():
-    results = scan_market_hunter()
-    return render_template("market_hunter.html", results=results)
+    return redirect(url_for("opportunities"))
 
 @app.route("/news/<ticker>")
 def stock_news(ticker):

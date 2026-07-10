@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>今日机会｜SmartAI Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <style>
+    :root{--bg:#07101f;--panel:#0d1728;--line:#24334b;--text:#eef4ff;--muted:#91a2bb;--blue:#4d8dff;--green:#43df8c;--yellow:#ffd05a;--red:#ff747b}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#152746 0,#07101f 42%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}.container{max-width:920px;margin:auto;padding:12px}.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.top h1{margin:0;font-size:26px}.back{color:white;text-decoration:none;background:#1b2a42;border:1px solid #314766;border-radius:11px;padding:9px 12px;font-weight:800}.card{background:linear-gradient(145deg,rgba(17,31,52,.98),rgba(10,20,36,.98));border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 14px 34px rgba(0,0,0,.26)}.intro{color:var(--muted);line-height:1.65}.scan-btn{width:100%;border:0;border-radius:13px;background:linear-gradient(135deg,#2d6be8,#367ff7);color:white;font-weight:900;padding:14px 18px;font-size:16px;cursor:pointer}.scan-btn:disabled{opacity:.65;cursor:not-allowed}.loading{display:none;margin-top:10px;color:#8fb3ff;font-weight:800;text-align:center}.section-title{font-size:18px;font-weight:900;margin:0 0 12px}.count{color:var(--muted);font-size:13px}.opportunity{background:#081221;border:1px solid #21314a;border-radius:14px;padding:13px;margin-top:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.ticker{font-size:23px;font-weight:950}.score{font-size:20px;font-weight:950;color:var(--yellow)}.price{font-size:18px;font-weight:850;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}.setup{color:var(--yellow);font-weight:850;margin-top:9px}.meta{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:13px;margin-top:8px}.plan{margin-top:10px;line-height:1.55;color:#dbe8f7}.reason{margin-top:8px;color:#cbd5e1;line-height:1.5}.empty{text-align:center;color:var(--muted);padding:16px}.cache-note{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}@media(max-width:620px){.container{padding:10px}.top h1{font-size:22px}.card{padding:13px}.ticker{font-size:21px}.row{align-items:center}}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="top">
+    <h1>⭐ 今日机会</h1>
+    <a class="back" href="/">← 返回首页</a>
+  </div>
+
+  {% if not scanned %}
+  <section class="card">
+    <div class="intro">把原来的「AI 市场猎手」和「低位反弹扫描」合并成一次扫描。页面打开时不会自动运行，只有按下按钮才会请求数据，减少 Render 卡住或重复请求。</div>
+    <form method="post" action="/opportunities" onsubmit="startScan()" style="margin-top:14px">
+      <button id="scanBtn" class="scan-btn" type="submit">⭐ 开始扫描今日机会</button>
+      <div id="scanLoading" class="loading">⏳ 正在扫描并分类，请稍等...</div>
+    </form>
+    <div class="cache-note">扫描结果缓存约 {{ cache_minutes }} 分钟，同一时段再次扫描会更快。</div>
+  </section>
+  {% else %}
+  <section class="card">
+    <form method="post" action="/opportunities" onsubmit="startScan()">
+      <button id="scanBtn" class="scan-btn" type="submit">🔄 重新扫描今日机会</button>
+      <div id="scanLoading" class="loading">⏳ 正在重新扫描，请稍等...</div>
+    </form>
+  </section>
+
+  {% set groups = [
+    ('breakout','🔥 放量突破'),
+    ('pullback','📈 强势回调'),
+    ('early','💎 低位启动'),
+    ('trend','🚀 趋势机会')
+  ] %}
+
+  {% for key, title in groups %}
+    {% set items = categories[key] %}
+    {% if items %}
+    <section class="card">
+      <h2 class="section-title">{{ title }} <span class="count">（{{ items|length }}）</span></h2>
+      {% for s in items %}
+      <div class="opportunity">
+        <div class="row">
+          <div>
+            <div class="ticker">{{ s.ticker }}</div>
+            <div class="price">${{ s.price }}　<span class="{% if s.change_pct >= 0 %}up{% else %}down{% endif %}">{{ '%+.2f'|format(s.change_pct) }}%</span></div>
+          </div>
+          <div class="score">{{ s.score }} 分</div>
+        </div>
+        <div class="setup">{{ s.setup_type }} ｜ {{ s.entry_status }}</div>
+        <div class="meta">
+          <span>RSI {{ s.rsi }}</span><span>量比 {{ s.volume_ratio }}x</span><span>强过QQQ {{ s.rs_strength }}%</span><span>风险 {{ s.risk_level }}</span>
+        </div>
+        <div class="plan">买区：${{ s.buy_low }} – ${{ s.buy_high }}<br>止损：${{ s.stop }}（{{ s.stop_pct }}%）<br>目标：${{ s.target1 }} / ${{ s.target2 }}</div>
+        <div class="reason">{{ s.reasons }}</div>
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+  {% endfor %}
+
+  {% if not results %}
+  <section class="card"><div class="empty">今天暂时没有符合条件的机会。</div></section>
+  {% endif %}
+  {% endif %}
+</div>
+<script>
+function startScan(){
+  const b=document.getElementById('scanBtn');
+  const l=document.getElementById('scanLoading');
+  if(b){b.disabled=true;b.innerText='⏳ 正在扫描今日机会...';}
+  if(l)l.style.display='block';
+  return true;
+}
+</script>
+</body>
+</html>

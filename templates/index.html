@@ -61,10 +61,17 @@
     </form>
     <div id="loadingMsg" style="display:none;margin-top:10px;color:#8fb3ff;font-weight:800">⏳ 正在分析中...</div>
     <div class="button-grid">
-      <a href="/market"><button type="button">📊 查看大盘状态</button></a>
-      <a href="/market_hunter"><button type="button">🧠 AI 市场猎手</button></a>
-      <a href="/market"><button type="button">🧭 板块轮动</button></a>
-      <a href="/scan_rebound"><button type="button">🔥 扫描低位反弹</button></a>
+      <a href="/market" onclick="showButtonLoading('marketBtn','⏳ 正在分析大盘...')">
+        <button id="marketBtn" type="button">📊 查看大盘状态</button>
+      </a>
+
+      <a href="/market_hunter" onclick="showButtonLoading('hunterBtn','🤖 AI 正在寻找机会...')">
+        <button id="hunterBtn" type="button">🧠 AI 市场猎手</button>
+      </a>
+
+      <a href="/scan_rebound" onclick="showButtonLoading('scanBtn','🔍 正在扫描股票...')">
+        <button id="scanBtn" type="button">🔥 扫描低位反弹</button>
+      </a>
     </div>
   </section>
 
@@ -199,8 +206,63 @@
   {% if market_status and market_status.sector_rotation %}<section class="card"><h2 class="section-title">🔥 板块轮动</h2>{% for s in market_status.sector_rotation %}<div class="wide-row"><b>{{ loop.index }}. {{ s.ticker }} {{ s.name }}</b><div><span style="color:{% if s.change > 0 %}#43df8c{% else %}#ff747b{% endif %};font-weight:900">{{ s.change }}%</span>　{{ s.status }}</div></div>{% endfor %}</section>{% endif %}
 </div>
 <script>
-function showLoading(){const m=document.getElementById('loadingMsg');const b=document.getElementById('analyzeBtn');if(m)m.style.display='block';if(b)b.innerText='分析中...'}
-function loadAIAnalysis(ticker){const b=document.getElementById('aiBtn'),l=document.getElementById('aiLoading'),r=document.getElementById('aiResult');if(b.disabled)return;b.disabled=true;b.innerText='分析中...';l.style.display='block';r.innerText='';fetch(`/api/ai_analysis/${ticker}`).then(x=>x.json()).then(d=>{l.style.display='none';r.innerText=(d.cached?'✅ 使用4小时内缓存：\n\n':'')+(d.ai_analysis||'暂时无法生成 AI 分析');b.innerText='✅ 已生成'}).catch(()=>{l.style.display='none';r.innerText='AI 分析失败，请稍后再试。';b.disabled=false;b.innerText='重新生成 AI 分析'})}
+function showLoading() {
+    const m = document.getElementById("loadingMsg");
+    const b = document.getElementById("analyzeBtn");
+
+    if (m) m.style.display = "block";
+
+    if (b) {
+        b.disabled = true;
+        b.innerHTML = "⏳ 正在分析股票...";
+        b.style.opacity = "0.65";
+    }
+}
+
+function showButtonLoading(buttonId, text) {
+    const b = document.getElementById(buttonId);
+
+    if (!b || b.disabled) return false;
+
+    b.disabled = true;
+    b.innerHTML = text;
+    b.style.opacity = "0.65";
+
+    return true;
+}
+
+function loadAIAnalysis(ticker){
+    const b=document.getElementById('aiBtn');
+    const l=document.getElementById('aiLoading');
+    const r=document.getElementById('aiResult');
+
+    if(b.disabled) return;
+
+    b.disabled=true;
+    b.innerHTML='🤖 AI 分析中...';
+    b.style.opacity="0.65";
+
+    l.style.display='block';
+    r.innerText='';
+
+    fetch(`/api/ai_analysis/${ticker}`)
+    .then(x=>x.json())
+    .then(d=>{
+        l.style.display='none';
+        r.innerText=(d.cached?'✅ 使用4小时缓存\n\n':'')+
+                    (d.ai_analysis||'暂时无法生成 AI 分析');
+
+        b.innerHTML='✅ 已完成';
+    })
+    .catch(()=>{
+        l.style.display='none';
+        r.innerText='AI 分析失败，请稍后再试。';
+
+        b.disabled=false;
+        b.style.opacity="1";
+        b.innerHTML='重新生成 AI 分析';
+    });
+}
 </script>
 </body>
 </html>

@@ -2465,14 +2465,37 @@ def build_index_technical(ticker, spy_returns=None):
             rs = {"1d": 0.0, "5d": 0.0, "20d": 0.0}
 
         breakout = price > high20_prev and volume_ratio >= 1.2
+        near_breakout = price >= high20_prev * 0.985
+        if breakout:
+            breakout_label = "✓ 放量突破"
+        elif near_breakout:
+            breakout_label = "△ 接近突破"
+        else:
+            breakout_label = "未突破"
+
         return {
-            "trend_score_v3": trend_score, "market_stage": stage,
-            "adx": adx, "plus_di": plus_di, "minus_di": minus_di,
-            "ma20_slope": round(ma20_slope, 2), "ma60_slope": round(ma60_slope, 2),
-            "macd_hist_v3": round(macd_hist, 4), "atr_pct_v3": round(atr_pct, 2),
-            "rs_1d": rs["1d"], "rs_5d": rs["5d"], "rs_20d": rs["20d"],
-            "return_1d": round(returns["1d"], 2), "return_5d": round(returns["5d"], 2), "return_20d": round(returns["20d"], 2),
-            "breakout_confirmed": breakout, "volume_ratio_daily": round(volume_ratio, 2),
+            "trend_score_v3": trend_score,
+            "market_stage": stage,
+            "regime_label_v3": stage,
+            "adx": adx,
+            "plus_di": plus_di,
+            "minus_di": minus_di,
+            # Keep both the concise backend names and the names used by the template.
+            "ma20_slope": round(ma20_slope, 2),
+            "ma60_slope": round(ma60_slope, 2),
+            "ma20_slope_5d": round(ma20_slope, 2),
+            "ma60_slope_10d": round(ma60_slope, 2),
+            "macd_hist_v3": round(macd_hist, 4),
+            "atr_pct_v3": round(atr_pct, 2),
+            "rs_1d": rs["1d"],
+            "rs_5d": rs["5d"],
+            "rs_20d": rs["20d"],
+            "return_1d": round(returns["1d"], 2),
+            "return_5d": round(returns["5d"], 2),
+            "return_20d": round(returns["20d"], 2),
+            "breakout_confirmed": breakout,
+            "breakout_label": breakout_label,
+            "volume_ratio_daily": round(volume_ratio, 2),
             "technical_reasons_v3": reasons,
         }
     except Exception as exc:
@@ -2491,8 +2514,14 @@ def get_market_breadth_v3(spy_return_1d=0.0):
     stats = {"valid": 0, "up": 0, "ma20": 0, "ma60": 0, "ma120": 0, "macd": 0, "rsi50": 0, "outperform": 0}
     for ticker in symbols:
         try:
-            df = get_history(ticker, days=150, interval="1d")
-            if df is None or df.empty or len(df) < 125:
+            df = get_history(ticker, days=220, interval="1d")
+
+            if df is None or df.empty:
+                print(f"⚠️ Breadth no data: {ticker}")
+                continue
+
+            if len(df) < 125:
+                print(f"⚠️ Breadth insufficient history: {ticker}, rows={len(df)}")
                 continue
             df = df.copy(); df.columns = [str(c).capitalize() for c in df.columns]
             close = df["Close"].astype(float)
@@ -2508,7 +2537,8 @@ def get_market_breadth_v3(spy_return_1d=0.0):
             stats["macd"] += float(hist.iloc[-1]) > 0
             stats["rsi50"] += rsi > 50
             stats["outperform"] += ret > spy_return_1d
-        except Exception:
+        except Exception as e:
+            print(f"⚠️ Breadth failed for {ticker}: {e}")
             continue
     n = stats["valid"]
     pct = lambda key: round(stats[key] / n * 100) if n else 0

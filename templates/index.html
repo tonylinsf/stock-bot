@@ -204,12 +204,18 @@
           <div>趋势结构<b>{{ m.trend_score_v3|default('--') }}</b></div>
           <div>ADX<b>{{ m.adx|default('--') }}</b></div>
           <div>+DI / -DI<b>{{ m.plus_di|default('--') }} / {{ m.minus_di|default('--') }}</b></div>
-          <div>MA20斜率<b>{{ m.ma20_slope_5d|default('--') }}%</b></div>
-          <div>MA60斜率<b>{{ m.ma60_slope_10d|default('--') }}%</b></div>
-          <div>20日突破<b>{{ m.breakout_label|default('--') }}</b></div>
-          <div>RS 1日<b>{{ m.rs_1d|default('--') }}%</b></div>
-          <div>RS 5日<b>{{ m.rs_5d|default('--') }}%</b></div>
-          <div>RS 20日<b>{{ m.rs_20d|default('--') }}%</b></div>
+          <div>MA20斜率<b>{% if m.ma20_slope_5d is defined and m.ma20_slope_5d is not none %}{{ "%+.2f"|format(m.ma20_slope_5d) }}%{% else %}数据不足{% endif %}</b></div>
+          <div>MA60斜率<b>{% if m.ma60_slope_10d is defined and m.ma60_slope_10d is not none %}{{ "%+.2f"|format(m.ma60_slope_10d) }}%{% else %}数据不足{% endif %}</b></div>
+          <div>20日突破<b>{{ m.breakout_label|default('数据不足', true) }}</b></div>
+          {% if m.ticker == 'SPY' %}
+          <div>RS 1日<b>基准</b></div>
+          <div>RS 5日<b>基准</b></div>
+          <div>RS 20日<b>基准</b></div>
+          {% else %}
+          <div>RS 1日<b>{{ "%+.2f"|format(m.rs_1d|default(0, true)) }}%</b></div>
+          <div>RS 5日<b>{{ "%+.2f"|format(m.rs_5d|default(0, true)) }}%</b></div>
+          <div>RS 20日<b>{{ "%+.2f"|format(m.rs_20d|default(0, true)) }}%</b></div>
+          {% endif %}
           <div>RSI<b>{{ m.rsi }}</b></div>
           <div>同时段量比<b>{{ m.volume_ratio }}x</b></div>
           <div>盘中确认<b>{{ m.intraday_score or '--' }}</b></div>

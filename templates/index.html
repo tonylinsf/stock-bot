@@ -34,7 +34,7 @@
     .pro-metric .k{color:var(--muted);font-size:12px;font-weight:800}.pro-metric .v{font-size:18px;font-weight:950;margin-top:5px}
     .reason-list{display:grid;gap:9px;margin-top:14px}.reason-row{padding:10px 12px;border-radius:11px;background:rgba(255,255,255,.035);line-height:1.45}
     .breadth-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.breadth-box{background:#081221;border:1px solid #21314a;border-radius:13px;padding:12px;text-align:center}.breadth-box b{font-size:21px;display:block;margin-top:5px}.breadth-box span{color:var(--muted);font-size:12px}
-    .index-tech{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}.index-tech div{color:var(--muted);font-size:11px}.index-tech b{display:block;color:var(--text);font-size:13px;margin-top:3px}.index-summary{margin-top:10px;padding:9px 10px;border-radius:10px;background:rgba(76,201,255,.06);color:#b8def1;font-size:12px;line-height:1.5}
+    .index-tech{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}.index-tech div{color:var(--muted);font-size:11px}.index-tech b{display:block;color:var(--text);font-size:13px;margin-top:3px}.index-tech span{display:block;font-size:11px;margin-top:3px;line-height:1.35}.index-summary{margin-top:10px;padding:9px 10px;border-radius:10px;background:rgba(76,201,255,.06);color:#b8def1;font-size:12px;line-height:1.5}
     .error{background:#401d26;border:1px solid #7f2634;padding:13px;border-radius:12px;color:#ffd1d6}
     @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.dashboard-hero{grid-template-columns:1fr}.dashboard-score{margin:auto}.index-detail{grid-template-columns:repeat(2,1fr)}.pro-grid,.breadth-grid{grid-template-columns:repeat(2,1fr)}.index-tech{grid-template-columns:repeat(2,1fr)}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
   </style>
@@ -202,25 +202,19 @@
         {% if m.ticker != 'VIX' %}
         <div class="index-tech">
           <div>趋势结构<b>{{ m.trend_score_v3|default('--') }}</b></div>
-          <div>ADX<b>{{ m.adx|default('--') }}</b></div>
-          <div>+DI / -DI<b>{{ m.plus_di|default('--') }} / {{ m.minus_di|default('--') }}</b></div>
-          <div>MA20斜率<b>{% if m.ma20_slope_5d is defined and m.ma20_slope_5d is not none %}{{ "%+.2f"|format(m.ma20_slope_5d) }}%{% else %}数据不足{% endif %}</b></div>
-          <div>MA60斜率<b>{% if m.ma60_slope_10d is defined and m.ma60_slope_10d is not none %}{{ "%+.2f"|format(m.ma60_slope_10d) }}%{% else %}数据不足{% endif %}</b></div>
-          <div>20日突破<b>{{ m.breakout_label|default('数据不足', true) }}</b></div>
-          {% if m.ticker == 'SPY' %}
-          <div>RS 1日<b>基准</b></div>
-          <div>RS 5日<b>基准</b></div>
-          <div>RS 20日<b>基准</b></div>
-          {% else %}
-          <div>RS 1日<b>{{ "%+.2f"|format(m.rs_1d|default(0, true)) }}%</b></div>
-          <div>RS 5日<b>{{ "%+.2f"|format(m.rs_5d|default(0, true)) }}%</b></div>
-          <div>RS 20日<b>{{ "%+.2f"|format(m.rs_20d|default(0, true)) }}%</b></div>
-          {% endif %}
-          <div>RSI<b>{{ m.rsi }}</b></div>
+          <div>ADX 趋势强度<b>{{ m.adx|default('--') }}</b><span class="{{ m.adx_class|default('muted') }}">{{ m.adx_label|default('数据不足') }}</span></div>
+          <div>+DI / -DI 多空<b><span class="positive">+{{ m.plus_di|default('--') }}</span> / <span class="negative">-{{ m.minus_di|default('--') }}</span></b><span class="{{ m.di_class|default('muted') }}">{{ m.di_label|default('数据不足') }}</span></div>
+          <div>MA20 上涨速度<b>{{ '%+.2f'|format(m.ma20_slope|default(0)) }}%</b><span class="{{ m.ma20_class|default('muted') }}">{{ m.ma20_label|default('数据不足') }}</span></div>
+          <div>MA60 中期趋势<b>{{ '%+.2f'|format(m.ma60_slope|default(0)) }}%</b><span class="{{ m.ma60_class|default('muted') }}">{{ m.ma60_label|default('数据不足') }}</span></div>
+          <div>突破状态<b class="{{ m.breakout_class|default('muted') }}">{{ m.breakout_label|default('数据不足') }}</b></div>
+          <div>RS(1) 今日跑赢SPY<b class="{{ m.rs1_class|default('muted') }}">{{ m.rs1_text|default('数据不足') }}</b></div>
+          <div>RS(5) 本周跑赢SPY<b class="{{ m.rs5_class|default('muted') }}">{{ m.rs5_text|default('数据不足') }}</b></div>
+          <div>RS(20) 本月跑赢SPY<b class="{{ m.rs20_class|default('muted') }}">{{ m.rs20_text|default('数据不足') }}</b></div>
+          <div>RSI 热度<b>{{ m.rsi }}</b></div>
           <div>同时段量比<b>{{ m.volume_ratio }}x</b></div>
           <div>盘中确认<b>{{ m.intraday_score or '--' }}</b></div>
         </div>
-        <div class="index-summary">{{ m.regime_label_v3|default(m.trend_label or m.setup) }}</div>
+        <div class="index-summary"><b>技术解读：</b>{{ m.readable_summary|default(m.regime_label_v3|default(m.trend_label or m.setup)) }}</div>
         {% else %}
         <div class="index-detail"><div>当日变化<b>{{ m.change_pct }}</b></div><div>RSI<b>{{ m.rsi }}</b></div><div>风险指标<b>波动率</b></div></div>
         {% endif %}

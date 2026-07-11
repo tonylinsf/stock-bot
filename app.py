@@ -2465,42 +2465,117 @@ def build_index_technical(ticker, spy_returns=None):
             rs = {"1d": 0.0, "5d": 0.0, "20d": 0.0}
 
         breakout = price > high20_prev and volume_ratio >= 1.2
-        near_breakout = price >= high20_prev * 0.985
-        if breakout:
-            breakout_label = "✓ 放量突破"
-        elif near_breakout:
-            breakout_label = "△ 接近突破"
-        else:
-            breakout_label = "未突破"
-
         return {
-            "trend_score_v3": trend_score,
-            "market_stage": stage,
-            "regime_label_v3": stage,
-            "adx": adx,
-            "plus_di": plus_di,
-            "minus_di": minus_di,
-            # Keep both the concise backend names and the names used by the template.
-            "ma20_slope": round(ma20_slope, 2),
-            "ma60_slope": round(ma60_slope, 2),
-            "ma20_slope_5d": round(ma20_slope, 2),
-            "ma60_slope_10d": round(ma60_slope, 2),
-            "macd_hist_v3": round(macd_hist, 4),
-            "atr_pct_v3": round(atr_pct, 2),
-            "rs_1d": rs["1d"],
-            "rs_5d": rs["5d"],
-            "rs_20d": rs["20d"],
-            "return_1d": round(returns["1d"], 2),
-            "return_5d": round(returns["5d"], 2),
-            "return_20d": round(returns["20d"], 2),
-            "breakout_confirmed": breakout,
-            "breakout_label": breakout_label,
-            "volume_ratio_daily": round(volume_ratio, 2),
+            "trend_score_v3": trend_score, "market_stage": stage,
+            "adx": adx, "plus_di": plus_di, "minus_di": minus_di,
+            "ma20_slope": round(ma20_slope, 2), "ma60_slope": round(ma60_slope, 2),
+            "macd_hist_v3": round(macd_hist, 4), "atr_pct_v3": round(atr_pct, 2),
+            "rs_1d": rs["1d"], "rs_5d": rs["5d"], "rs_20d": rs["20d"],
+            "return_1d": round(returns["1d"], 2), "return_5d": round(returns["5d"], 2), "return_20d": round(returns["20d"], 2),
+            "breakout_confirmed": breakout, "volume_ratio_daily": round(volume_ratio, 2),
             "technical_reasons_v3": reasons,
         }
     except Exception as exc:
         print(f"Market technical error {ticker}: {exc}")
         return {}
+
+
+def enrich_index_card_readability(card):
+    """Translate technical market fields into concise Chinese labels."""
+    if not card or card.get("ticker") == "VIX":
+        return card
+
+    adx = _safe_float(card.get("adx"))
+    plus_di = _safe_float(card.get("plus_di"))
+    minus_di = _safe_float(card.get("minus_di"))
+    ma20_slope = _safe_float(card.get("ma20_slope"))
+    ma60_slope = _safe_float(card.get("ma60_slope"))
+
+    if adx >= 30:
+        card["adx_label"] = "强趋势"
+        card["adx_class"] = "positive"
+    elif adx >= 20:
+        card["adx_label"] = "趋势形成中"
+        card["adx_class"] = "neutral"
+    else:
+        card["adx_label"] = "震荡整理"
+        card["adx_class"] = "muted"
+
+    di_gap = plus_di - minus_di
+    if di_gap >= 5:
+        card["di_label"] = "多头占优"
+        card["di_class"] = "positive"
+    elif di_gap <= -5:
+        card["di_label"] = "空头占优"
+        card["di_class"] = "negative"
+    else:
+        card["di_label"] = "多空接近"
+        card["di_class"] = "neutral"
+
+    if ma20_slope >= 1:
+        card["ma20_label"] = "短线加速上涨"
+        card["ma20_class"] = "positive"
+    elif ma20_slope > 0:
+        card["ma20_label"] = "短线上行"
+        card["ma20_class"] = "positive"
+    elif ma20_slope > -0.5:
+        card["ma20_label"] = "短线走平"
+        card["ma20_class"] = "neutral"
+    else:
+        card["ma20_label"] = "短线走弱"
+        card["ma20_class"] = "negative"
+
+    if ma60_slope >= 1:
+        card["ma60_label"] = "中期明显转强"
+        card["ma60_class"] = "positive"
+    elif ma60_slope > 0:
+        card["ma60_label"] = "中期向上"
+        card["ma60_class"] = "positive"
+    elif ma60_slope > -0.5:
+        card["ma60_label"] = "中期横盘"
+        card["ma60_class"] = "neutral"
+    else:
+        card["ma60_label"] = "中期下降"
+        card["ma60_class"] = "negative"
+
+    if card.get("breakout_confirmed"):
+        card["breakout_label"] = "✓ 已突破"
+        card["breakout_class"] = "positive"
+    elif _safe_float(card.get("return_1d")) > 0 and _safe_float(card.get("trend_score_v3")) >= 60:
+        card["breakout_label"] = "△ 接近突破"
+        card["breakout_class"] = "neutral"
+    else:
+        card["breakout_label"] = "未突破"
+        card["breakout_class"] = "muted"
+
+    for key, label_key in (("rs_1d", "rs1"), ("rs_5d", "rs5"), ("rs_20d", "rs20")):
+        value = _safe_float(card.get(key))
+        if card.get("ticker") == "SPY":
+            card[f"{label_key}_text"] = "基准指数"
+            card[f"{label_key}_class"] = "muted"
+        elif value >= 1:
+            card[f"{label_key}_text"] = f"+{value:.2f}% 明显跑赢"
+            card[f"{label_key}_class"] = "positive"
+        elif value > 0:
+            card[f"{label_key}_text"] = f"+{value:.2f}% 跑赢"
+            card[f"{label_key}_class"] = "positive"
+        elif value <= -1:
+            card[f"{label_key}_text"] = f"{value:.2f}% 明显落后"
+            card[f"{label_key}_class"] = "negative"
+        elif value < 0:
+            card[f"{label_key}_text"] = f"{value:.2f}% 落后"
+            card[f"{label_key}_class"] = "negative"
+        else:
+            card[f"{label_key}_text"] = "持平"
+            card[f"{label_key}_class"] = "neutral"
+
+    summary = []
+    summary.append(f"{card.get('adx_label', '趋势不明')}，{card.get('di_label', '多空接近')}")
+    summary.append(card.get("ma20_label", "短线状态不明"))
+    summary.append(card.get("breakout_label", "突破状态不明"))
+    card["readable_summary"] = "；".join(summary)
+    return card
+
 
 def get_market_breadth_v3(spy_return_1d=0.0):
     """Breadth from the configured universe, cached and capped for Render stability."""
@@ -2616,6 +2691,7 @@ def get_market_cards():
                 "change_val": analysis.get("change_val"),
             }
         card.update(technical_v3)
+        enrich_index_card_readability(card)
         cards.append(card)
 
     cards.append(get_vix_card())

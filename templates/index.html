@@ -35,8 +35,14 @@
     .reason-list{display:grid;gap:9px;margin-top:14px}.reason-row{padding:10px 12px;border-radius:11px;background:rgba(255,255,255,.035);line-height:1.45}
     .breadth-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.breadth-box{background:#081221;border:1px solid #21314a;border-radius:13px;padding:12px;text-align:center}.breadth-box b{font-size:21px;display:block;margin-top:5px}.breadth-box span{color:var(--muted);font-size:12px}
     .index-tech{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}.index-tech div{color:var(--muted);font-size:11px}.index-tech b{display:block;color:var(--text);font-size:13px;margin-top:3px}.index-tech span{display:block;font-size:11px;margin-top:3px;line-height:1.35}.index-summary{margin-top:10px;padding:9px 10px;border-radius:10px;background:rgba(76,201,255,.06);color:#b8def1;font-size:12px;line-height:1.5}
+
+    .grade-panel{display:grid;grid-template-columns:130px 1fr;gap:16px;align-items:center;margin-bottom:16px;padding:14px;border-radius:14px;background:rgba(77,141,255,.07);border:1px solid rgba(77,141,255,.2)}
+    .grade-badge{text-align:center}.grade-badge .stars{color:var(--yellow);font-size:19px;letter-spacing:2px}.grade-badge .grade{font-size:27px;font-weight:950;margin-top:5px}.grade-copy{color:#dce8f8;line-height:1.55}.grade-copy b{display:block;font-size:17px;margin-bottom:4px}
+    .score-reasons{display:grid;gap:8px;margin-top:16px}.score-reason{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.035)}.score-reason .pts{font-weight:900}.score-reason.positive .pts{color:var(--green)}.score-reason.negative .pts{color:var(--red)}.score-reason.neutral .pts{color:var(--yellow)}
+    .entry-zones{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.entry-zone{background:#081221;border:1px solid #21314a;border-radius:12px;padding:11px}.entry-zone .zlabel{font-size:12px;font-weight:900}.entry-zone .zval{font-size:14px;font-weight:900;margin-top:6px}.entry-zone.low .zlabel,.entry-zone.low .zval{color:var(--green)}.entry-zone.normal .zlabel,.entry-zone.normal .zval{color:#8fb3ff}.entry-zone.chase .zlabel,.entry-zone.chase .zval{color:var(--yellow)}
+    .valuation-note{margin-top:12px;padding:10px 12px;border-radius:11px;background:rgba(255,208,90,.07);color:#ffe29a;font-size:13px;line-height:1.5}
     .error{background:#401d26;border:1px solid #7f2634;padding:13px;border-radius:12px;color:#ffd1d6}
-    @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.dashboard-hero{grid-template-columns:1fr}.dashboard-score{margin:auto}.index-detail{grid-template-columns:repeat(2,1fr)}.pro-grid,.breadth-grid{grid-template-columns:repeat(2,1fr)}.index-tech{grid-template-columns:repeat(2,1fr)}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
+    @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.dashboard-hero{grid-template-columns:1fr}.dashboard-score{margin:auto}.index-detail{grid-template-columns:repeat(2,1fr)}.pro-grid,.breadth-grid{grid-template-columns:repeat(2,1fr)}.index-tech{grid-template-columns:repeat(2,1fr)}.grade-panel{grid-template-columns:1fr}.entry-zones{grid-template-columns:1fr}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
   </style>
 </head>
 <body>
@@ -87,15 +93,30 @@
 
   <section class="card">
     <h2 class="section-title">综合评分</h2>
+    <div class="grade-panel">
+      <div class="grade-badge">
+        <div class="stars">{% for _ in range(analysis.investment_stars|default(1)|int) %}★{% endfor %}{% for _ in range(5-(analysis.investment_stars|default(1)|int)) %}☆{% endfor %}</div>
+        <div class="grade {{ analysis.grade_class|default('neutral') }}">{{ analysis.investment_grade|default('观察级') }}</div>
+      </div>
+      <div class="grade-copy"><b>模型投资等级</b>根据趋势、动能、相对强弱、盘中确认及价格位置综合分级；它是模型信号，不代表历史胜率或保证回报。</div>
+    </div>
     <div class="score-grid">
       <div class="score-circle" style="--score:{{ analysis.final_score or 0 }}"><div class="score-value"><b>{{ analysis.final_score }}</b><span>/ 100</span></div></div>
       <div class="bar-list">
         <div class="bar-row"><span>📈 技术面</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.technical_score or 0 }}%"></div></div><b>{{ analysis.technical_score }}</b></div>
         <div class="bar-row"><span>⚡ 盘中确认</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.intraday_score or 0 }}%"></div></div><b>{{ analysis.intraday_score or '--' }}</b></div>
-        <div class="bar-row"><span>💰 股票资金</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.stock_flow_score or 0 }}%"></div></div><b>{{ analysis.stock_flow_score or '--' }}</b></div>
-        <div class="bar-row"><span>💎 估值</span><div class="bar-track"><div class="bar-fill" style="width:{% if '便宜' in analysis.pe_label %}80{% elif '合理' in analysis.pe_label %}60{% elif '偏贵' in analysis.pe_label %}30{% else %}45{% endif %}%"></div></div><b>{% if '便宜' in analysis.pe_label %}80{% elif '合理' in analysis.pe_label %}60{% elif '偏贵' in analysis.pe_label %}30{% else %}45{% endif %}</b></div>
+        <div class="bar-row"><span>💰 资金确认</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.stock_flow_score or 0 }}%"></div></div><b>{{ analysis.stock_flow_score or '--' }}</b></div>
+        <div class="bar-row"><span>💎 估值</span><div class="bar-track"><div class="bar-fill" style="width:{{ analysis.valuation_score|default(45) }}%"></div></div><b>{{ analysis.valuation_score|default(45) }}</b></div>
       </div>
     </div>
+    <div class="valuation-note"><b>估值说明：</b>{{ analysis.valuation_explain|default('暂无可靠估值说明') }}。这里只依据当前 PE 区间判断，不冒充行业平均折价。</div>
+    {% if analysis.score_reasons %}
+    <div class="score-reasons">
+      {% for item in analysis.score_reasons %}
+      <div class="score-reason {{ item.type }}"><span>{% if item.type == 'positive' %}✓{% elif item.type == 'negative' %}✕{% else %}△{% endif %}</span><span>{{ item.text }}</span><span class="pts">{{ item.points }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </section>
 
   <section class="card">
@@ -107,6 +128,13 @@
       <div class="plan-box"><div class="label">目标1</div><div class="val up">{{ analysis.target1 }}</div></div>
       <div class="plan-box"><div class="label">目标2</div><div class="val up">{{ analysis.target2 }}</div></div>
     </div>
+    {% if analysis.entry_zones %}
+    <div class="entry-zones">
+      <div class="entry-zone low"><div class="zlabel">低吸区</div><div class="zval">{{ analysis.entry_zones.low_absorb }}</div></div>
+      <div class="entry-zone normal"><div class="zlabel">正常买入区</div><div class="zval">{{ analysis.entry_zones.normal }}</div></div>
+      <div class="entry-zone chase"><div class="zlabel">追价区</div><div class="zval">{{ analysis.entry_zones.chase }}</div></div>
+    </div>
+    {% endif %}
     <div class="wide-row"><b>波动区间</b><div><span class="up">70%：${{ analysis.safe_low }} → ${{ analysis.safe_high }}</span><br><span style="color:#8fb3ff">25%：${{ analysis.future_low }} → ${{ analysis.future_high }}</span><br><span class="down">5%：${{ analysis.extreme_low }} → ${{ analysis.extreme_high }}</span></div></div>
     <div class="wide-row"><b>风险等级</b><div style="color:{{ analysis.risk_color }};font-weight:900">{{ analysis.risk }}</div></div>
   </section>

@@ -1756,54 +1756,110 @@ def analyze_ticker(ticker):
         change_pct=change_pct,
     )
 
-    # ===== 综合评分 =====
+    # ===== 综合评分与可解释原因 =====
     final_score = 0
+    score_reasons = []
 
     # 趋势
     if price > ma20:
         final_score += 15
+        score_reasons.append({"type": "positive", "text": "股价站上 MA20", "points": "+15"})
+    else:
+        score_reasons.append({"type": "negative", "text": "股价仍低于 MA20", "points": "+0"})
 
     if price > ma60:
         final_score += 15
+        score_reasons.append({"type": "positive", "text": "股价站上 MA60", "points": "+15"})
+    else:
+        score_reasons.append({"type": "neutral", "text": "股价尚未站上 MA60", "points": "+0"})
 
     # RSI
     if 40 <= rsi <= 65:
         final_score += 15
-
+        score_reasons.append({"type": "positive", "text": f"RSI {rsi:.1f} 位于健康区", "points": "+15"})
     elif rsi > 75:
         final_score -= 10
+        score_reasons.append({"type": "negative", "text": f"RSI {rsi:.1f} 过热", "points": "-10"})
+    else:
+        score_reasons.append({"type": "neutral", "text": f"RSI {rsi:.1f} 动能一般", "points": "+0"})
 
     # BOLL
     if 30 <= boll_pct <= 70:
         final_score += 15
-
+        score_reasons.append({"type": "positive", "text": "价格位于布林带健康区", "points": "+15"})
     elif boll_pct > 85:
         final_score -= 10
+        score_reasons.append({"type": "negative", "text": "价格接近布林带上沿，追高风险增加", "points": "-10"})
+    else:
+        score_reasons.append({"type": "neutral", "text": "布林位置尚未形成明确优势", "points": "+0"})
 
     # 相对强弱
     if relative_strength > 0.8:
         final_score += 15
-
+        score_reasons.append({"type": "positive", "text": f"相对大盘领先 {relative_strength:+.2f}%", "points": "+15"})
     elif relative_strength < -0.8:
         final_score -= 10
+        score_reasons.append({"type": "negative", "text": f"相对大盘落后 {relative_strength:+.2f}%", "points": "-10"})
+    else:
+        score_reasons.append({"type": "neutral", "text": "相对大盘强弱接近", "points": "+0"})
 
     # 盘中确认（只使用可验证的股价/VWAP/同时段量比）
-    if short_options_status["score"] is not None:
-        if short_options_status["score"] >= 70:
+    intraday_confirm_score = short_options_status.get("score")
+    if intraday_confirm_score is not None:
+        if intraday_confirm_score >= 70:
             final_score += 15
-        elif short_options_status["score"] < 35:
+            score_reasons.append({"type": "positive", "text": f"盘中确认较强（{intraday_confirm_score}）", "points": "+15"})
+        elif intraday_confirm_score < 35:
             final_score -= 5
+            score_reasons.append({"type": "negative", "text": f"盘中确认偏弱（{intraday_confirm_score}）", "points": "-5"})
+        else:
+            score_reasons.append({"type": "neutral", "text": f"盘中确认一般（{intraday_confirm_score}）", "points": "+0"})
 
     final_score = max(0, min(100, final_score))
 
+    if final_score >= 85:
+        investment_grade, investment_stars, grade_class = "A 级", 5, "positive"
+    elif final_score >= 75:
+        investment_grade, investment_stars, grade_class = "B+ 级", 4, "positive"
+    elif final_score >= 60:
+        investment_grade, investment_stars, grade_class = "B 级", 3, "neutral"
+    elif final_score >= 45:
+        investment_grade, investment_stars, grade_class = "C 级", 2, "neutral"
+    else:
+        investment_grade, investment_stars, grade_class = "D 级", 1, "negative"
+
     if final_score >= 75:
         final_decision = "🟢 可关注买入"
-
     elif final_score >= 55:
         final_decision = "🟡 观察等回调"
-
     else:
         final_decision = "🔴 暂时观望"
+
+    # 估值说明仅依据当前 PE 区间，不冒充行业平均值
+    pe_value = None
+    try:
+        pe_value = float(str(pe_info.get("pe_text", "")).lower().replace("x", "").strip())
+    except (TypeError, ValueError):
+        pe_value = None
+
+    if pe_value is None:
+        valuation_score = 45
+        valuation_explain = "暂无可靠 PE 数据"
+    elif pe_value < 10:
+        valuation_score = 85
+        valuation_explain = "PE 低于 10x，处于低估值区"
+    elif pe_value < 15:
+        valuation_score = 80
+        valuation_explain = "PE 低于 15x，估值较低"
+    elif pe_value < 30:
+        valuation_score = 60
+        valuation_explain = "PE 位于常见合理区间"
+    elif pe_value < 45:
+        valuation_score = 40
+        valuation_explain = "PE 偏高，需要盈利增长支撑"
+    else:
+        valuation_score = 25
+        valuation_explain = "PE 较高，估值风险偏大"
 
     atr = calc_atr(df)
 
@@ -1979,6 +2035,22 @@ def analyze_ticker(ticker):
     support = max(float(last["BB_LOWER"]), float(last["LOW_20"]), ma60 * 0.98)
     buy_low = min(close * 0.97, ma20 * 0.99)
     buy_high = close * 0.995
+
+    # 买入区细分必须放在 buy_low / buy_high 计算完成之后
+    buy_low = float(buy_low)
+    buy_high = float(buy_high)
+    if buy_high <= buy_low:
+        buy_high = round(buy_low + max(close * 0.01, 0.01), 2)
+
+    buy_range = max(0.01, buy_high - buy_low)
+    low_absorb_high = round(buy_low + buy_range * 0.38, 2)
+    normal_buy_high = round(buy_low + buy_range * 0.72, 2)
+    entry_zones = {
+        "low_absorb": f"${buy_low:.2f} – ${low_absorb_high:.2f}",
+        "normal": f"${low_absorb_high:.2f} – ${normal_buy_high:.2f}",
+        "chase": f"${normal_buy_high:.2f} – ${buy_high:.2f}",
+    }
+
     stop = min(support * 0.98, close * 0.93)
     target1 = close * 1.08
     target2 = close * 1.15
@@ -2149,6 +2221,13 @@ def analyze_ticker(ticker):
         "volume_signal": volume_signal,
         "final_score": final_score,
         "final_decision": final_decision,
+        "investment_grade": investment_grade,
+        "investment_stars": investment_stars,
+        "grade_class": grade_class,
+        "score_reasons": score_reasons,
+        "valuation_score": valuation_score,
+        "valuation_explain": valuation_explain,
+        "entry_zones": entry_zones,
         "technical_score": trend_score,
         "intraday_score": short_options_status.get("score"),
         "stock_flow_score": short_options_status.get("score"),

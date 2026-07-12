@@ -41,8 +41,13 @@
     .score-reasons{display:grid;gap:8px;margin-top:16px}.score-reason{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.035)}.score-reason .pts{font-weight:900}.score-reason.positive .pts{color:var(--green)}.score-reason.negative .pts{color:var(--red)}.score-reason.neutral .pts{color:var(--yellow)}
     .entry-zones{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.entry-zone{background:#081221;border:1px solid #21314a;border-radius:12px;padding:11px}.entry-zone .zlabel{font-size:12px;font-weight:900}.entry-zone .zval{font-size:14px;font-weight:900;margin-top:6px}.entry-zone.low .zlabel,.entry-zone.low .zval{color:var(--green)}.entry-zone.normal .zlabel,.entry-zone.normal .zval{color:#8fb3ff}.entry-zone.chase .zlabel,.entry-zone.chase .zval{color:var(--yellow)}
     .valuation-note{margin-top:12px;padding:10px 12px;border-radius:11px;background:rgba(255,208,90,.07);color:#ffe29a;font-size:13px;line-height:1.5}
+
+    .risk-light{display:flex;align-items:center;justify-content:center;gap:9px;margin:10px auto 0;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.04);font-weight:950;font-size:18px}.risk-light.positive{border:1px solid rgba(67,223,140,.3);background:rgba(67,223,140,.08)}.risk-light.neutral{border:1px solid rgba(255,208,90,.3);background:rgba(255,208,90,.08)}.risk-light.negative{border:1px solid rgba(255,116,123,.3);background:rgba(255,116,123,.08)}
+    .position-panel{margin-top:14px;padding:13px;border-radius:14px;background:#081221;border:1px solid #21314a}.position-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:11px}.position-head b{font-size:16px}.position-track{height:18px;border-radius:999px;background:linear-gradient(90deg,rgba(67,223,140,.95) 0 34%,rgba(77,141,255,.95) 34% 67%,rgba(255,208,90,.95) 67% 84%,rgba(255,116,123,.95) 84% 100%);position:relative;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08)}.position-marker{position:absolute;top:50%;left:calc(var(--position)*1%);transform:translate(-50%,-50%);width:25px;height:25px;border-radius:50%;background:#fff;border:4px solid #07101f;box-shadow:0 0 0 2px #fff,0 4px 12px rgba(0,0,0,.5)}.position-labels{display:grid;grid-template-columns:34fr 33fr 17fr 16fr;margin-top:8px;font-size:10px;text-align:center;color:var(--muted)}.position-advice{margin-top:10px;color:#cfe0f6;line-height:1.5;font-size:13px}
+    .market-signal{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:13px 14px;border-radius:14px;margin-bottom:15px}.market-signal.positive{background:rgba(67,223,140,.08);border:1px solid rgba(67,223,140,.25)}.market-signal.neutral{background:rgba(255,208,90,.08);border:1px solid rgba(255,208,90,.25)}.market-signal.negative{background:rgba(255,116,123,.08);border:1px solid rgba(255,116,123,.25)}.market-signal-icon{font-size:32px}.market-signal-title{font-size:19px;font-weight:950}.market-ai-summary{margin-top:6px;color:#d9e7f8;line-height:1.55}
+    .leader-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.leader-card{background:#081221;border:1px solid #21314a;border-radius:12px;padding:11px;text-align:center}.leader-rank{color:var(--yellow);font-weight:950;font-size:12px}.leader-name{font-size:18px;font-weight:950;margin-top:4px}.leader-change{color:var(--green);font-weight:900;margin-top:5px}.leader-rs{color:var(--muted);font-size:11px;margin-top:4px}
     .error{background:#401d26;border:1px solid #7f2634;padding:13px;border-radius:12px;color:#ffd1d6}
-    @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.dashboard-hero{grid-template-columns:1fr}.dashboard-score{margin:auto}.index-detail{grid-template-columns:repeat(2,1fr)}.pro-grid,.breadth-grid{grid-template-columns:repeat(2,1fr)}.index-tech{grid-template-columns:repeat(2,1fr)}.grade-panel{grid-template-columns:1fr}.entry-zones{grid-template-columns:1fr}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
+    @media(max-width:650px){.container{padding:10px}.brand{align-items:center}.account{flex-direction:column;align-items:flex-end;gap:5px}.search{grid-template-columns:1fr}.button-grid{grid-template-columns:1fr}.hero-symbol{font-size:27px}.price{font-size:36px}.change{font-size:17px}.score-grid{grid-template-columns:1fr}.score-circle{margin:auto}.plan-grid{grid-template-columns:repeat(3,1fr)}.metric-grid{grid-template-columns:repeat(2,1fr)}.market-cards{grid-template-columns:1fr}.wide-row{grid-template-columns:1fr}.dashboard-hero{grid-template-columns:1fr}.dashboard-score{margin:auto}.index-detail{grid-template-columns:repeat(2,1fr)}.pro-grid,.breadth-grid{grid-template-columns:repeat(2,1fr)}.index-tech{grid-template-columns:repeat(2,1fr)}.grade-panel{grid-template-columns:1fr}.entry-zones{grid-template-columns:1fr}.leader-grid{grid-template-columns:repeat(2,1fr)}.card{padding:13px}.bar-row{grid-template-columns:80px 1fr 42px}}
   </style>
 </head>
 <body>
@@ -87,6 +92,7 @@
     <div class="price-row"><span class="price" style="color:{{ analysis.change_color }}">{{ analysis.price_fmt }}</span><span class="change" style="color:{{ analysis.change_color }}">{{ analysis.change_val }} / {{ analysis.change_pct }}</span></div>
     {% if analysis.pe_text %}<div class="pe" style="color:{{ analysis.pe_color }}">{{ analysis.pe_text }} ｜ {{ analysis.pe_label }}</div>{% endif %}
     <div class="decision">{{ analysis.final_decision }}</div>
+    <div class="risk-light {{ analysis.stock_risk_class|default('neutral') }}"><span>{{ analysis.stock_risk_light|default('🟡') }}</span><span>{{ analysis.stock_risk_label|default('控制仓位') }}</span></div>
     <div class="hero-meta">{{ analysis.trend_arrow }} {{ analysis.trend_label }}　｜　Volume {{ analysis.volume }}　｜　Avg {{ analysis.vol20 }}</div>
     <div class="open">🔥 开盘预测：{{ analysis.open_signal }}</div>
   </section>
@@ -135,6 +141,12 @@
       <div class="entry-zone chase"><div class="zlabel">追价区</div><div class="zval">{{ analysis.entry_zones.chase }}</div></div>
     </div>
     {% endif %}
+    <div class="position-panel">
+      <div class="position-head"><b>📍 当前价格位置</b><strong class="{{ analysis.price_zone_class|default('neutral') }}">{{ analysis.price_zone_label|default('位置评估中') }}</strong></div>
+      <div class="position-track"><div class="position-marker" style="--position:{{ analysis.price_position_pct|default(50) }}"></div></div>
+      <div class="position-labels"><span>低吸区</span><span>正常区</span><span>追价区</span><span>偏高</span></div>
+      <div class="position-advice">{{ analysis.price_zone_advice|default('请结合大盘、成交量及止损计划判断。') }}</div>
+    </div>
     <div class="wide-row"><b>波动区间</b><div><span class="up">70%：${{ analysis.safe_low }} → ${{ analysis.safe_high }}</span><br><span style="color:#8fb3ff">25%：${{ analysis.future_low }} → ${{ analysis.future_high }}</span><br><span class="down">5%：${{ analysis.extreme_low }} → ${{ analysis.extreme_high }}</span></div></div>
     <div class="wide-row"><b>风险等级</b><div style="color:{{ analysis.risk_color }};font-weight:900">{{ analysis.risk }}</div></div>
   </section>
@@ -182,6 +194,10 @@
   {% if market_dashboard %}
   <section class="card">
     <h2 class="section-title">📊 大盘专业总览</h2>
+    <div class="market-signal {{ market_dashboard.market_light_class|default('neutral') }}">
+      <div class="market-signal-icon">{{ market_dashboard.market_light|default('🟡') }}</div>
+      <div><div class="market-signal-title">{{ market_dashboard.market_light_label|default('控制仓位') }}</div><div class="market-ai-summary"><b>AI 市场结论：</b>{{ market_dashboard.ai_market_summary|default(market_dashboard.strategy) }}</div></div>
+    </div>
     <div class="dashboard-hero">
       <div class="dashboard-score" style="--market-score:{{ market_dashboard.score }}"><div class="dashboard-score-inner"><b>{{ market_dashboard.score }}</b><span>/ 100</span></div></div>
       <div class="dashboard-summary">
@@ -215,6 +231,23 @@
       <div class="breadth-box"><span>强于 SPY</span><b>{{ market_dashboard.breadth.outperform_spy_pct|default('--') }}%</b></div>
     </div>
     <div class="note-box">样本 {{ market_dashboard.breadth.sample_size|default('--') }} 只，结果缓存约15分钟，避免重复扫描拖慢服务器。</div>
+  </section>
+  {% endif %}
+
+  {% if market_dashboard.top_leaders %}
+  <section class="card">
+    <h2 class="section-title">🏆 今日强势股票（股票池抽样）</h2>
+    <div class="leader-grid">
+      {% for item in market_dashboard.top_leaders %}
+      <div class="leader-card">
+        <div class="leader-rank">TOP {{ loop.index }}</div>
+        <div class="leader-name">{{ item.ticker }}</div>
+        <div class="leader-change">{{ '%+.2f'|format(item.change_pct) }}%</div>
+        <div class="leader-rs">相对SPY {{ '%+.2f'|format(item.relative_spy) }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="note-box">排行榜来自本次市场广度抽样，不会额外再次扫描，因此不会增加新的 API 压力。</div>
   </section>
   {% endif %}
   {% endif %}

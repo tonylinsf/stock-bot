@@ -2051,6 +2051,35 @@ def analyze_ticker(ticker):
         "chase": f"${normal_buy_high:.2f} – ${buy_high:.2f}",
     }
 
+    # S级功能：当前价格在交易计划中的位置。仅使用现有价格与买入区，不增加API请求。
+    position_floor = max(0.01, buy_low - max(buy_range * 0.45, close * 0.015))
+    position_ceiling = buy_high + max(buy_range * 0.45, close * 0.015)
+    position_span = max(0.01, position_ceiling - position_floor)
+    price_position_pct = round(max(0, min(100, (close - position_floor) / position_span * 100)), 1)
+
+    if close < buy_low:
+        price_zone_label, price_zone_class = "低于计划买入区", "positive"
+        price_zone_advice = "可观察是否止跌，不要只因便宜立即进场"
+    elif close <= low_absorb_high:
+        price_zone_label, price_zone_class = "低吸区", "positive"
+        price_zone_advice = "位置较好，可结合大盘与盘中确认分批关注"
+    elif close <= normal_buy_high:
+        price_zone_label, price_zone_class = "正常买入区", "neutral"
+        price_zone_advice = "仍在计划区内，适合分批而不是一次买满"
+    elif close <= buy_high:
+        price_zone_label, price_zone_class = "追价区", "neutral"
+        price_zone_advice = "接近买入上沿，等待回踩更稳妥"
+    else:
+        price_zone_label, price_zone_class = "高于计划买入区", "negative"
+        price_zone_advice = "当前偏离计划区，不建议为短线涨幅追价"
+
+    if final_score >= 75 and close <= normal_buy_high:
+        stock_risk_light, stock_risk_label, stock_risk_class = "🟢", "可分批关注", "positive"
+    elif final_score >= 55 and close <= buy_high:
+        stock_risk_light, stock_risk_label, stock_risk_class = "🟡", "控制仓位", "neutral"
+    else:
+        stock_risk_light, stock_risk_label, stock_risk_class = "🔴", "等待更好位置", "negative"
+
     stop = min(support * 0.98, close * 0.93)
     target1 = close * 1.08
     target2 = close * 1.15
@@ -2228,6 +2257,13 @@ def analyze_ticker(ticker):
         "valuation_score": valuation_score,
         "valuation_explain": valuation_explain,
         "entry_zones": entry_zones,
+        "price_position_pct": price_position_pct,
+        "price_zone_label": price_zone_label,
+        "price_zone_class": price_zone_class,
+        "price_zone_advice": price_zone_advice,
+        "stock_risk_light": stock_risk_light,
+        "stock_risk_label": stock_risk_label,
+        "stock_risk_class": stock_risk_class,
         "technical_score": trend_score,
         "intraday_score": short_options_status.get("score"),
         "stock_flow_score": short_options_status.get("score"),
@@ -2666,6 +2702,7 @@ def get_market_breadth_v3(spy_return_1d=0.0):
     except Exception:
         symbols = []
     stats = {"valid": 0, "up": 0, "ma20": 0, "ma60": 0, "ma120": 0, "macd": 0, "rsi50": 0, "outperform": 0}
+    leaders = []
     for ticker in symbols:
         try:
             df = get_history(ticker, days=220, interval="1d")
@@ -2691,6 +2728,14 @@ def get_market_breadth_v3(spy_return_1d=0.0):
             stats["macd"] += float(hist.iloc[-1]) > 0
             stats["rsi50"] += rsi > 50
             stats["outperform"] += ret > spy_return_1d
+            leaders.append({
+                "ticker": ticker,
+                "change_pct": round(ret, 2),
+                "relative_spy": round(ret - spy_return_1d, 2),
+                "rsi": round(rsi, 1),
+                "above_ma20": bool(price > ma20),
+                "macd_positive": bool(float(hist.iloc[-1]) > 0),
+            })
         except Exception as e:
             print(f"⚠️ Breadth failed for {ticker}: {e}")
             continue
@@ -2701,6 +2746,11 @@ def get_market_breadth_v3(spy_return_1d=0.0):
         "up_pct": pct("up"), "above_ma20_pct": pct("ma20"), "above_ma60_pct": pct("ma60"),
         "above_ma120_pct": pct("ma120"), "macd_positive_pct": pct("macd"),
         "rsi_above_50_pct": pct("rsi50"), "outperform_spy_pct": pct("outperform"),
+        "top_leaders": sorted(
+            leaders,
+            key=lambda x: (x.get("relative_spy", 0), x.get("change_pct", 0)),
+            reverse=True,
+        )[:5],
     }
     data["score"] = round(
         data["above_ma20_pct"] * .25 + data["above_ma60_pct"] * .20 + data["above_ma120_pct"] * .15 +
@@ -2869,6 +2919,25 @@ def build_market_dashboard(cards, market_status):
     if weakest:
         style_text += f"；{weakest.get('ticker')}相对落后"
 
+    # S级功能：大盘风险灯与一句话结论，完全复用现有评分。
+    if market_score >= 72 and breadth_score >= 55 and volatility_score >= 60:
+        market_light, market_light_label, market_light_class = "🟢", "可以顺势", "positive"
+    elif market_score >= 50:
+        market_light, market_light_label, market_light_class = "🟡", "控制仓位", "neutral"
+    else:
+        market_light, market_light_label, market_light_class = "🔴", "减少追涨", "negative"
+
+    if breadth_score < 45 and trend_score >= 65:
+        ai_market_summary = "指数趋势偏强，但上涨参与度不足；优先龙头与强于SPY的股票，不宜全面追涨。"
+    elif market_score >= 75:
+        ai_market_summary = "趋势、广度与指数同步较好；可顺势持有，并优先寻找强势回调与突破回踩。"
+    elif market_score >= 60:
+        ai_market_summary = "市场震荡偏多，但确认度尚未全面增强；保持中等仓位，等待成交量配合。"
+    elif market_score >= 45:
+        ai_market_summary = "市场处于结构分化阶段；减少追高，重点观察SPY、QQQ与市场广度是否同步改善。"
+    else:
+        ai_market_summary = "市场偏弱且风险较高；优先防守，等待核心指数重新站稳关键均线。"
+
     reasons = []
     if trend_score >= 65: reasons.append("✓ 日线趋势结构偏强")
     else: reasons.append("△ 日线趋势尚未全面确认")
@@ -2904,6 +2973,11 @@ def build_market_dashboard(cards, market_status):
         "volatility_regime": volatility_regime,
         "breadth": breadth,
         "reasons": reasons,
+        "market_light": market_light,
+        "market_light_label": market_light_label,
+        "market_light_class": market_light_class,
+        "ai_market_summary": ai_market_summary,
+        "top_leaders": breadth.get("top_leaders", []),
     }
 
 def get_market_status():
